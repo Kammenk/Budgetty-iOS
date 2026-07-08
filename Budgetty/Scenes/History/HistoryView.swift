@@ -36,29 +36,87 @@ struct HistoryView: View {
     @State private var showDate = false
     @State private var showPrice = false
     @State private var showCategory = false
+    /// Selected receipt in the iPad-landscape two-pane detail view.
+    @State private var selectedID: PersistentIdentifier?
 
     var body: some View {
+        GeometryReader { geo in
+            // Two-pane master–detail only when there's landscape-width room (iPad landscape / wide
+            // Split View); iPhone and iPad portrait keep the single readable column with push nav.
+            let twoPane = geo.size.width >= 820 && geo.size.width > geo.size.height
+            Group {
+                if twoPane { twoPaneLayout } else { singleColumn }
+            }
+            .sheet(isPresented: $showDate) { DateRangeSheet(range: $dateRange) }
+            .sheet(isPresented: $showPrice) { PriceRangeSheet(lower: $priceLo, upper: $priceHi, bound: priceBound) }
+            .sheet(isPresented: $showCategory) { CategoryFilterSheet(selected: $categoryFilter) }
+        }
+    }
+
+    // MARK: - Single column (iPhone / iPad portrait)
+
+    private var singleColumn: some View {
         NavigationStack {
             VStack(spacing: 0) {
                 header
                     .adaptiveReadableWidth()
                 ScrollView {
-                    Group {
-                        switch mode {
-                        case .receipts: receiptsTab
-                        case .items: itemsTab
-                        case .budgets: budgetsTab
-                        }
-                    }
-                    .adaptiveReadableWidth()
+                    tabContent(selecting: false)
+                        .adaptiveReadableWidth()
                 }
                 .background(Palette.groupedBackground)
             }
             .background(Palette.groupedBackground)
             .navigationTitle("History")
-            .sheet(isPresented: $showDate) { DateRangeSheet(range: $dateRange) }
-            .sheet(isPresented: $showPrice) { PriceRangeSheet(lower: $priceLo, upper: $priceHi, bound: priceBound) }
-            .sheet(isPresented: $showCategory) { CategoryFilterSheet(selected: $categoryFilter) }
+        }
+    }
+
+    // MARK: - Two-pane master–detail (iPad landscape)
+
+    private var twoPaneLayout: some View {
+        HStack(spacing: 0) {
+            VStack(spacing: 0) {
+                header
+                ScrollView { tabContent(selecting: true) }
+                    .background(Palette.groupedBackground)
+            }
+            .frame(width: 390)
+            .background(Palette.groupedBackground)
+
+            Divider()
+
+            Group {
+                if let receipt = selectedReceipt {
+                    NavigationStack { ReceiptDetailView(receipt: receipt) }
+                } else {
+                    detailPlaceholder
+                }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(Palette.groupedBackground)
+        }
+        .onAppear {
+            if selectedID == nil { selectedID = filteredReceipts.first?.persistentModelID }
+        }
+    }
+
+    private var detailPlaceholder: some View {
+        ContentUnavailableView("Select a receipt",
+                               systemImage: "doc.text",
+                               description: Text("Choose a receipt to see its details."))
+    }
+
+    private var selectedReceipt: Receipt? {
+        guard let id = selectedID else { return nil }
+        return receipts.first { $0.persistentModelID == id }
+    }
+
+    @ViewBuilder
+    private func tabContent(selecting: Bool) -> some View {
+        switch mode {
+        case .receipts: receiptsTab(selecting: selecting)
+        case .items: itemsTab(selecting: selecting)
+        case .budgets: budgetsTab
         }
     }
 
@@ -186,7 +244,7 @@ struct HistoryView: View {
 
     // MARK: - Receipts tab
 
-    private var receiptsTab: some View {
+    private func receiptsTab(selecting: Bool) -> some View {
         Group {
             if filteredReceipts.isEmpty {
                 HistoryEmpty(symbol: "receipt", text: hasActiveFilters ? "No matching receipts" : "No receipts yet")
@@ -197,8 +255,7 @@ struct HistoryView: View {
                                       trailing: group.items.reduce(Decimal.zero) { $0 + $1.paidTotal }.formatMoney())
                         card {
                             ForEach(Array(group.items.enumerated()), id: \.element.persistentModelID) { idx, r in
-                                NavigationLink { ReceiptDetailView(receipt: r) } label: { ReceiptRowView(receipt: r) }
-                                    .buttonStyle(.plain)
+                                receiptRow(r, selecting: selecting)
                                 if idx < group.items.count - 1 { Divider().padding(.leading, 64) }
                             }
                         }
@@ -209,11 +266,25 @@ struct HistoryView: View {
         }
     }
 
+    /// A receipt row: pushes detail in single-column mode, or selects the two-pane detail (with a
+    /// tint-wash highlight) in two-pane mode.
+    @ViewBuilder
+    private func receiptRow(_ r: Receipt, selecting: Bool) -> some View {
+        if selecting {
+            Button { selectedID = r.persistentModelID } label: { ReceiptRowView(receipt: r) }
+                .buttonStyle(.plain)
+                .background(selectedID == r.persistentModelID ? Palette.tintSoft : Color.clear)
+        } else {
+            NavigationLink { ReceiptDetailView(receipt: r) } label: { ReceiptRowView(receipt: r) }
+                .buttonStyle(.plain)
+        }
+    }
+
     // MARK: - Items tab
 
     private var allItems: [LineItem] { receipts.flatMap(\.items) }
 
-    private var itemsTab: some View {
+    private func itemsTab(selecting: Bool) -> some View {
         Group {
             if filteredItems.isEmpty {
                 HistoryEmpty(symbol: "list.bullet", text: hasActiveFilters ? "No matching items" : "No items yet")
@@ -224,7 +295,13 @@ struct HistoryView: View {
                                       trailing: group.items.reduce(Decimal.zero) { $0 + $1.lineTotal }.formatMoney())
                         card {
                             ForEach(Array(group.items.enumerated()), id: \.element.persistentModelID) { idx, item in
-                                itemRow(item)
+                                if selecting {
+                                    // Tapping an item opens its parent receipt in the detail pane.
+                                    Button { selectedID = item.receipt?.persistentModelID } label: { itemRow(item) }
+                                        .buttonStyle(.plain)
+                                } else {
+                                    itemRow(item)
+                                }
                                 if idx < group.items.count - 1 { Divider().padding(.leading, 58) }
                             }
                         }
