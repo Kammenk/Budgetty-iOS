@@ -22,6 +22,7 @@ struct BudgetView: View {
     @Query(sort: \Recurring.createdAt) private var recurring: [Recurring]
 
     @State private var period: BudgetPeriod = .monthly
+    @State private var wide = false
 
     // Sheet routing
     private struct RecurringEditor: Identifiable { let id = UUID(); let isIncome: Bool; let existing: Recurring? }
@@ -35,10 +36,15 @@ struct BudgetView: View {
         NavigationStack {
             ScrollView {
                 Group {
-                    if hSize == .regular { regularStack } else { compactStack }
+                    if hSize == .regular {
+                        if wide { wideStack } else { regularStack }
+                    } else {
+                        compactStack
+                    }
                 }
                 .padding(.horizontal, 20).padding(.top, 6).padding(.bottom, 24)
             }
+            .trackWideLandscape($wide)
             .background(Palette.groupedBackground)
             .navigationTitle("Budget")
             .sheet(item: $recurringEditor) { ed in
@@ -76,8 +82,17 @@ struct BudgetView: View {
         }
     }
 
-    /// iPad: income | recurring side by side, wider category grid, capped and centered.
+    /// iPad portrait: income | recurring side by side, 4-column category grid, capped and centered.
     private var regularStack: some View {
+        budgetStack(maxWidth: Dimens.wideContentMaxWidth)
+    }
+
+    /// iPad landscape: same, but a wider cap and a 6-column category grid.
+    private var wideStack: some View {
+        budgetStack(maxWidth: Dimens.landscapeContentMaxWidth)
+    }
+
+    private func budgetStack(maxWidth: CGFloat) -> some View {
         VStack(spacing: 16) {
             periodPicker
             if period == .custom {
@@ -93,7 +108,7 @@ struct BudgetView: View {
                 categorySection
             }
         }
-        .adaptiveReadableWidth(Dimens.wideContentMaxWidth)
+        .adaptiveReadableWidth(maxWidth)
     }
 
     // MARK: - Derived data
@@ -326,7 +341,7 @@ struct BudgetView: View {
     private var categorySection: some View {
         VStack(spacing: 0) {
             sectionHeader("Category Budgets")
-            LazyVGrid(columns: adaptiveGridColumns(compact: 2, regular: 4,
+            LazyVGrid(columns: adaptiveGridColumns(compact: 2, regular: wide ? 6 : 4,
                                                    isRegular: hSize == .regular, spacing: 10),
                       spacing: 10) {
                 ForEach(Categories.groups.filter { $0.name != Categories.other }, id: \.name) { g in

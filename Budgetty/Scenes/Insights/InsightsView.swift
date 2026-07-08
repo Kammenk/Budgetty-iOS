@@ -12,6 +12,7 @@ import SwiftData
 
 struct InsightsView: View {
     @Environment(\.horizontalSizeClass) private var hSize
+    @State private var wide = false
     @Query(sort: \Receipt.createdAt, order: .reverse) private var receipts: [Receipt]
     @Query(sort: \Recurring.createdAt) private var recurring: [Recurring]
 
@@ -26,10 +27,15 @@ struct InsightsView: View {
         NavigationStack {
             ScrollView {
                 Group {
-                    if hSize == .regular { regularStack } else { compactStack }
+                    if hSize == .regular {
+                        if wide { wideStack } else { regularStack }
+                    } else {
+                        compactStack
+                    }
                 }
                 .padding(.horizontal, 20).padding(.bottom, 24)
             }
+            .trackWideLandscape($wide)
             .background(Palette.groupedBackground)
             .navigationTitle("Insights")
             .sheet(item: $categorySel) { CategoryTransactionsSheet(category: $0.name, items: monthItems) }
@@ -62,7 +68,7 @@ struct InsightsView: View {
         }
     }
 
-    /// iPad: two masonry columns of the same cards, capped and centered.
+    /// iPad portrait: two masonry columns of the same cards, capped and centered.
     private var regularStack: some View {
         VStack(spacing: Dimens.regularColumnSpacing) {
             stepper
@@ -81,6 +87,28 @@ struct InsightsView: View {
             }
         }
         .adaptiveReadableWidth(Dimens.wideContentMaxWidth)
+    }
+
+    /// iPad landscape: three masonry columns for the extra width.
+    private var wideStack: some View {
+        VStack(spacing: Dimens.regularColumnSpacing) {
+            stepper
+            if monthReceipts.isEmpty {
+                emptyState
+            } else {
+                ThreeColumns {
+                    trendCard
+                    statGrid
+                } second: {
+                    breakdownCard
+                    topCategoriesCard
+                } third: {
+                    topStoresCard
+                    incomeCards
+                }
+            }
+        }
+        .adaptiveReadableWidth(Dimens.landscapeContentMaxWidth)
     }
 
     // MARK: - Period

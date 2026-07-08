@@ -12,6 +12,7 @@ import SwiftUI
 struct PaywallView: View {
     @Environment(\.dismiss) private var dismiss
     @AppStorage(SettingsKey.premium) private var premium = false
+    @State private var wide = false
 
     private enum Plan { case yearly, monthly }
     @State private var plan: Plan = .yearly
@@ -31,23 +32,42 @@ struct PaywallView: View {
         ScrollView {
             VStack(spacing: 0) {
                 hero
-                VStack(spacing: 20) {
-                    VStack(spacing: 14) { ForEach(features) { featureRow($0) } }
-                    VStack(spacing: 10) {
-                        planCard(.yearly, title: "Yearly", detail: "€2.50 / month",
-                                 price: "€29.99", sub: "billed annually", badge: "BEST VALUE · SAVE 37%")
-                        planCard(.monthly, title: "Monthly", detail: "Billed each month",
-                                 price: "€3.99", sub: nil, badge: nil)
+                Group {
+                    if wide {
+                        // iPad landscape: features on the left, plans on the right.
+                        HStack(alignment: .top, spacing: 28) {
+                            featuresColumn.frame(maxWidth: .infinity)
+                            plansColumn.frame(maxWidth: .infinity)
+                        }
+                    } else {
+                        VStack(spacing: 20) {
+                            featuresColumn
+                            plansColumn
+                        }
                     }
                 }
                 .padding(20)
             }
-            .adaptiveReadableWidth()
+            .adaptiveReadableWidth(wide ? 900 : Dimens.contentMaxWidth)
         }
+        .trackWideLandscape($wide)
         .background(Palette.groupedBackground)
         .navigationTitle("Premium")
         .navigationBarTitleDisplayMode(.inline)
         .safeAreaInset(edge: .bottom) { footer }
+    }
+
+    private var featuresColumn: some View {
+        VStack(spacing: 14) { ForEach(features) { featureRow($0) } }
+    }
+
+    private var plansColumn: some View {
+        VStack(spacing: 10) {
+            planCard(.yearly, title: "Yearly", detail: "€2.50 / month",
+                     price: "€29.99", sub: "billed annually", badge: "BEST VALUE · SAVE 37%")
+            planCard(.monthly, title: "Monthly", detail: "Billed each month",
+                     price: "€3.99", sub: nil, badge: nil)
+        }
     }
 
     private var hero: some View {

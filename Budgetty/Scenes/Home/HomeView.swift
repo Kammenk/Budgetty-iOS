@@ -13,6 +13,7 @@ import SwiftData
 struct HomeView: View {
     @Environment(AuthModel.self) private var auth
     @Environment(\.horizontalSizeClass) private var hSize
+    @State private var wide = false
     @Query(sort: \Receipt.createdAt, order: .reverse) private var receipts: [Receipt]
     @Query private var budgets: [Budget]
 
@@ -36,12 +37,17 @@ struct HomeView: View {
         NavigationStack {
             ScrollView {
                 Group {
-                    if hSize == .regular { regularStack } else { compactStack }
+                    if hSize == .regular {
+                        if wide { wideStack } else { regularStack }
+                    } else {
+                        compactStack
+                    }
                 }
                 .padding(.horizontal, 20)
                 .padding(.top, 6)
                 .padding(.bottom, 24)
             }
+            .trackWideLandscape($wide)
             .background(Palette.groupedBackground)
             .navigationTitle("Budgetty")
             .toolbar {
@@ -63,8 +69,14 @@ struct HomeView: View {
         }
     }
 
-    /// iPad: hero full-width, then budgets | recent receipts side by side, capped and centered.
-    private var regularStack: some View {
+    /// iPad portrait: hero full-width, then budgets | recent receipts side by side, capped/centered.
+    private var regularStack: some View { homeStack(maxWidth: Dimens.wideContentMaxWidth) }
+
+    /// iPad landscape: same arrangement (keeps the receipts list in a half-width column so its rows
+    /// don't stretch), with a wider cap.
+    private var wideStack: some View { homeStack(maxWidth: Dimens.landscapeContentMaxWidth) }
+
+    private func homeStack(maxWidth: CGFloat) -> some View {
         VStack(spacing: Dimens.regularColumnSpacing) {
             heroCard
             if hasBudget {
@@ -77,7 +89,7 @@ struct HomeView: View {
                 recentReceiptsSection
             }
         }
-        .adaptiveReadableWidth(Dimens.wideContentMaxWidth)
+        .adaptiveReadableWidth(maxWidth)
     }
 
     // MARK: - Hero

@@ -24,9 +24,10 @@ enum Dimens {
     static let screenPadding: CGFloat = 16
 
     // iPad (regular width) content sizing
-    static let contentMaxWidth: CGFloat = 720      // readable single column (lists / detail)
-    static let wideContentMaxWidth: CGFloat = 980  // two-column dashboards
-    static let regularColumnSpacing: CGFloat = 16  // gap between iPad columns
+    static let contentMaxWidth: CGFloat = 720           // readable single column (lists / detail)
+    static let wideContentMaxWidth: CGFloat = 980       // two-column dashboards (iPad portrait)
+    static let landscapeContentMaxWidth: CGFloat = 1180 // three-column dashboards (iPad landscape)
+    static let regularColumnSpacing: CGFloat = 16       // gap between iPad columns
 
     // Corners
     static let cornerS: CGFloat = 8

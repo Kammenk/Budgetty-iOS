@@ -32,6 +32,13 @@ extension View {
     func adaptiveReadableWidth(_ maxWidth: CGFloat = Dimens.contentMaxWidth) -> some View {
         modifier(ReadableWidth(maxWidth: maxWidth))
     }
+
+    /// Reports into `flag` whether the container is landscape-wide (>= 1100pt) — approximates iPad
+    /// landscape / wide Split View, which the size classes alone can't tell from iPad portrait.
+    /// Dashboards use this to switch from a two-column to a three-column layout.
+    func trackWideLandscape(_ flag: Binding<Bool>) -> some View {
+        onGeometryChange(for: Bool.self) { $0.size.width >= 1100 } action: { flag.wrappedValue = $0 }
+    }
 }
 
 /// True when the horizontal size class is regular (iPad, or an iPhone in landscape split).
@@ -62,6 +69,22 @@ struct RegularColumns<Left: View, Right: View>: View {
         HStack(alignment: .top, spacing: spacing) {
             VStack(spacing: spacing) { left }.frame(maxWidth: .infinity)
             VStack(spacing: spacing) { right }.frame(maxWidth: .infinity)
+        }
+    }
+}
+
+/// Three top-aligned columns of equal width — the wider iPad-landscape dashboard arrangement.
+struct ThreeColumns<A: View, B: View, C: View>: View {
+    var spacing: CGFloat = Dimens.regularColumnSpacing
+    @ViewBuilder var first: A
+    @ViewBuilder var second: B
+    @ViewBuilder var third: C
+
+    var body: some View {
+        HStack(alignment: .top, spacing: spacing) {
+            VStack(spacing: spacing) { first }.frame(maxWidth: .infinity)
+            VStack(spacing: spacing) { second }.frame(maxWidth: .infinity)
+            VStack(spacing: spacing) { third }.frame(maxWidth: .infinity)
         }
     }
 }
