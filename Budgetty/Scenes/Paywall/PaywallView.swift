@@ -3,19 +3,31 @@
 //  Budgetty
 //
 //  Budgetty Premium paywall from the mockup: violet hero, feature list, Yearly/Monthly plan cards,
-//  and a subscribe CTA. Purchasing is a mock unlock for now — real StoreKit 2 (Product/Transaction)
-//  replaces `subscribe()` later.
+//  and a subscribe CTA. Purchases run through StoreManager (StoreKit 2); prices come from the loaded
+//  products with a static fallback. The hidden 11-tap tester unlock stays as a separate path.
 //
 
 import SwiftUI
+import StoreKit
 
 struct PaywallView: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(StoreManager.self) private var store
     @AppStorage(SettingsKey.premium) private var premium = false
     @State private var wide = false
+    @State private var busy = false
 
     private enum Plan { case yearly, monthly }
     @State private var plan: Plan = .yearly
+
+    private var selectedProduct: Product? {
+        store.product(plan == .yearly ? StoreManager.yearlyID : StoreManager.monthlyID)
+    }
+    /// Real localized price when products loaded; static fallback otherwise (e.g. Simulator with no
+    /// StoreKit configuration).
+    private func price(_ id: String, fallback: String) -> String {
+        store.product(id)?.displayPrice ?? fallback
+    }
 
     private struct Feature: Identifiable {
         let id = UUID(); let symbol: String; let title: String; let subtitle: String
@@ -64,9 +76,10 @@ struct PaywallView: View {
     private var plansColumn: some View {
         VStack(spacing: 10) {
             planCard(.yearly, title: "Yearly", detail: "€2.50 / month",
-                     price: "€29.99", sub: "billed annually", badge: "BEST VALUE · SAVE 37%")
+                     price: price(StoreManager.yearlyID, fallback: "€29.99"),
+                     sub: "billed annually", badge: "BEST VALUE · SAVE 37%")
             planCard(.monthly, title: "Monthly", detail: "Billed each month",
-                     price: "€3.99", sub: nil, badge: nil)
+                     price: price(StoreManager.monthlyID, fallback: "€3.99"), sub: nil, badge: nil)
         }
     }
 
@@ -137,14 +150,18 @@ struct PaywallView: View {
 
     private var footer: some View {
         VStack(spacing: 8) {
-            Button(action: subscribe) {
-                Text(premium ? "You're Premium ✓" : "Subscribe")
-                    .font(.headline).foregroundStyle(.white)
-                    .frame(maxWidth: .infinity).frame(height: 52)
-                    .background(Palette.tint, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+            Button { Task { await subscribe() } } label: {
+                ZStack {
+                    if busy { ProgressView().tint(.white) }
+                    else { Text(premium ? "You're Premium ✓" : "Subscribe").font(.headline) }
+                }
+                .foregroundStyle(.white)
+                .frame(maxWidth: .infinity).frame(height: 52)
+                .background(Palette.tint, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
             }
-            .disabled(premium)
-            Button("Restore purchases") {}.font(.subheadline).foregroundStyle(Palette.tint)
+            .disabled(premium || busy || selectedProduct == nil)
+            Button("Restore purchases") { Task { await store.restore() } }
+                .font(.subheadline).foregroundStyle(Palette.tint)
             Text("No free trial · cancel anytime")
                 .font(.caption2).foregroundStyle(Palette.secondaryLabel)
         }
@@ -152,9 +169,12 @@ struct PaywallView: View {
         .background(.bar)
     }
 
-    private func subscribe() {
-        // TODO: real StoreKit 2 purchase. Mock unlock for now.
-        premium = true
-        dismiss()
+    /// Real StoreKit 2 purchase of the selected plan. Entitlement changes flow back through
+    /// StoreManager, which flips the `premium` flag the rest of the app reads.
+    private func subscribe() async {
+        guard let product = selectedProduct else { return }
+        busy = true
+        defer { busy = false }
+        if (try? await store.purchase(product)) == true { dismiss() }
     }
 }

@@ -10,8 +10,8 @@ import SwiftUI
 
 struct SupportAboutView: View {
     @AppStorage(SettingsKey.premium) private var premium = false
+    @AppStorage(SettingsKey.testerPremium) private var testerUnlocked = false
     @State private var versionTaps = 0
-    @State private var testerUnlocked = false
 
     var body: some View {
         List {

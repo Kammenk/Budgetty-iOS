@@ -15,6 +15,7 @@ struct BudgettyApp: App {
     let container: ModelContainer
 
     @State private var auth: AuthModel
+    @State private var store: StoreManager
 
     @Environment(\.scenePhase) private var scenePhase
     @AppStorage(SettingsKey.appearance) private var appearanceRaw = AppearancePref.system.rawValue
@@ -35,6 +36,7 @@ struct BudgettyApp: App {
     init() {
         FirebaseBootstrap.configure()
         _auth = State(initialValue: AuthModel())
+        _store = State(initialValue: StoreManager())
         do {
             container = try ModelContainer(
                 for: LineItem.self, Receipt.self, Category.self,
@@ -65,6 +67,7 @@ struct BudgettyApp: App {
                 }
             }
             .environment(auth)
+            .environment(store)
             .tint(Palette.tint)
             .preferredColorScheme((AppearancePref(rawValue: appearanceRaw) ?? .system).colorScheme)
             .task { @MainActor in

@@ -15,7 +15,8 @@ enum SettingsKey {
     static let notifications = "pref.notifications"
     static let faceID = "pref.faceID"
     static let analytics = "pref.analytics"
-    static let premium = "pref.premium"
+    static let premium = "pref.premium"           // effective Premium flag (subscription OR tester)
+    static let testerPremium = "pref.testerPremium" // hidden 11-tap tester unlock, kept separate
     static let onboarded = "pref.onboarded"
 }
 
