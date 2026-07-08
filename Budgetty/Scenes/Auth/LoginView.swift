@@ -76,6 +76,7 @@ struct LoginView: View {
                 .font(.subheadline).padding(.top, 24)
             }
             .padding(.horizontal, 20).padding(.bottom, 40)
+            .adaptiveReadableWidth(460)
         }
         .background(Palette.groupedBackground.ignoresSafeArea())
         .alert("Reset password", isPresented: $showReset) {

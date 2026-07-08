@@ -35,6 +35,7 @@ struct ReviewView: View {
                     addItemButton
                 }
                 .padding(16)
+                .adaptiveReadableWidth()
             }
             .background(Palette.groupedBackground)
             .navigationTitle("Review Receipt")
