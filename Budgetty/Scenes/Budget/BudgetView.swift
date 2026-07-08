@@ -1,0 +1,366 @@
+//
+//  BudgetView.swift
+//  Budgetty
+//
+//  Budget tab from the mockup: a Monthly/Weekly period toggle, the overall budget card, Income and
+//  Recurring lists (add/edit), and a per-category budget grid. Single budget period model, mirroring
+//  Android (one Monthly + one Weekly amount).
+//
+
+import SwiftUI
+import SwiftData
+
+private enum BudgetPeriod: String, CaseIterable, Identifiable {
+    case monthly = "Monthly", weekly = "Weekly", custom = "Custom"
+    var id: String { rawValue }
+}
+
+struct BudgetView: View {
+    @Query(sort: \Receipt.createdAt, order: .reverse) private var receipts: [Receipt]
+    @Query private var budgets: [Budget]
+    @Query(sort: \Recurring.createdAt) private var recurring: [Recurring]
+
+    @State private var period: BudgetPeriod = .monthly
+
+    // Sheet routing
+    private struct RecurringEditor: Identifiable { let id = UUID(); let isIncome: Bool; let existing: Recurring? }
+    private struct BudgetEditor: Identifiable { let id: String; let title: String; let key: String; let existing: Budget? }
+    private struct CategoryRoute: Identifiable { let id: String }
+    @State private var recurringEditor: RecurringEditor?
+    @State private var budgetEditor: BudgetEditor?
+    @State private var categoryRoute: CategoryRoute?
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(spacing: 16) {
+                    Picker("Period", selection: $period) {
+                        ForEach(BudgetPeriod.allCases) { Text($0.rawValue).tag($0) }
+                    }
+                    .pickerStyle(.segmented)
+
+                    if period == .custom {
+                        placeholderCard
+                    } else {
+                        overallCard
+                        incomeSection
+                        recurringSection
+                        activeSubBudgetsSection
+                        categorySection
+                    }
+                }
+                .padding(.horizontal, 20).padding(.top, 6).padding(.bottom, 24)
+            }
+            .background(Palette.groupedBackground)
+            .navigationTitle("Budget")
+            .sheet(item: $recurringEditor) { ed in
+                RecurringSheet(isIncome: ed.isIncome, existing: ed.existing)
+            }
+            .sheet(item: $budgetEditor) { ed in
+                BudgetAmountSheet(title: ed.title, budgetKey: ed.key, existing: ed.existing)
+            }
+            .sheet(item: $categoryRoute) { CategoryBudgetSheet(group: $0.id) }
+        }
+    }
+
+    // MARK: - Derived data
+
+    private var isWeekly: Bool { period == .weekly }
+    private var overallKey: String { isWeekly ? Budget.weeklyKey : Budget.monthlyKey }
+    private var overallBudget: Budget? { budgets.first { $0.key == overallKey } }
+
+    private var allItems: [LineItem] { receipts.flatMap(\.items) }
+
+    private var spent: Decimal {
+        let cal = Calendar.current
+        let granularity: Calendar.Component = isWeekly ? .weekOfYear : .month
+        return receipts
+            .filter { cal.isDate($0.createdAt, equalTo: .now, toGranularity: granularity) }
+            .reduce(.zero) { $0 + $1.paidTotal }
+    }
+
+    private func categorySpent(_ group: String) -> Decimal {
+        let cal = Calendar.current
+        return allItems
+            .filter { cal.isDate($0.createdAt, equalTo: .now, toGranularity: .month) }
+            .filter { Categories.groupOf($0.category).caseInsensitiveCompare(group) == .orderedSame
+                || $0.category.caseInsensitiveCompare(group) == .orderedSame }
+            .reduce(.zero) { $0 + $1.lineTotal }
+    }
+
+    private var income: [Recurring] { recurring.filter(\.isIncome) }
+    private var bills: [Recurring] { recurring.filter { !$0.isIncome } }
+
+    // MARK: - Overall card
+
+    private var overallCard: some View {
+        Button {
+            budgetEditor = BudgetEditor(id: overallKey, title: "\(period.rawValue) Budget",
+                                        key: overallKey, existing: overallBudget)
+        } label: {
+            VStack(alignment: .leading, spacing: 0) {
+                Text("\(period.rawValue) budget")
+                    .font(.subheadline).foregroundStyle(Palette.secondaryLabel)
+                    .padding(.bottom, 8)
+                if let b = overallBudget {
+                    let frac = HomeView.fraction(spent, of: b.amount)
+                    let color: Color = frac >= 1 ? Palette.bad : (frac >= 0.85 ? Palette.warn : Palette.good)
+                    HStack(alignment: .firstTextBaseline, spacing: 6) {
+                        Text(b.amount.formatMoney())
+                            .font(.system(size: 40, weight: .bold)).foregroundStyle(Palette.label)
+                        Text(isWeekly ? "/ week" : "/ month")
+                            .font(.subheadline).foregroundStyle(Palette.secondaryLabel)
+                    }
+                    .padding(.bottom, 14)
+                    ProgressBarView(fraction: frac, color: color, height: 8)
+                    HStack {
+                        Text("\(spent.formatMoney()) spent · \(Int(frac * 100))%")
+                        Spacer()
+                        Text("\((b.amount - spent).formatMoney()) remaining").fontWeight(.semibold)
+                            .foregroundStyle(color)
+                    }
+                    .font(.footnote).foregroundStyle(Palette.secondaryLabel)
+                    .padding(.top, 8)
+                } else {
+                    HStack(spacing: 6) {
+                        Image(systemName: "plus.circle.fill")
+                        Text("Set a \(period.rawValue.lowercased()) budget")
+                    }
+                    .font(.headline).foregroundStyle(Palette.tint)
+                    .padding(.vertical, 6)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(18)
+            .background(Palette.card, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        }
+        .buttonStyle(.plain)
+    }
+
+    // MARK: - Income
+
+    private var incomeSection: some View {
+        VStack(spacing: 0) {
+            sectionHeader("Income")
+            VStack(spacing: 0) {
+                ForEach(income) { r in
+                    moneyRow(r)
+                    Divider().padding(.leading, 60)
+                }
+                addRow("Add income source") {
+                    recurringEditor = RecurringEditor(isIncome: true, existing: nil)
+                }
+            }
+            .background(Palette.card, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        }
+    }
+
+    private var recurringSection: some View {
+        VStack(spacing: 0) {
+            sectionHeader("Recurring")
+            VStack(spacing: 0) {
+                ForEach(bills) { r in
+                    moneyRow(r)
+                    Divider().padding(.leading, 60)
+                }
+                addRow("Add recurring payment") {
+                    recurringEditor = RecurringEditor(isIncome: false, existing: nil)
+                }
+            }
+            .background(Palette.card, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        }
+    }
+
+    private func moneyRow(_ r: Recurring) -> some View {
+        Button {
+            recurringEditor = RecurringEditor(isIncome: r.isIncome, existing: r)
+        } label: {
+            HStack(spacing: 12) {
+                iconTile(for: r)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(r.label).font(.body).foregroundStyle(Palette.label)
+                    Text(Self.cadenceSubtitle(r)).font(.caption).foregroundStyle(Palette.secondaryLabel)
+                }
+                Spacer(minLength: 8)
+                Text("\(r.isIncome ? "+" : "−")\(r.amount.formatMoney())")
+                    .font(.body).fontWeight(.semibold)
+                    .foregroundStyle(r.isIncome ? Palette.good : Palette.bad)
+                Image(systemName: "chevron.right").font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(Palette.tertiaryLabel)
+            }
+            .padding(.horizontal, 16).padding(.vertical, 12)
+        }
+        .buttonStyle(.plain)
+    }
+
+    @ViewBuilder
+    private func iconTile(for r: Recurring) -> some View {
+        if r.isIncome {
+            RoundedRectangle(cornerRadius: 8, style: .continuous).fill(Palette.good)
+                .frame(width: 32, height: 32)
+                .overlay(Image(systemName: "dollarsign").font(.system(size: 15, weight: .bold)).foregroundStyle(.white))
+        } else {
+            CategoryTile(category: r.category.isEmpty ? Categories.defaultName : r.category, size: 32)
+        }
+    }
+
+    private func addRow(_ title: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: 12) {
+                RoundedRectangle(cornerRadius: 8, style: .continuous).fill(Palette.fill)
+                    .frame(width: 32, height: 32)
+                    .overlay(Image(systemName: "plus").font(.system(size: 15, weight: .semibold)).foregroundStyle(Palette.tint))
+                Text(title).foregroundStyle(Palette.tint)
+                Spacer()
+            }
+            .padding(.horizontal, 16).padding(.vertical, 12)
+        }
+        .buttonStyle(.plain)
+    }
+
+    // MARK: - Active sub-budgets
+
+    /// Every sub-category (a category that rolls up into a different group) that has a budget set.
+    private var activeSubBudgets: [(sub: String, parent: String, amount: Decimal)] {
+        budgets.compactMap { b -> (sub: String, parent: String, amount: Decimal)? in
+            guard b.key.hasPrefix("CAT:"), b.amount > 0 else { return nil }
+            let name = String(b.key.dropFirst(4))
+            let parent = Categories.groupOf(name)
+            guard parent.caseInsensitiveCompare(name) != .orderedSame else { return nil }
+            return (sub: name, parent: parent, amount: b.amount)
+        }
+        .sorted { $0.parent == $1.parent ? $0.sub < $1.sub : $0.parent < $1.parent }
+    }
+
+    private func subBudgetCount(_ group: String) -> Int {
+        Categories.children(of: group).filter { child in
+            budgets.contains { $0.key == Budget.categoryKey(child.name) && $0.amount > 0 }
+        }.count
+    }
+
+    @ViewBuilder
+    private var activeSubBudgetsSection: some View {
+        let subs = activeSubBudgets
+        if !subs.isEmpty {
+            VStack(spacing: 0) {
+                HStack(spacing: 8) {
+                    Text("Active sub-budgets").font(.caption).fontWeight(.semibold).textCase(.uppercase)
+                        .foregroundStyle(Palette.secondaryLabel).tracking(0.5)
+                    Text("\(subs.count)").font(.caption2).fontWeight(.bold).foregroundStyle(.white)
+                        .padding(.horizontal, 6).padding(.vertical, 1)
+                        .background(Palette.tint, in: Capsule())
+                    Spacer()
+                }
+                .padding(.horizontal, 16).padding(.top, 4).padding(.bottom, 6)
+                VStack(spacing: 0) {
+                    ForEach(Array(subs.enumerated()), id: \.element.sub) { idx, s in
+                        subBudgetRow(s)
+                        if idx < subs.count - 1 { Divider().padding(.leading, 54) }
+                    }
+                }
+                .background(Palette.card, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+            }
+        }
+    }
+
+    private func subBudgetRow(_ s: (sub: String, parent: String, amount: Decimal)) -> some View {
+        let sp = categorySpent(s.sub)
+        let frac = HomeView.fraction(sp, of: s.amount)
+        let color: Color = frac >= 1 ? Palette.bad : (frac >= 0.85 ? Palette.warn : Palette.good)
+        return Button {
+            categoryRoute = CategoryRoute(id: s.parent)
+        } label: {
+            HStack(spacing: 10) {
+                CategoryTile(category: s.sub, size: 28)
+                VStack(alignment: .leading, spacing: 5) {
+                    HStack(spacing: 4) {
+                        Text(s.sub).font(.subheadline).foregroundStyle(Palette.label)
+                        Text("· \(s.parent)").font(.caption).foregroundStyle(Palette.secondaryLabel)
+                        Spacer(minLength: 4)
+                        Text("\(sp.formatMoney()) / \(s.amount.formatMoney())")
+                            .font(.caption).fontWeight(.semibold).foregroundStyle(color)
+                    }
+                    ProgressBarView(fraction: frac, color: color, height: 4)
+                }
+            }
+            .padding(.horizontal, 16).padding(.vertical, 12)
+        }
+        .buttonStyle(.plain)
+    }
+
+    // MARK: - Category budgets
+
+    private var categorySection: some View {
+        VStack(spacing: 0) {
+            sectionHeader("Category Budgets")
+            LazyVGrid(columns: [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)], spacing: 10) {
+                ForEach(Categories.groups.filter { $0.name != Categories.other }, id: \.name) { g in
+                    categoryCard(g.name)
+                }
+            }
+        }
+    }
+
+    private func categoryCard(_ group: String) -> some View {
+        let key = Budget.categoryKey(group)
+        let budget = budgets.first { $0.key == key }
+        let spent = categorySpent(group)
+        let subCount = subBudgetCount(group)
+        return Button {
+            categoryRoute = CategoryRoute(id: group)
+        } label: {
+            VStack(alignment: .leading, spacing: 6) {
+                Text(Categories.emoji(for: group)).font(.system(size: 22))
+                Text(group).font(.subheadline).fontWeight(.semibold).foregroundStyle(Palette.label)
+                    .lineLimit(1)
+                if let b = budget {
+                    let frac = HomeView.fraction(spent, of: b.amount)
+                    let color: Color = frac >= 1 ? Palette.bad : (frac >= 0.85 ? Palette.warn : Palette.good)
+                    Text("\(spent.formatMoney()) / \(b.amount.formatMoney())")
+                        .font(.caption).foregroundStyle(color)
+                    ProgressBarView(fraction: frac, color: Color(argb: Categories.color(for: group)), height: 4)
+                } else {
+                    Text("Set budget").font(.caption).foregroundStyle(Palette.tint)
+                    ProgressBarView(fraction: 0, color: .clear, height: 4)
+                }
+                if subCount > 0 {
+                    Text("\(subCount) sub-budget\(subCount == 1 ? "" : "s")")
+                        .font(.caption2).foregroundStyle(Palette.secondaryLabel)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(14)
+            .background(Palette.card, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        }
+        .buttonStyle(.plain)
+    }
+
+    // MARK: - Bits
+
+    private var placeholderCard: some View {
+        VStack(spacing: 8) {
+            Image(systemName: "calendar.badge.clock").font(.system(size: 32)).foregroundStyle(Palette.tertiaryLabel)
+            Text("Custom periods coming soon").font(.subheadline).foregroundStyle(Palette.secondaryLabel)
+        }
+        .frame(maxWidth: .infinity).padding(.vertical, 50)
+        .background(Palette.card, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+    }
+
+    private func sectionHeader(_ title: String) -> some View {
+        HStack {
+            Text(title).font(.caption).fontWeight(.semibold).textCase(.uppercase)
+                .foregroundStyle(Palette.secondaryLabel).tracking(0.5)
+            Spacer()
+        }
+        .padding(.horizontal, 16).padding(.top, 4).padding(.bottom, 6)
+    }
+
+    static func cadenceSubtitle(_ r: Recurring) -> String {
+        switch r.cadence {
+        case .monthly: "Monthly · \(RecurringSheet.ordinal(r.dueDay))"
+        case .weekly: "Weekly · \(RecurringSheet.weekdayName(r.dueDay))s"
+        case .yearly: "Yearly · \(RecurringSheet.ordinal(r.dueDay))"
+        case .once: "One-time"
+        }
+    }
+}
