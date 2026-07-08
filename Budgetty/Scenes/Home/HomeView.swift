@@ -12,8 +12,13 @@ import SwiftData
 
 struct HomeView: View {
     @Environment(AuthModel.self) private var auth
+    @Environment(\.horizontalSizeClass) private var hSize
     @Query(sort: \Receipt.createdAt, order: .reverse) private var receipts: [Receipt]
     @Query private var budgets: [Budget]
+
+    private var hasBudget: Bool {
+        budget(Budget.monthlyKey) != nil || budget(Budget.weeklyKey) != nil
+    }
 
     private var monthReceipts: [Receipt] {
         let cal = Calendar.current
@@ -30,12 +35,8 @@ struct HomeView: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(spacing: 14) {
-                    heroCard
-                    if budget(Budget.monthlyKey) != nil || budget(Budget.weeklyKey) != nil {
-                        budgetsCard
-                    }
-                    recentReceiptsSection
+                Group {
+                    if hSize == .regular { regularStack } else { compactStack }
                 }
                 .padding(.horizontal, 20)
                 .padding(.top, 6)
@@ -49,6 +50,34 @@ struct HomeView: View {
                 }
             }
         }
+    }
+
+    // MARK: - Layout
+
+    /// iPhone: one column.
+    private var compactStack: some View {
+        VStack(spacing: 14) {
+            heroCard
+            if hasBudget { budgetsCard }
+            recentReceiptsSection
+        }
+    }
+
+    /// iPad: hero full-width, then budgets | recent receipts side by side, capped and centered.
+    private var regularStack: some View {
+        VStack(spacing: Dimens.regularColumnSpacing) {
+            heroCard
+            if hasBudget {
+                RegularColumns {
+                    budgetsCard
+                } right: {
+                    recentReceiptsSection
+                }
+            } else {
+                recentReceiptsSection
+            }
+        }
+        .adaptiveReadableWidth(Dimens.wideContentMaxWidth)
     }
 
     // MARK: - Hero

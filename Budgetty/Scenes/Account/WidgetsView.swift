@@ -33,6 +33,7 @@ struct WidgetsView: View {
                 section("Medium") { recentWidget.frame(height: 150) }
             }
             .padding(20)
+            .adaptiveReadableWidth()
         }
         .background(Palette.groupedBackground)
         .navigationTitle("Widgets")

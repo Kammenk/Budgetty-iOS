@@ -23,6 +23,11 @@ enum Dimens {
     // Screen edges
     static let screenPadding: CGFloat = 16
 
+    // iPad (regular width) content sizing
+    static let contentMaxWidth: CGFloat = 720      // readable single column (lists / detail)
+    static let wideContentMaxWidth: CGFloat = 980  // two-column dashboards
+    static let regularColumnSpacing: CGFloat = 16  // gap between iPad columns
+
     // Corners
     static let cornerS: CGFloat = 8
     static let cornerM: CGFloat = 12

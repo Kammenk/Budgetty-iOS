@@ -11,6 +11,7 @@ import SwiftUI
 import SwiftData
 
 struct InsightsView: View {
+    @Environment(\.horizontalSizeClass) private var hSize
     @Query(sort: \Receipt.createdAt, order: .reverse) private var receipts: [Receipt]
     @Query(sort: \Recurring.createdAt) private var recurring: [Recurring]
 
@@ -24,20 +25,8 @@ struct InsightsView: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(spacing: 14) {
-                    stepper
-                    if monthReceipts.isEmpty {
-                        emptyState
-                    } else {
-                        trendCard
-                        breakdownCard
-                        statGrid
-                        topCategoriesCard
-                        topStoresCard
-                        IncomeInsightsCards(income: recurring.filter(\.isIncome),
-                                            bills: recurring.filter { !$0.isIncome },
-                                            monthSpent: totalSpent)
-                    }
+                Group {
+                    if hSize == .regular { regularStack } else { compactStack }
                 }
                 .padding(.horizontal, 20).padding(.bottom, 24)
             }
@@ -46,6 +35,52 @@ struct InsightsView: View {
             .sheet(item: $categorySel) { CategoryTransactionsSheet(category: $0.name, items: monthItems) }
             .sheet(item: $storeSel) { StoreTransactionsSheet(store: $0.name, receipts: monthReceipts) }
         }
+    }
+
+    // MARK: - Layout
+
+    private var incomeCards: some View {
+        IncomeInsightsCards(income: recurring.filter(\.isIncome),
+                            bills: recurring.filter { !$0.isIncome },
+                            monthSpent: totalSpent)
+    }
+
+    /// iPhone: one column.
+    private var compactStack: some View {
+        VStack(spacing: 14) {
+            stepper
+            if monthReceipts.isEmpty {
+                emptyState
+            } else {
+                trendCard
+                breakdownCard
+                statGrid
+                topCategoriesCard
+                topStoresCard
+                incomeCards
+            }
+        }
+    }
+
+    /// iPad: two masonry columns of the same cards, capped and centered.
+    private var regularStack: some View {
+        VStack(spacing: Dimens.regularColumnSpacing) {
+            stepper
+            if monthReceipts.isEmpty {
+                emptyState
+            } else {
+                RegularColumns {
+                    trendCard
+                    statGrid
+                    topCategoriesCard
+                } right: {
+                    breakdownCard
+                    topStoresCard
+                    incomeCards
+                }
+            }
+        }
+        .adaptiveReadableWidth(Dimens.wideContentMaxWidth)
     }
 
     // MARK: - Period

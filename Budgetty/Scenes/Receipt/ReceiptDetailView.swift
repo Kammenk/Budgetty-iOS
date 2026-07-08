@@ -29,6 +29,7 @@ struct ReceiptDetailView: View {
                 actions
             }
             .padding(.horizontal, 20).padding(.top, 16).padding(.bottom, 40)
+            .adaptiveReadableWidth()
         }
         .background(Palette.groupedBackground)
         .navigationTitle(receipt.store)

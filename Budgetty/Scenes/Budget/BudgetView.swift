@@ -16,6 +16,7 @@ private enum BudgetPeriod: String, CaseIterable, Identifiable {
 }
 
 struct BudgetView: View {
+    @Environment(\.horizontalSizeClass) private var hSize
     @Query(sort: \Receipt.createdAt, order: .reverse) private var receipts: [Receipt]
     @Query private var budgets: [Budget]
     @Query(sort: \Recurring.createdAt) private var recurring: [Recurring]
@@ -33,21 +34,8 @@ struct BudgetView: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(spacing: 16) {
-                    Picker("Period", selection: $period) {
-                        ForEach(BudgetPeriod.allCases) { Text($0.rawValue).tag($0) }
-                    }
-                    .pickerStyle(.segmented)
-
-                    if period == .custom {
-                        placeholderCard
-                    } else {
-                        overallCard
-                        incomeSection
-                        recurringSection
-                        activeSubBudgetsSection
-                        categorySection
-                    }
+                Group {
+                    if hSize == .regular { regularStack } else { compactStack }
                 }
                 .padding(.horizontal, 20).padding(.top, 6).padding(.bottom, 24)
             }
@@ -61,6 +49,51 @@ struct BudgetView: View {
             }
             .sheet(item: $categoryRoute) { CategoryBudgetSheet(group: $0.id) }
         }
+    }
+
+    // MARK: - Layout
+
+    private var periodPicker: some View {
+        Picker("Period", selection: $period) {
+            ForEach(BudgetPeriod.allCases) { Text($0.rawValue).tag($0) }
+        }
+        .pickerStyle(.segmented)
+    }
+
+    /// iPhone: one column.
+    private var compactStack: some View {
+        VStack(spacing: 16) {
+            periodPicker
+            if period == .custom {
+                placeholderCard
+            } else {
+                overallCard
+                incomeSection
+                recurringSection
+                activeSubBudgetsSection
+                categorySection
+            }
+        }
+    }
+
+    /// iPad: income | recurring side by side, wider category grid, capped and centered.
+    private var regularStack: some View {
+        VStack(spacing: 16) {
+            periodPicker
+            if period == .custom {
+                placeholderCard
+            } else {
+                overallCard
+                RegularColumns {
+                    incomeSection
+                } right: {
+                    recurringSection
+                }
+                activeSubBudgetsSection
+                categorySection
+            }
+        }
+        .adaptiveReadableWidth(Dimens.wideContentMaxWidth)
     }
 
     // MARK: - Derived data
@@ -293,7 +326,9 @@ struct BudgetView: View {
     private var categorySection: some View {
         VStack(spacing: 0) {
             sectionHeader("Category Budgets")
-            LazyVGrid(columns: [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)], spacing: 10) {
+            LazyVGrid(columns: adaptiveGridColumns(compact: 2, regular: 4,
+                                                   isRegular: hSize == .regular, spacing: 10),
+                      spacing: 10) {
                 ForEach(Categories.groups.filter { $0.name != Categories.other }, id: \.name) { g in
                     categoryCard(g.name)
                 }

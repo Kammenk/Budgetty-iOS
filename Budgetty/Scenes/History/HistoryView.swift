@@ -41,12 +41,16 @@ struct HistoryView: View {
         NavigationStack {
             VStack(spacing: 0) {
                 header
+                    .adaptiveReadableWidth()
                 ScrollView {
-                    switch mode {
-                    case .receipts: receiptsTab
-                    case .items: itemsTab
-                    case .budgets: budgetsTab
+                    Group {
+                        switch mode {
+                        case .receipts: receiptsTab
+                        case .items: itemsTab
+                        case .budgets: budgetsTab
+                        }
                     }
+                    .adaptiveReadableWidth()
                 }
                 .background(Palette.groupedBackground)
             }

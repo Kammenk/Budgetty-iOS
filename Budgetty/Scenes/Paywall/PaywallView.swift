@@ -42,6 +42,7 @@ struct PaywallView: View {
                 }
                 .padding(20)
             }
+            .adaptiveReadableWidth()
         }
         .background(Palette.groupedBackground)
         .navigationTitle("Premium")
