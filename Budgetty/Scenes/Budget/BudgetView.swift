@@ -11,7 +11,7 @@ import SwiftUI
 import SwiftData
 
 private enum BudgetPeriod: String, CaseIterable, Identifiable {
-    case monthly = "Monthly", weekly = "Weekly", custom = "Custom"
+    case monthly = "Monthly", weekly = "Weekly"
     var id: String { rawValue }
 }
 
@@ -70,15 +70,11 @@ struct BudgetView: View {
     private var compactStack: some View {
         VStack(spacing: 16) {
             periodPicker
-            if period == .custom {
-                placeholderCard
-            } else {
-                overallCard
-                incomeSection
-                recurringSection
-                activeSubBudgetsSection
-                categorySection
-            }
+            overallCard
+            incomeSection
+            recurringSection
+            activeSubBudgetsSection
+            categorySection
         }
     }
 
@@ -95,18 +91,14 @@ struct BudgetView: View {
     private func budgetStack(maxWidth: CGFloat) -> some View {
         VStack(spacing: 16) {
             periodPicker
-            if period == .custom {
-                placeholderCard
-            } else {
-                overallCard
-                RegularColumns {
-                    incomeSection
-                } right: {
-                    recurringSection
-                }
-                activeSubBudgetsSection
-                categorySection
+            overallCard
+            RegularColumns {
+                incomeSection
+            } right: {
+                recurringSection
             }
+            activeSubBudgetsSection
+            categorySection
         }
         .adaptiveReadableWidth(maxWidth)
     }
@@ -386,15 +378,6 @@ struct BudgetView: View {
     }
 
     // MARK: - Bits
-
-    private var placeholderCard: some View {
-        VStack(spacing: 8) {
-            Image(systemName: "calendar.badge.clock").font(.system(size: 32)).foregroundStyle(Palette.tertiaryLabel)
-            Text("Custom periods coming soon").font(.subheadline).foregroundStyle(Palette.secondaryLabel)
-        }
-        .frame(maxWidth: .infinity).padding(.vertical, 50)
-        .background(Palette.card, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-    }
 
     private func sectionHeader(_ title: String) -> some View {
         HStack {

@@ -13,6 +13,9 @@ import SwiftData
 struct InsightsView: View {
     @Environment(\.horizontalSizeClass) private var hSize
     @State private var wide = false
+    @AppStorage(InsightsLayoutStore.orderKey) private var orderRaw = ""
+    @AppStorage(InsightsLayoutStore.hiddenKey) private var hiddenRaw = ""
+    @State private var showCustomize = false
     @Query(sort: \Receipt.createdAt, order: .reverse) private var receipts: [Receipt]
     @Query(sort: \Recurring.createdAt) private var recurring: [Recurring]
 
@@ -38,8 +41,21 @@ struct InsightsView: View {
             .trackWideLandscape($wide)
             .background(Palette.groupedBackground)
             .navigationTitle("Insights")
+            .toolbar {
+                // Customizing the section order/visibility applies to the iPhone layout only.
+                if hSize == .compact {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button { showCustomize = true } label: {
+                            Image(systemName: "slider.horizontal.3")
+                        }
+                    }
+                }
+            }
             .sheet(item: $categorySel) { CategoryTransactionsSheet(category: $0.name, items: monthItems) }
             .sheet(item: $storeSel) { StoreTransactionsSheet(store: $0.name, receipts: monthReceipts) }
+            .sheet(isPresented: $showCustomize) {
+                InsightsCustomizeSheet(orderRaw: $orderRaw, hiddenRaw: $hiddenRaw)
+            }
         }
     }
 
@@ -51,20 +67,32 @@ struct InsightsView: View {
                             monthSpent: totalSpent)
     }
 
-    /// iPhone: one column.
+    /// iPhone: one column, in the user's chosen order with hidden sections removed.
     private var compactStack: some View {
         VStack(spacing: 14) {
             stepper
             if monthReceipts.isEmpty {
                 emptyState
             } else {
-                trendCard
-                breakdownCard
-                statGrid
-                topCategoriesCard
-                topStoresCard
-                incomeCards
+                ForEach(visibleSections) { sectionView($0) }
             }
+        }
+    }
+
+    private var visibleSections: [InsightSection] {
+        let hidden = InsightsLayoutStore.hidden(hiddenRaw)
+        return InsightsLayoutStore.order(orderRaw).filter { !hidden.contains($0) }
+    }
+
+    @ViewBuilder
+    private func sectionView(_ section: InsightSection) -> some View {
+        switch section {
+        case .trend: trendCard
+        case .breakdown: breakdownCard
+        case .stats: statGrid
+        case .topCategories: topCategoriesCard
+        case .topStores: topStoresCard
+        case .income: incomeCards
         }
     }
 
