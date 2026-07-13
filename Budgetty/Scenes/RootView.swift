@@ -2,10 +2,12 @@
 //  RootView.swift
 //  Budgetty
 //
-//  App shell. `TabView` + `.tabViewStyle(.sidebarAdaptable)` — Apple's adaptive tab-app pattern:
-//  iPhone shows the system bottom tab bar; iPad shows the floating top tab bar that expands into a
-//  plain-label sidebar. Scan is a primary action in the tab bar's bottom accessory (not a tab).
-//  Presented as a full-screen cover from anywhere.
+//  App shell. iPhone (compact) draws its own floating glass dock — the mockup's dock is denser,
+//  wider and violet-selected, and the system Liquid Glass tab bar can't be restyled (it ignores
+//  `UITabBarAppearance` — pixel-diff-proven), so a custom bottom chrome is the only way to match.
+//  The Scan pill floats exactly 10pt above the dock (mockup spacing). iPad (regular) keeps the
+//  system `TabView` + `.sidebarAdaptable` — the floating top tab bar matches the iPad mockup —
+//  with Scan in the tab bar's bottom accessory. Scan is presented as a full-screen cover.
 //
 
 import SwiftUI
@@ -46,6 +48,7 @@ struct RootView: View {
     }()
     @State private var showScan = false
     @Environment(\.horizontalSizeClass) private var hSize
+    @Namespace private var dockNS
 
     var body: some View {
         Group {
@@ -69,12 +72,12 @@ struct RootView: View {
 
     // MARK: - Adaptive tab bar
 
-    /// iPhone: bottom tab bar + a floating Scan pill overlaid above it (mockup's standalone CTA).
+    /// iPhone: custom glass dock + the Scan pill floating 10pt above it (mockup bottom chrome).
     /// iPad: floating top tab bar / sidebar; Scan rides the tab-bar bottom accessory.
     @ViewBuilder
     private var mainTabs: some View {
         if hSize == .compact {
-            styledTabView.overlay(alignment: .bottom) { scanFloating }
+            compactShell
         } else {
             styledTabView.tabViewBottomAccessory { scanAccessory }
         }
@@ -99,13 +102,90 @@ struct RootView: View {
         .tabBarMinimizeBehavior(.onScrollDown) // Liquid Glass: chrome recedes as content scrolls up
     }
 
-    /// Floating "Scan receipt" CTA above the iPhone tab bar — a solid rich-violet capsule with a
-    /// glossy top sheen and a violet drop shadow (mockup `--lg-cta` / `--lg-sheen`), not translucent
-    /// glass (which washed the color out).
-    private var scanFloating: some View {
-        Button { showScan = true } label: { scanPill }
-            .buttonStyle(.plain)
-            .padding(.bottom, 76) // float clear above the floating tab bar
+    // MARK: - iPhone custom bottom chrome
+
+    /// All four screens stay alive in a ZStack (so each keeps its scroll position and state, like
+    /// `TabView` would) with only the selected one visible; the glass dock rides a bottom
+    /// safe-area inset so content scrolls under it.
+    private var compactShell: some View {
+        ZStack {
+            tabScreen(.home) { HomeView() }
+            tabScreen(.history) { HistoryView() }
+            tabScreen(.insights) { InsightsView() }
+            tabScreen(.budget) { BudgetView() }
+        }
+        .safeAreaInset(edge: .bottom, spacing: 0) { bottomChrome }
+    }
+
+    private func tabScreen<Content: View>(_ t: AppTab, @ViewBuilder content: () -> Content) -> some View {
+        content()
+            .opacity(tab == t ? 1 : 0)
+            .allowsHitTesting(tab == t)
+            .accessibilityHidden(tab != t)
+    }
+
+    /// The dock, with the Scan pill drawn 10pt above it (mockup spacing). The pill lives in an
+    /// overlay so only the dock's height insets the content — the page scrolls under the pill.
+    private var bottomChrome: some View {
+        glassDock
+            .overlay(alignment: .top) {
+                Button { showScan = true } label: { scanPill }
+                    .buttonStyle(.plain)
+                    .alignmentGuide(.top) { $0[.bottom] + 10 }
+            }
+            .padding(.horizontal, 14)
+    }
+
+    /// The mockup's floating tab dock: a 56pt glass capsule (chrome wash over blur, white-alpha
+    /// rim + top specular, deep drop shadow) holding four equal items; the selected one sits in a
+    /// violet `tint-bg` pill that slides between tabs.
+    private var glassDock: some View {
+        HStack(spacing: 2) {
+            ForEach(AppTab.allCases, id: \.self) { dockItem($0) }
+        }
+        .padding(5)
+        .frame(height: 56)
+        .background(Palette.matPill, in: Capsule())
+        .background(.ultraThinMaterial, in: Capsule())
+        .overlay(Capsule().strokeBorder(Palette.matPillBorder, lineWidth: 0.5))
+        .overlay(Capsule().strokeBorder(
+            LinearGradient(stops: [.init(color: Palette.glassSpecular, location: 0),
+                                   .init(color: .clear, location: 0.35)],
+                           startPoint: .top, endPoint: .bottom),
+            lineWidth: 1))
+        .shadow(color: Palette.dropShadow, radius: 24, y: 16)
+        .shadow(color: Palette.dropShadowSoft, radius: 7, y: 4)
+    }
+
+    private func dockItem(_ t: AppTab) -> some View {
+        let selected = tab == t
+        return Button {
+            withAnimation(.snappy(duration: 0.25)) { tab = t }
+        } label: {
+            VStack(spacing: 3) {
+                Image(systemName: t.symbol).font(.system(size: 18, weight: .medium))
+                Text(t.title).font(.system(size: 10, weight: selected ? .semibold : .medium))
+            }
+            .foregroundStyle(selected ? Palette.tint : Palette.secondaryLabel)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background {
+                if selected {
+                    let pill = RoundedRectangle(cornerRadius: 22, style: .continuous)
+                    pill.fill(Palette.tintSoft)
+                        // mockup: inset 0 1px 1px -.5px white .5, inset 0 0 0 .5px white .12
+                        .overlay(pill.strokeBorder(.white.opacity(0.12), lineWidth: 0.5))
+                        .overlay(pill.strokeBorder(
+                            LinearGradient(stops: [.init(color: .white.opacity(0.5), location: 0),
+                                                   .init(color: .clear, location: 0.3)],
+                                           startPoint: .top, endPoint: .bottom),
+                            lineWidth: 1))
+                        .matchedGeometryEffect(id: "dockSelection", in: dockNS)
+                }
+            }
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(t.title)
+        .accessibilityAddTraits(selected ? [.isSelected] : [])
     }
 
     /// iPad accessory variant — same pill, no floating offset (the accessory positions it).
