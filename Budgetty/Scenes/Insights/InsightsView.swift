@@ -2,9 +2,9 @@
 //  InsightsView.swift
 //  Budgetty
 //
-//  Insights tab from the mockup: a month stepper, a Breakdown donut (spend by category group) with
-//  legend, a stat grid, Top categories bars, and Top stores. All computed from SwiftData for the
-//  selected month.
+//  Insights tab from the mockup: a period stepper (week / month / quarter / half-year / custom
+//  range — Android parity), a Breakdown donut (spend by category group) with legend, a stat grid,
+//  Top categories bars, and Top stores. All computed from SwiftData for the selected period.
 //
 
 import SwiftUI
@@ -19,8 +19,21 @@ struct InsightsView: View {
     @Query(sort: \Receipt.createdAt, order: .reverse) private var receipts: [Receipt]
     @Query(sort: \Recurring.createdAt) private var recurring: [Recurring]
 
-    /// Months back from the current month (0 = this month).
-    @State private var monthOffset = 0
+    /// The window the whole screen is scoped to; the stepper walks it one unit at a time.
+    @State private var period: InsightsPeriod = {
+        #if DEBUG
+        // Lets screenshot tooling exercise the non-default units (the START_TAB pattern).
+        switch ProcessInfo.processInfo.environment["START_PERIOD"] {
+        case "week": return .stepped(unit: .week, offset: 0)
+        case "quarter": return .stepped(unit: .quarter, offset: 0)
+        case "halfYear": return .stepped(unit: .halfYear, offset: 0)
+        default: break
+        }
+        #endif
+        return .stepped(unit: .month, offset: 0)
+    }()
+    @State private var customRange: ClosedRange<Date>?
+    @State private var showCustomSheet = false
 
     private struct Sel: Identifiable { let id = UUID(); let name: String }
     @State private var categorySel: Sel?
@@ -48,10 +61,18 @@ struct InsightsView: View {
             // SAME row, which the system large-title nav bar can't do (toolbar items sit in the small
             // bar above the large title). So draw our own header and hide the bar — the Home pattern.
             .toolbar(.hidden, for: .navigationBar)
-            .sheet(item: $categorySel) { CategoryTransactionsSheet(category: $0.name, items: monthItems) }
-            .sheet(item: $storeSel) { StoreTransactionsSheet(store: $0.name, receipts: monthReceipts) }
+            .sheet(item: $categorySel) { CategoryTransactionsSheet(category: $0.name, items: periodItems) }
+            .sheet(item: $storeSel) { StoreTransactionsSheet(store: $0.name, receipts: periodReceipts) }
             .sheet(isPresented: $showCustomize) {
                 InsightsCustomizeSheet(orderRaw: $orderRaw, hiddenRaw: $hiddenRaw)
+            }
+            .sheet(isPresented: $showCustomSheet) { DateRangeSheet(range: $customRange) }
+            .onChange(of: customRange) { _, range in
+                if let range {
+                    period = .custom(start: range.lowerBound, end: range.upperBound)
+                } else if period.isCustom {
+                    period = .stepped(unit: .month, offset: 0)
+                }
             }
         }
     }
@@ -88,7 +109,7 @@ struct InsightsView: View {
     private var compactStack: some View {
         VStack(spacing: 14) {
             stepper
-            if monthReceipts.isEmpty {
+            if periodReceipts.isEmpty {
                 emptyState
             } else {
                 ForEach(visibleSections) { sectionView($0) }
@@ -117,7 +138,7 @@ struct InsightsView: View {
     private var regularStack: some View {
         VStack(spacing: Dimens.regularColumnSpacing) {
             stepper
-            if monthReceipts.isEmpty {
+            if periodReceipts.isEmpty {
                 emptyState
             } else {
                 RegularColumns {
@@ -138,7 +159,7 @@ struct InsightsView: View {
     private var wideStack: some View {
         VStack(spacing: Dimens.regularColumnSpacing) {
             stepper
-            if monthReceipts.isEmpty {
+            if periodReceipts.isEmpty {
                 emptyState
             } else {
                 ThreeColumns {
@@ -158,21 +179,87 @@ struct InsightsView: View {
 
     // MARK: - Period
 
-    private var selectedMonth: Date {
-        Calendar.current.date(byAdding: .month, value: monthOffset, to: .now) ?? .now
-    }
-
+    /// `‹ [pill] ›` — the Android period stepper: arrows walk a calendar-aligned block one unit at
+    /// a time; the centre pill shows the active unit as an eyebrow over the period value and opens
+    /// a menu to switch the unit or pick a custom range (arrows disable while a custom range is
+    /// active).
     private var stepper: some View {
-        HStack(spacing: 28) {
-            stepButton("chevron.left") { monthOffset -= 1 }
-            Text(Self.monthLabel(selectedMonth))
-                .font(.headline).frame(minWidth: 130)
-            stepButton("chevron.right", disabled: monthOffset >= 0) {
-                if monthOffset < 0 { monthOffset += 1 }
-            }
+        let steppable = !period.isCustom
+        return HStack(spacing: 12) {
+            stepButton("chevron.left", disabled: !steppable || !canStepBackward) { step(-1) }
+            periodMenu
+            stepButton("chevron.right", disabled: !steppable || !canStepForward) { step(1) }
         }
         .frame(maxWidth: .infinity)
         .padding(.top, 8).padding(.bottom, 6)
+    }
+
+    private var periodMenu: some View {
+        Menu {
+            ForEach(PeriodUnit.allCases) { unit in
+                Button {
+                    period = .stepped(unit: unit, offset: 0)
+                    customRange = nil
+                } label: {
+                    if period.steppedUnit == unit {
+                        Label(unit.menuLabel, systemImage: "checkmark")
+                    } else {
+                        Text(unit.menuLabel)
+                    }
+                }
+            }
+            Divider()
+            Button {
+                if case .custom(let s, let e) = period { customRange = s...e }
+                showCustomSheet = true
+            } label: {
+                if period.isCustom {
+                    Label("Custom range…", systemImage: "checkmark")
+                } else {
+                    Label("Custom range…", systemImage: "calendar")
+                }
+            }
+        } label: {
+            HStack(spacing: 10) {
+                VStack(alignment: .leading, spacing: 0) {
+                    HStack(spacing: 4) {
+                        if period.isCustom {
+                            Image(systemName: "calendar").font(.system(size: 9, weight: .semibold))
+                        }
+                        Text(period.isCustom ? "CUSTOM" : (period.steppedUnit?.eyebrow ?? ""))
+                            .font(.system(size: 10, weight: .medium)).kerning(0.8)
+                    }
+                    .foregroundStyle(Palette.secondaryLabel)
+                    Text(period.friendlyLabel)
+                        .font(.headline).foregroundStyle(Palette.label).lineLimit(1)
+                }
+                Image(systemName: "chevron.down")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(Palette.secondaryLabel)
+            }
+            .padding(.horizontal, 16).padding(.vertical, 7)
+            .frame(minWidth: 150)
+            .background(Palette.matControl, in: Capsule())
+            .background(.ultraThinMaterial, in: Capsule())
+            .overlay(Capsule().strokeBorder(Palette.matControlBorder, lineWidth: 0.5))
+        }
+        .accessibilityLabel("Period: \(period.friendlyLabel)")
+    }
+
+    private func step(_ delta: Int) {
+        if case .stepped(let unit, let offset) = period {
+            period = .stepped(unit: unit, offset: offset + delta)
+        }
+    }
+
+    private var canStepForward: Bool {
+        if case .stepped(_, let offset) = period { offset < 0 } else { false }
+    }
+
+    /// Stop stepping back once the window reaches the earliest recorded receipt.
+    private var canStepBackward: Bool {
+        guard let oldest = receipts.last?.createdAt else { return false }
+        return period.interval.start > oldest
     }
 
     private func stepButton(_ symbol: String, disabled: Bool = false, action: @escaping () -> Void) -> some View {
@@ -187,18 +274,18 @@ struct InsightsView: View {
 
     // MARK: - Derived data
 
-    private var monthReceipts: [Receipt] {
-        let cal = Calendar.current
-        return receipts.filter { cal.isDate($0.createdAt, equalTo: selectedMonth, toGranularity: .month) }
+    private var periodReceipts: [Receipt] {
+        let window = period.interval
+        return receipts.filter { window.contains($0.createdAt) }
     }
-    private var monthItems: [LineItem] { monthReceipts.flatMap(\.items) }
-    private var totalSpent: Decimal { monthReceipts.reduce(.zero) { $0 + $1.paidTotal } }
-    private var totalSaved: Decimal { monthReceipts.reduce(.zero) { $0 + $1.discount } }
+    private var periodItems: [LineItem] { periodReceipts.flatMap(\.items) }
+    private var totalSpent: Decimal { periodReceipts.reduce(.zero) { $0 + $1.paidTotal } }
+    private var totalSaved: Decimal { periodReceipts.reduce(.zero) { $0 + $1.discount } }
 
     /// Spend rolled up to top-level groups, descending.
     private var groupSlices: [(name: String, value: Decimal)] {
         var sums: [String: Decimal] = [:]
-        for item in monthItems {
+        for item in periodItems {
             let g = Categories.groupOf(item.category)
             sums[g, default: .zero] += item.lineTotal
         }
@@ -209,20 +296,22 @@ struct InsightsView: View {
 
     // MARK: - Trend
 
-    /// Total spend for each of the last 7 months, oldest → the selected month (last = current).
-    private var monthlyTrend: [(label: String, value: Decimal)] {
-        let cal = Calendar.current
-        return (0..<7).reversed().map { back in
-            let month = cal.date(byAdding: .month, value: -back, to: selectedMonth) ?? selectedMonth
+    /// Total spend for each of the last 7 windows of the selected unit, oldest → the selected
+    /// window (last bar = selected).
+    private var periodTrend: [(label: String, value: Decimal)] {
+        var windows = [period]
+        for _ in 0..<6 { windows.append(windows.last!.previous()) }
+        return windows.reversed().map { p in
+            let window = p.interval
             let total = receipts
-                .filter { cal.isDate($0.createdAt, equalTo: month, toGranularity: .month) }
+                .filter { window.contains($0.createdAt) }
                 .reduce(Decimal.zero) { $0 + $1.paidTotal }
-            return (label: Self.shortMonth(month), value: total)
+            return (label: p.barLabel, value: total)
         }
     }
 
     private var trendCard: some View {
-        let data = monthlyTrend
+        let data = periodTrend
         let maxV = data.map { dbl($0.value) }.max() ?? 1
         return VStack(alignment: .leading, spacing: 12) {
             HStack {
@@ -254,7 +343,7 @@ struct InsightsView: View {
 
     @ViewBuilder
     private var trendDeltaPill: some View {
-        let vals = monthlyTrend.map { dbl($0.value) }
+        let vals = periodTrend.map { dbl($0.value) }
         if vals.count >= 2, let current = vals.last {
             let prev = vals[vals.count - 2]
             if prev > 0 {
@@ -264,7 +353,7 @@ struct InsightsView: View {
                 HStack(spacing: 4) {
                     Image(systemName: down ? "arrow.down" : "arrow.up")
                         .font(.system(size: 10, weight: .bold))
-                    Text("\(pct)% vs last month").font(.caption).fontWeight(.semibold)
+                    Text("\(pct)% \(period.compareNoun)").font(.caption).fontWeight(.semibold)
                 }
                 .foregroundStyle(color)
                 .padding(.horizontal, 9).padding(.vertical, 3)
@@ -276,10 +365,6 @@ struct InsightsView: View {
     private func barHeight(_ value: Double, max: Double) -> CGFloat {
         guard max > 0 else { return 4 }
         return Swift.max(4, CGFloat(value / max) * 84)
-    }
-
-    static func shortMonth(_ date: Date) -> String {
-        let f = DateFormatter(); f.dateFormat = "MMM"; return f.string(from: date)
     }
 
     // MARK: - Breakdown
@@ -296,7 +381,7 @@ struct InsightsView: View {
                     VStack(spacing: 0) {
                         Text("Total").font(.caption2).foregroundStyle(Palette.secondaryLabel)
                         Text(netTotal.formatMoney()).font(.title3).fontWeight(.bold)
-                        Text("this month").font(.caption2).foregroundStyle(Palette.secondaryLabel)
+                        Text(period.contextNoun).font(.caption2).foregroundStyle(Palette.secondaryLabel)
                     }
                 }
                 .frame(maxWidth: .infinity)
@@ -323,15 +408,15 @@ struct InsightsView: View {
     private var statGrid: some View {
         LazyVGrid(columns: [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)], spacing: 10) {
             statTile("Total spent", totalSpent.formatMoney(), color: Palette.label)
-            statTile("Receipts", "\(monthReceipts.count)", color: Palette.label)
+            statTile("Receipts", "\(periodReceipts.count)", color: Palette.label)
             statTile("Avg / receipt", avgPerReceipt.formatMoney(), color: Palette.label)
             statTile("Saved", totalSaved.formatMoney(), color: Palette.good)
         }
     }
 
     private var avgPerReceipt: Decimal {
-        guard !monthReceipts.isEmpty else { return .zero }
-        return totalSpent / Decimal(monthReceipts.count)
+        guard !periodReceipts.isEmpty else { return .zero }
+        return totalSpent / Decimal(periodReceipts.count)
     }
 
     private func statTile(_ title: String, _ value: String, color: Color) -> some View {
@@ -377,7 +462,7 @@ struct InsightsView: View {
 
     private var topStores: [(store: String, value: Decimal)] {
         var sums: [String: Decimal] = [:]
-        for r in monthReceipts { sums[r.store, default: .zero] += r.paidTotal }
+        for r in periodReceipts { sums[r.store, default: .zero] += r.paidTotal }
         return sums.map { (store: $0.key, value: $0.value) }.sorted { $0.value > $1.value }.prefix(5).map { $0 }
     }
 
@@ -412,12 +497,8 @@ struct InsightsView: View {
     private var emptyState: some View {
         VStack(spacing: 8) {
             Image(systemName: "chart.pie").font(.system(size: 34)).foregroundStyle(Palette.tertiaryLabel)
-            Text("Nothing spent this month").font(.subheadline).foregroundStyle(Palette.secondaryLabel)
+            Text("Nothing spent \(period.contextNoun)").font(.subheadline).foregroundStyle(Palette.secondaryLabel)
         }
         .frame(maxWidth: .infinity).padding(.top, 60)
-    }
-
-    static func monthLabel(_ date: Date) -> String {
-        let f = DateFormatter(); f.dateFormat = "MMMM yyyy"; return f.string(from: date)
     }
 }

@@ -171,6 +171,13 @@ enum Palette {
     /// wash re-solved so material + wash lands on the mockup's rendered header color (rgb 22,16,39,
     /// measured off a headless-Chrome render of `iOS History.dc.html`).
     static let matHeader = dynamic(light: 0x66FAF8FF, dark: 0xBF100825)
+    /// `--mat-pill`: the floating tab-dock wash. Light is CSS-exact (rgba(252,250,255,.42)). Dark
+    /// is re-solved the same way as `matHeader` — the mockup dock renders at rgb(22,16,40)
+    /// (headless-Chrome sample of `iOS Insights.dc.html`), the same rendered color as the History
+    /// header, so it reuses that calibrated wash over `.ultraThinMaterial`.
+    static let matPill = dynamic(light: 0x6BFCFAFF, dark: 0xBF100825)
+    /// `--mat-pill-b`: white-alpha rim on the floating dock (light .55 · dark .16).
+    static let matPillBorder = dynamic(light: 0x8CFFFFFF, dark: 0x29FFFFFF)
     /// `--mat-ctrl`: glass control fill (light rgba(255,255,255,.46) · dark rgba(255,255,255,.09)).
     static let matControl = dynamic(light: 0x75FFFFFF, dark: 0x17FFFFFF)
     /// `--mat-ctrl-b`: white-alpha rim on glass controls (light .65 · dark .2).
@@ -208,6 +215,11 @@ enum Palette {
     /// Soft violet-tinted drop shadow that lifts content cards off the canvas (mockup:
     /// `0 10px 28px rgba(25,12,60,.1)`).
     static let cardShadow = Color(argb: 0x1A190C3C)
+
+    /// `--lg-drop`: the floating dock's paired drop shadows
+    /// (light rgba(25,12,60,.28)/(.14) · dark rgba(0,0,0,.55)/(.32)).
+    static let dropShadow = dynamic(light: 0x47190C3C, dark: 0x8C000000)
+    static let dropShadowSoft = dynamic(light: 0x24190C3C, dark: 0x52000000)
 }
 
 // MARK: - Page canvas
