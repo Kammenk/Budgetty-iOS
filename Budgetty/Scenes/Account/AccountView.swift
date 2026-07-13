@@ -2,9 +2,9 @@
 //  AccountView.swift
 //  Budgetty
 //
-//  Account / Settings — an iOS inset-grouped list with colored icon tiles (Settings-app style).
-//  Appearance and Currency are functional and persisted; the rest are faithful rows wired where it
-//  makes sense (toggles persist; Subscription → Paywall).
+//  Account / Settings — Liquid Glass v2 (iOS Account.dc.html): glass section cards over the
+//  ambient canvas, colored icon tiles, inline toggles. Appearance and Currency are functional
+//  and persisted; toggles persist; Subscription → Paywall.
 //
 
 import SwiftUI
@@ -17,6 +17,7 @@ struct AccountView: View {
     @AppStorage(SettingsKey.appearance) private var appearanceRaw = AppearancePref.system.rawValue
     @AppStorage(SettingsKey.currency) private var currency = "EUR"
     @AppStorage(SettingsKey.language) private var language = "system"
+    @AppStorage(SettingsKey.notifications) private var notifications = true
     @AppStorage(SettingsKey.faceID) private var faceID = false
     @AppStorage(SettingsKey.analytics) private var analytics = true
     @AppStorage(SettingsKey.premium) private var premium = false
@@ -35,32 +36,55 @@ struct AccountView: View {
     private var appearance: AppearancePref { AppearancePref(rawValue: appearanceRaw) ?? .system }
 
     var body: some View {
-        List {
-            Section { profileRow }
+        ScrollView {
+            VStack(spacing: 0) {
+                profileCard
+                    .padding(.bottom, 32)
 
-            accountSection
-            dataSection
-            preferencesSection
-            privacySection
+                sectionHeader("Account")
+                accountCard
+                    .padding(.bottom, 24)
 
-            Section {
+                sectionHeader("Preferences")
+                preferencesCard
+                    .padding(.bottom, 24)
+
+                sectionHeader("Privacy & Security")
+                privacyCard
+                    .padding(.bottom, 24)
+
                 NavigationLink { SupportAboutView() } label: {
-                    label("Help & Support", "questionmark.circle.fill", Color(argb: 0xFF8E8E93))
+                    row("Help & Support", "questionmark.circle.fill", Color(argb: 0xFF8E8E93)) { chevron }
                 }
-            }
+                .buttonStyle(.plain)
+                .contentCard(cornerRadius: 14)
+                .padding(.bottom, 24)
 
-            Section {
-                Button("Sign Out") { confirmSignOut = true }
-                    .frame(maxWidth: .infinity).foregroundStyle(Palette.bad)
+                Button { confirmSignOut = true } label: {
+                    Text("Sign Out")
+                        .foregroundStyle(Palette.bad)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 14)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .contentCard(cornerRadius: 14)
+                .padding(.bottom, 12)
+
+                Button("Delete Account") { confirmDelete = true }
+                    .font(.subheadline)
+                    .foregroundStyle(Palette.bad)
+                    .padding(.vertical, 8)
+
+                Text("Budgetty \(Self.appVersion) · Made with ❤️")
+                    .font(.footnote)
+                    .foregroundStyle(Palette.secondaryLabel)
+                    .padding(.top, 8)
             }
-            Section {
-                Button("Delete Account", role: .destructive) { confirmDelete = true }
-                    .frame(maxWidth: .infinity)
-            } footer: {
-                Text("Budgetty 1.0 · Made with ❤️")
-                    .frame(maxWidth: .infinity, alignment: .center).padding(.top, 8)
-            }
+            .padding(.horizontal, 20).padding(.top, 6).padding(.bottom, 40)
+            .adaptiveReadableWidth()
         }
+        .screenCanvas()
         .navigationTitle("Account")
         .confirmationDialog("Sign out of Budgetty?", isPresented: $confirmSignOut, titleVisibility: .visible) {
             Button("Sign Out", role: .destructive) { try? auth.signOut() }
@@ -88,68 +112,116 @@ struct AccountView: View {
         } message: { Text(backupError ?? "") }
     }
 
-    // MARK: - Sections
+    // MARK: - Cards
 
-    private var accountSection: some View {
-        Section("Account") {
+    private var profileCard: some View {
+        HStack(spacing: 14) {
+            AvatarView(initials: auth.initials, size: 56, fontSize: 20)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(auth.email.isEmpty ? "Your account" : auth.email)
+                    .font(.system(size: 19, weight: .semibold))
+                    .foregroundStyle(Palette.label)
+                    .lineLimit(1)
+                Text("Signed in").font(.subheadline).foregroundStyle(Palette.secondaryLabel)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(18)
+        .contentCard(cornerRadius: 16)
+    }
+
+    private var accountCard: some View {
+        VStack(spacing: 0) {
             NavigationLink { PaywallView() } label: {
                 row("Subscription", "star.fill", Color(argb: 0xFFFFD700), icon: Color(argb: 0xFF7A6000)) {
                     Text(premium ? "Premium" : "Free")
-                        .font(.caption).fontWeight(.semibold).foregroundStyle(.white)
-                        .padding(.horizontal, 10).padding(.vertical, 3)
+                        .font(.system(size: 14, weight: .semibold)).foregroundStyle(.white)
+                        .padding(.horizontal, 12).padding(.vertical, 4)
                         .background(Palette.tint, in: Capsule())
+                    chevron
                 }
             }
-            NavigationLink { NotificationsView() } label: { label("Notifications", "bell.fill", Palette.bad) }
+            .buttonStyle(.plain)
+            divider
+            Toggle(isOn: $notifications) { label("Notifications", "bell.fill", Palette.bad) }
+                .tint(Palette.good)
+                .padding(.vertical, 8).padding(.horizontal, 16)
+            divider
             NavigationLink { CurrencyPickerView(selection: $currency) } label: {
                 row("Currency", "eurosign", Palette.good) {
-                    Text("\(currency) (\(CurrencyOption.symbol(currency)))").foregroundStyle(.secondary)
+                    value("\(currency) (\(CurrencyOption.symbol(currency)))")
+                    chevron
                 }
             }
-            NavigationLink { WidgetsView() } label: { label("Widgets", "square.grid.2x2.fill", Color(argb: 0xFF5856D6)) }
-        }
-    }
-
-    private var dataSection: some View {
-        Section {
+            .buttonStyle(.plain)
+            divider
             Button { exportBackup() } label: {
-                label("Export data", "square.and.arrow.up", Color(argb: 0xFF007AFF))
+                row("Export data", "square.and.arrow.up", Color(argb: 0xFF007AFF)) { chevron }
             }
             .buttonStyle(.plain)
+            divider
             Button { showImporter = true } label: {
-                label("Import data", "square.and.arrow.down", Color(argb: 0xFF30B0C7))
+                row("Import data", "square.and.arrow.down", Color(argb: 0xFF30B0C7)) { chevron }
             }
             .buttonStyle(.plain)
-        } header: {
-            Text("Data")
-        } footer: {
-            Text("Export all your receipts, budgets and categories to a file, or restore from one.")
+            divider
+            NavigationLink { WidgetsView() } label: {
+                row("Widgets", "square.grid.2x2.fill", Color(argb: 0xFF5856D6)) { chevron }
+            }
+            .buttonStyle(.plain)
         }
+        .contentCard(cornerRadius: 14)
     }
 
-    private var preferencesSection: some View {
-        Section("Preferences") {
+    private var preferencesCard: some View {
+        VStack(spacing: 0) {
             NavigationLink { appearancePicker } label: {
                 row("Appearance", "moon.fill", Color(argb: 0xFF636366)) {
-                    Text(appearance.label).foregroundStyle(.secondary)
+                    value(appearance.label)
+                    chevron
                 }
             }
-            row("Accent color", "sun.max.fill", Palette.tint) {
-                Text("Violet").font(.subheadline).fontWeight(.semibold).foregroundStyle(Palette.tint)
+            .buttonStyle(.plain)
+            divider
+            if premium {
+                row("Accent color", "sun.max.fill", Palette.tint) {
+                    Text("Violet").font(.subheadline).fontWeight(.semibold).foregroundStyle(Palette.tint)
+                }
+            } else {
+                NavigationLink { PaywallView() } label: {
+                    row("Accent color", "sun.max.fill", Palette.tint) {
+                        Text("Premium")
+                            .font(.system(size: 12, weight: .semibold)).foregroundStyle(.white)
+                            .padding(.horizontal, 9).padding(.vertical, 3)
+                            .background(Palette.tint, in: Capsule())
+                        chevron
+                    }
+                }
+                .buttonStyle(.plain)
             }
+            divider
             NavigationLink { LanguagePickerView(selection: $language) } label: {
                 row("Language", "globe", Color(argb: 0xFF0A84FF)) {
-                    Text(LanguageOption.name(language)).foregroundStyle(.secondary)
+                    value(LanguageOption.name(language))
+                    chevron
                 }
             }
+            .buttonStyle(.plain)
         }
+        .contentCard(cornerRadius: 14)
     }
 
-    private var privacySection: some View {
-        Section("Privacy & Security") {
-            Toggle(isOn: $faceID) { label("Face ID Lock", "lock.fill", Color(argb: 0xFF30B0C7)) }
+    private var privacyCard: some View {
+        VStack(spacing: 0) {
+            Toggle(isOn: $faceID) { label("Face ID", "lock.fill", Color(argb: 0xFF30B0C7)) }
+                .tint(Palette.good)
+                .padding(.vertical, 8).padding(.horizontal, 16)
+            divider
             Toggle(isOn: $analytics) { label("Analytics", "chart.bar.fill", Color(argb: 0xFF5AC8FA)) }
+                .tint(Palette.good)
+                .padding(.vertical, 8).padding(.horizontal, 16)
         }
+        .contentCard(cornerRadius: 14)
     }
 
     // MARK: - Backup / restore
@@ -197,24 +269,38 @@ struct AccountView: View {
         return "Budgetty-backup-\(f.string(from: .now))"
     }
 
-    // MARK: - Rows
+    private static var appVersion: String {
+        Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1.0"
+    }
 
-    private var profileRow: some View {
-        HStack(spacing: 14) {
-            AvatarView(initials: auth.initials, size: 56, fontSize: 20)
-            VStack(alignment: .leading, spacing: 3) {
-                Text(auth.email.isEmpty ? "Your account" : auth.email)
-                    .font(.title3).fontWeight(.semibold).lineLimit(1)
-                Text("Signed in").font(.subheadline).foregroundStyle(.secondary)
-            }
-        }
-        .padding(.vertical, 6)
+    // MARK: - Row building blocks
+
+    private func sectionHeader(_ title: String) -> some View {
+        Text(title)
+            .font(.footnote)
+            .foregroundStyle(Palette.secondaryLabel)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 16).padding(.bottom, 6)
+    }
+
+    private var divider: some View {
+        Rectangle().fill(Palette.separator).frame(height: 0.5)
+    }
+
+    private var chevron: some View {
+        Image(systemName: "chevron.right")
+            .font(.system(size: 14, weight: .semibold))
+            .foregroundStyle(Palette.label.opacity(0.3))
+    }
+
+    private func value(_ text: String) -> some View {
+        Text(text).font(.subheadline).foregroundStyle(Palette.secondaryLabel)
     }
 
     private func label(_ title: String, _ symbol: String, _ tint: Color) -> some View {
         HStack(spacing: 12) {
             SettingsIcon(symbol: symbol, background: tint)
-            Text(title)
+            Text(title).foregroundStyle(Palette.label)
         }
     }
 
@@ -223,10 +309,12 @@ struct AccountView: View {
                                       @ViewBuilder trailing: () -> Trailing) -> some View {
         HStack(spacing: 12) {
             SettingsIcon(symbol: symbol, background: tint, foreground: icon)
-            Text(title)
+            Text(title).foregroundStyle(Palette.label)
             Spacer()
-            trailing()
+            HStack(spacing: 12) { trailing() }
         }
+        .padding(.vertical, 13).padding(.horizontal, 16)
+        .contentShape(Rectangle())
     }
 
     // MARK: - Sub-screens
