@@ -60,10 +60,9 @@ struct BudgetView: View {
     // MARK: - Layout
 
     private var periodPicker: some View {
-        Picker("Period", selection: $period) {
-            ForEach(BudgetPeriod.allCases) { Text($0.rawValue).tag($0) }
+        GlassSegmentedControl(options: Array(BudgetPeriod.allCases), selection: $period) {
+            $0.rawValue
         }
-        .pickerStyle(.segmented)
     }
 
     /// iPhone: one column.

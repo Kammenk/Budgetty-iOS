@@ -126,6 +126,24 @@ enum Palette {
     static let glassFill = dynamic(light: 0x70FFFFFF, dark: 0x6B262138)
     /// `--glass-b`: the white-alpha card rim.
     static let glassBorder = dynamic(light: 0x9EFFFFFF, dark: 0x24FFFFFF)
+    /// The top inner specular highlight glass surfaces catch (mockup `--lg-spec-sm` first inset:
+    /// light white .9 · dark white .45). Fades out a third of the way down the rim.
+    static let glassSpecular = dynamic(light: 0xE6FFFFFF, dark: 0x73FFFFFF)
+
+    // MARK: - Liquid Glass v2 chrome materials (mockup `--mat*` tokens)
+    //
+    // Fixed bars and inline glass controls (search field, chips, segmented pills) are washes of
+    // white-alpha (light) / tinted dark-alpha layered over a blur material, rimmed with white-alpha —
+    // NOT opaque card surfaces. CSS-exact from `iOS History.dc.html`.
+
+    /// `--mat`: fixed header / bar wash (light rgba(250,248,255,.4) · dark rgba(28,24,42,.46)).
+    static let matHeader = dynamic(light: 0x66FAF8FF, dark: 0x751C182A)
+    /// `--mat-ctrl`: glass control fill (light rgba(255,255,255,.46) · dark rgba(255,255,255,.09)).
+    static let matControl = dynamic(light: 0x75FFFFFF, dark: 0x17FFFFFF)
+    /// `--mat-ctrl-b`: white-alpha rim on glass controls (light .65 · dark .2).
+    static let matControlBorder = dynamic(light: 0xA6FFFFFF, dark: 0x33FFFFFF)
+    /// Segmented-control track (mockup `rgba(120,120,128,.15)`, both themes).
+    static let segmentedTrack = Color(argb: 0x26787880)
 
     // MARK: - Text
 
@@ -201,6 +219,11 @@ extension View {
             .background(Palette.glassFill, in: shape)
             .background(.ultraThinMaterial, in: shape)
             .overlay(shape.strokeBorder(Palette.glassBorder, lineWidth: 1))
+            .overlay(shape.strokeBorder(
+                LinearGradient(stops: [.init(color: Palette.glassSpecular, location: 0),
+                                       .init(color: .clear, location: 0.35)],
+                               startPoint: .top, endPoint: .bottom),
+                lineWidth: 1))
             .shadow(color: Palette.cardShadow, radius: 14, y: 10)
     }
 

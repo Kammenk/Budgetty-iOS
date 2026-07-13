@@ -2,8 +2,9 @@
 //  Components.swift
 //  Budgetty
 //
-//  Small shared UI pieces used across screens: the colored store-initial avatar and a thin
-//  rounded progress bar. Kept together so Home/History/Insights render receipts consistently.
+//  Small shared UI pieces used across screens: the colored store-initial avatar, a thin rounded
+//  progress bar, and the glass capsule segmented control. Kept together so screens render them
+//  consistently.
 //
 
 import SwiftUI
@@ -72,5 +73,50 @@ struct ProgressBarView: View {
             }
         }
         .frame(height: height)
+    }
+}
+
+/// The Liquid Glass v2 capsule segmented control: a recessed `segmentedTrack` capsule with the
+/// selected segment floating as a glass pill (`matControl` over blur, soft drop shadow) — the
+/// mockups' pill toggle, which the system `.segmented` picker style can't render.
+struct GlassSegmentedControl<Option: Identifiable & Equatable>: View {
+    let options: [Option]
+    @Binding var selection: Option
+    let title: (Option) -> String
+    @Namespace private var pillNS
+
+    var body: some View {
+        HStack(spacing: 0) {
+            ForEach(options) { option in
+                let selected = option == selection
+                Button {
+                    withAnimation(.snappy(duration: 0.25)) { selection = option }
+                } label: {
+                    Text(title(option))
+                        .font(.footnote)
+                        .fontWeight(selected ? .semibold : .regular)
+                        .foregroundStyle(selected ? Palette.label : Palette.secondaryLabel)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 7)
+                        .background {
+                            if selected {
+                                Capsule()
+                                    .fill(Palette.matControl)
+                                    .background(.ultraThinMaterial, in: Capsule())
+                                    .overlay(Capsule().strokeBorder(
+                                        LinearGradient(stops: [.init(color: Palette.glassSpecular, location: 0),
+                                                               .init(color: .clear, location: 0.5)],
+                                                       startPoint: .top, endPoint: .bottom),
+                                        lineWidth: 1))
+                                    .shadow(color: .black.opacity(0.16), radius: 2.5, y: 1.5)
+                                    .matchedGeometryEffect(id: "pill", in: pillNS)
+                            }
+                        }
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(2.5)
+        .background(Palette.segmentedTrack, in: Capsule())
     }
 }
