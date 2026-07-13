@@ -47,6 +47,8 @@ struct RootView: View {
         return .home
     }()
     @State private var showScan = false
+    @State private var dockHidden = false
+    @State private var lastScrollY: CGFloat?
     @Environment(\.horizontalSizeClass) private var hSize
     @Namespace private var dockNS
 
@@ -115,6 +117,33 @@ struct RootView: View {
             tabScreen(.budget) { BudgetView() }
         }
         .safeAreaInset(edge: .bottom, spacing: 0) { bottomChrome }
+        .environment(\.dockScrollReporter, handleDockScroll)
+        .onChange(of: tab) {
+            lastScrollY = nil // the new tab's offset is unrelated — don't read it as a scroll
+            setDock(hidden: false)
+        }
+    }
+
+    // MARK: Scroll-driven hide (custom-chrome stand-in for tabBarMinimizeBehavior)
+
+    /// Direction detection over the active tab's scroll offset: hide on a downward scroll, reveal
+    /// on an upward one, and always reveal near the top (covers rubber-band overshoot too).
+    private func handleDockScroll(_ y: CGFloat) {
+        defer { lastScrollY = y }
+        guard let last = lastScrollY else { return }
+        let delta = y - last
+        if y <= 8 {
+            setDock(hidden: false)
+        } else if delta > 3 {
+            setDock(hidden: true)
+        } else if delta < -3 {
+            setDock(hidden: false)
+        }
+    }
+
+    private func setDock(hidden: Bool) {
+        guard dockHidden != hidden else { return }
+        withAnimation(.spring(duration: 0.35)) { dockHidden = hidden }
     }
 
     private func tabScreen<Content: View>(_ t: AppTab, @ViewBuilder content: () -> Content) -> some View {
@@ -126,12 +155,17 @@ struct RootView: View {
 
     /// The dock, with the Scan pill drawn 10pt above it (mockup spacing). The pill lives in an
     /// overlay so only the dock's height insets the content — the page scrolls under the pill.
+    /// While scrolling down the dock slides off the bottom edge and the pill drops into its slot
+    /// (the primary action stays reachable, like the system accessory during tab-bar minimize);
+    /// `offset` doesn't reflow layout, so the safe-area inset — and the content under it — hold still.
     private var bottomChrome: some View {
         glassDock
+            .offset(y: dockHidden ? 100 : 0) // 56pt dock + 34pt home area → fully off-screen
             .overlay(alignment: .top) {
                 Button { showScan = true } label: { scanPill }
                     .buttonStyle(.plain)
                     .alignmentGuide(.top) { $0[.bottom] + 10 }
+                    .offset(y: dockHidden ? 66 : 0) // down by dock height + the 10pt gap
             }
             .padding(.horizontal, 14)
     }

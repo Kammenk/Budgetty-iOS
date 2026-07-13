@@ -48,6 +48,7 @@ struct BudgetView: View {
                 }
                 .padding(.horizontal, 20).padding(.top, 6).padding(.bottom, 24)
             }
+            .reportsDockScroll()
             .trackWideLandscape($wide)
             .screenCanvas()
             // The mockup puts the title at the very top of the scroll content (no nav-bar row above
