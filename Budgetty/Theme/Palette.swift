@@ -61,35 +61,57 @@ enum Palette {
         GeometryReader { geo in
             ZStack {
                 groupedBackground
+                let (w, h) = (geo.size.width, geo.size.height)
                 // dark rgba(140,105,230,.2) · light rgba(110,80,190,.16)
                 ambientGlow(dynamic(light: 0x296E50BE, dark: 0x338C69E6),
-                            cx: -0.08, cy: 0.04, rx: 0.52, ry: 0.40, in: geo.size)
+                            x: -0.08 * w, y: 0.04 * h, radiusX: 0.52 * w, radiusY: 0.40 * h)
                 // dark rgba(226,120,88,.12) · light rgba(214,110,80,.11)
                 ambientGlow(dynamic(light: 0x1CD66E50, dark: 0x1FE27858),
-                            cx: 1.10, cy: 0.26, rx: 0.46, ry: 0.36, in: geo.size)
+                            x: 1.10 * w, y: 0.26 * h, radiusX: 0.46 * w, radiusY: 0.36 * h)
                 // dark rgba(72,190,110,.1) · light rgba(70,150,86,.11)
                 ambientGlow(dynamic(light: 0x1C469656, dark: 0x1A48BE6E),
-                            cx: 0.46, cy: 1.10, rx: 0.52, ry: 0.42, in: geo.size)
+                            x: 0.46 * w, y: 1.10 * h, radiusX: 0.52 * w, radiusY: 0.42 * h)
             }
         }
         .ignoresSafeArea()
     }
 
+    /// The slice of ambient glow a fixed glass header re-emits. In the mockup the header's
+    /// `backdrop-filter: blur(26px) saturate(210%)` makes the canvas's top-left violet bloom across
+    /// the panel as a soft gradient; iOS blur materials *desaturate* what they sample, so the glow
+    /// vanishes behind `.ultraThinMaterial`. Instead we re-draw it on top of the wash, with alphas
+    /// pre-scaled to what the mockup's saturation boost + `--mat` wash net out to. Geometry follows
+    /// the canvas glows on the mockup's 390×844 artboard (vertical extents in fixed points because
+    /// the header only shows the glows' top slice).
+    static var headerAmbient: some View {
+        GeometryReader { geo in
+            let w = geo.size.width
+            ZStack {
+                ambientGlow(dynamic(light: 0x1A6E50BE, dark: 0x388C69E6),
+                            x: -0.08 * w, y: 34, radiusX: 0.52 * w, radiusY: 338)
+                ambientGlow(dynamic(light: 0x0FD66E50, dark: 0x12E27858),
+                            x: 1.10 * w, y: 219, radiusX: 0.46 * w, radiusY: 304)
+            }
+        }
+        .clipped()
+        .allowsHitTesting(false)
+    }
+
     /// One elliptical ambient glow: colour at the centre fading to clear at 62% of the radius
-    /// (mirroring the mockup's `transparent 62%` stop). `cx`/`cy` are the centre as fractions of the
-    /// canvas; `rx` is the horizontal radius as a fraction of the width, `ry` vertical of the height.
+    /// (mirroring the mockup's `transparent 62%` stop). Centre and radii are in points within the
+    /// enclosing view's coordinate space.
     private static func ambientGlow(
-        _ color: Color, cx: CGFloat, cy: CGFloat, rx: CGFloat, ry: CGFloat, in size: CGSize
+        _ color: Color, x: CGFloat, y: CGFloat, radiusX rx: CGFloat, radiusY ry: CGFloat
     ) -> some View {
-        let radiusX = max(size.width * rx, 1)
-        let radiusY = max(size.height * ry, 1)
+        let radiusX = max(rx, 1)
+        let radiusY = max(ry, 1)
         return RadialGradient(
             stops: [.init(color: color, location: 0), .init(color: color.opacity(0), location: 0.62)],
             center: .center, startRadius: 0, endRadius: radiusX
         )
         .frame(width: radiusX * 2, height: radiusX * 2)
         .scaleEffect(y: radiusY / radiusX)
-        .position(x: size.width * cx, y: size.height * cy)
+        .position(x: x, y: y)
         .allowsHitTesting(false)
     }
 
@@ -136,8 +158,13 @@ enum Palette {
     // white-alpha (light) / tinted dark-alpha layered over a blur material, rimmed with white-alpha —
     // NOT opaque card surfaces. CSS-exact from `iOS History.dc.html`.
 
-    /// `--mat`: fixed header / bar wash (light rgba(250,248,255,.4) · dark rgba(28,24,42,.46)).
-    static let matHeader = dynamic(light: 0x66FAF8FF, dark: 0x751C182A)
+    /// `--mat`: fixed header / bar wash. Light is CSS-exact (rgba(250,248,255,.4)). Dark is NOT the
+    /// raw `--mat` (rgba(28,24,42,.46)): in the mockup that wash sits on a backdrop the browser has
+    /// blurred *and* boosted to a dark saturated violet (`saturate(210%)` ≈ rgb 19,13,36), whereas
+    /// `.ultraThinMaterial` hands us a bright desaturated gray (≈ rgb 40,40,45). This value is the
+    /// wash re-solved so material + wash lands on the mockup's rendered header color (rgb 22,16,39,
+    /// measured off a headless-Chrome render of `iOS History.dc.html`).
+    static let matHeader = dynamic(light: 0x66FAF8FF, dark: 0xBF100825)
     /// `--mat-ctrl`: glass control fill (light rgba(255,255,255,.46) · dark rgba(255,255,255,.09)).
     static let matControl = dynamic(light: 0x75FFFFFF, dark: 0x17FFFFFF)
     /// `--mat-ctrl-b`: white-alpha rim on glass controls (light .65 · dark .2).

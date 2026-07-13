@@ -80,6 +80,7 @@ struct HistoryView: View {
     private var headerGlass: some View {
         Rectangle().fill(.ultraThinMaterial)
             .overlay(Palette.matHeader)
+            .overlay(Palette.headerAmbient)
             .overlay(alignment: .bottom) {
                 Rectangle().fill(Palette.separatorStrong).frame(height: 0.5)
             }
