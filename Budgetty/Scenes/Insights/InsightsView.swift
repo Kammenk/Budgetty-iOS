@@ -55,6 +55,7 @@ struct InsightsView: View {
                 }
                 .padding(.horizontal, 20).padding(.top, 6).padding(.bottom, 24)
             }
+            .reportsDockScroll()
             .trackWideLandscape($wide)
             .screenCanvas()
             // The mockup puts the title inside the scroll content with the customize control on the

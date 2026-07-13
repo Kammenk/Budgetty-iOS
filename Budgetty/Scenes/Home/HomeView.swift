@@ -51,6 +51,7 @@ struct HomeView: View {
                 .padding(.top, 6)
                 .padding(.bottom, 24)
             }
+            .reportsDockScroll()
             .trackWideLandscape($wide)
             .screenCanvas()
             // The mockup puts the brand title and the avatar on ONE row, which the system large-title
