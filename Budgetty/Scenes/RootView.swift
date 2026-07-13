@@ -45,6 +45,7 @@ struct RootView: View {
         return .home
     }()
     @State private var showScan = false
+    @Environment(\.horizontalSizeClass) private var hSize
 
     var body: some View {
         Group {
@@ -68,8 +69,18 @@ struct RootView: View {
 
     // MARK: - Adaptive tab bar
 
-    /// iPhone: bottom tab bar. iPad: floating top tab bar that expands to a plain-label sidebar.
+    /// iPhone: bottom tab bar + a floating Scan pill overlaid above it (mockup's standalone CTA).
+    /// iPad: floating top tab bar / sidebar; Scan rides the tab-bar bottom accessory.
+    @ViewBuilder
     private var mainTabs: some View {
+        if hSize == .compact {
+            styledTabView.overlay(alignment: .bottom) { scanFloating }
+        } else {
+            styledTabView.tabViewBottomAccessory { scanAccessory }
+        }
+    }
+
+    private var styledTabView: some View {
         TabView(selection: $tab) {
             Tab(AppTab.home.title, systemImage: AppTab.home.symbol, value: AppTab.home) {
                 HomeView()
@@ -85,18 +96,43 @@ struct RootView: View {
             }
         }
         .tabViewStyle(.sidebarAdaptable)
-        .tabViewBottomAccessory { scanAccessory }
+        .tabBarMinimizeBehavior(.onScrollDown) // Liquid Glass: chrome recedes as content scrolls up
     }
 
-    /// The persistent "Scan receipt" action shown above the tab bar (bottom accessory).
+    /// Floating "Scan receipt" CTA above the iPhone tab bar — a solid rich-violet capsule with a
+    /// glossy top sheen and a violet drop shadow (mockup `--lg-cta` / `--lg-sheen`), not translucent
+    /// glass (which washed the color out).
+    private var scanFloating: some View {
+        Button { showScan = true } label: { scanPill }
+            .buttonStyle(.plain)
+            .padding(.bottom, 76) // float clear above the floating tab bar
+    }
+
+    /// iPad accessory variant — same pill, no floating offset (the accessory positions it).
     private var scanAccessory: some View {
-        Button { showScan = true } label: {
-            Label("Scan receipt", systemImage: "camera.fill")
-                .font(.subheadline.weight(.semibold))
+        Button { showScan = true } label: { scanPill }
+            .buttonStyle(.plain)
+    }
+
+    private var scanPill: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "camera.fill")
+            Text("Scan receipt")
         }
-        .buttonStyle(.borderedProminent)
-        .buttonBorderShape(.capsule)
-        .tint(Palette.tint)
+        .font(.subheadline.weight(.semibold))
+        .foregroundStyle(.white)
+        .padding(.horizontal, 26).padding(.vertical, 14)
+        .background(Palette.scanCTA, in: Capsule())
+        .overlay( // glossy top sheen
+            Capsule()
+                .fill(LinearGradient(colors: [.white.opacity(0.45), .white.opacity(0.06), .clear],
+                                     startPoint: .top, endPoint: .bottom))
+                .blendMode(.plusLighter)
+                .allowsHitTesting(false)
+        )
+        .overlay(Capsule().strokeBorder(.white.opacity(0.22), lineWidth: 0.5))
+        .shadow(color: Palette.scanCTA.opacity(0.5), radius: 16, y: 7)
+        .shadow(color: .black.opacity(0.22), radius: 8, y: 3)
     }
 
     #if DEBUG

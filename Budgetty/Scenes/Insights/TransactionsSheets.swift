@@ -102,11 +102,11 @@ private func header<Tile: View>(tile: Tile, title: String, subtitle: String, tot
         Text(total.formatMoney()).font(.title3).fontWeight(.bold)
     }
     .padding(16)
-    .background(Palette.card, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+    .contentCard(cornerRadius: 14)
 }
 
 @ViewBuilder
 private func card<Content: View>(@ViewBuilder _ content: () -> Content) -> some View {
     VStack(spacing: 0) { content() }
-        .background(Palette.card, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .contentCard(cornerRadius: 14)
 }

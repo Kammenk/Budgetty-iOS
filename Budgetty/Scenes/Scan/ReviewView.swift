@@ -93,7 +93,7 @@ struct ReviewView: View {
             }
             .padding(12)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Palette.card, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .inputField(cornerRadius: 12)
 
             VStack(alignment: .leading, spacing: 6) {
                 fieldLabel("Date")
@@ -101,7 +101,7 @@ struct ReviewView: View {
                     .labelsHidden()
             }
             .padding(12)
-            .background(Palette.card, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .inputField(cornerRadius: 12)
         }
     }
 
@@ -196,7 +196,7 @@ private struct ItemCard: View {
                             .foregroundStyle(Palette.secondaryLabel)
                     }
                     .padding(10)
-                    .background(Palette.card, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                    .inputField(cornerRadius: 10)
                 }
                 .buttonStyle(.plain)
 
@@ -207,7 +207,7 @@ private struct ItemCard: View {
                 }
                 .padding(10)
                 .frame(width: 92)
-                .background(Palette.card, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                .inputField(cornerRadius: 10)
             }
         }
         .padding(14)

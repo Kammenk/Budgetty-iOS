@@ -72,7 +72,7 @@ struct ReceiptDetailView: View {
             }
         }
         .padding(16)
-        .background(Palette.card, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .contentCard(cornerRadius: 14)
     }
 
     // MARK: - Items
@@ -86,7 +86,7 @@ struct ReceiptDetailView: View {
                     if idx < items.count - 1 { Divider().padding(.leading, 64) }
                 }
             }
-            .background(Palette.card, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .contentCard(cornerRadius: 14)
         }
     }
 
@@ -137,7 +137,7 @@ struct ReceiptDetailView: View {
                 }
                 .padding(.horizontal, 16).padding(.vertical, 14)
             }
-            .background(Palette.card, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .contentCard(cornerRadius: 14)
         }
     }
 
@@ -162,7 +162,7 @@ struct ReceiptDetailView: View {
                 Text("Delete Receipt").frame(maxWidth: .infinity).padding(.vertical, 14)
             }
         }
-        .background(Palette.card, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .contentCard(cornerRadius: 14)
     }
 
     private func sectionLabel(_ text: String) -> some View {

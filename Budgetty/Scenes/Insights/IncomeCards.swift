@@ -165,6 +165,6 @@ struct IncomeInsightsCards: View {
         }
         .padding(18)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Palette.card, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .contentCard(cornerRadius: 16)
     }
 }

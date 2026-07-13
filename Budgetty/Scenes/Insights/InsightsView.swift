@@ -39,7 +39,7 @@ struct InsightsView: View {
                 .padding(.horizontal, 20).padding(.bottom, 24)
             }
             .trackWideLandscape($wide)
-            .background(Palette.groupedBackground)
+            .screenCanvas()
             .navigationTitle("Insights")
             .toolbar {
                 // Customizing the section order/visibility applies to the iPhone layout only.
@@ -232,7 +232,7 @@ struct InsightsView: View {
         }
         .padding(18)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Palette.card, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .contentCard(cornerRadius: 16)
     }
 
     @ViewBuilder
@@ -298,7 +298,7 @@ struct InsightsView: View {
         }
         .padding(18)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Palette.card, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .contentCard(cornerRadius: 16)
     }
 
     // MARK: - Stat grid
@@ -324,7 +324,7 @@ struct InsightsView: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(14)
-        .background(Palette.card, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .contentCard(cornerRadius: 14)
     }
 
     // MARK: - Top categories
@@ -353,7 +353,7 @@ struct InsightsView: View {
         }
         .padding(18)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Palette.card, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .contentCard(cornerRadius: 16)
     }
 
     // MARK: - Top stores
@@ -387,7 +387,7 @@ struct InsightsView: View {
         }
         .padding(18)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Palette.card, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .contentCard(cornerRadius: 16)
     }
 
     // MARK: - Empty

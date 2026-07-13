@@ -64,9 +64,8 @@ struct HistoryView: View {
                     tabContent(selecting: false)
                         .adaptiveReadableWidth()
                 }
-                .background(Palette.groupedBackground)
             }
-            .background(Palette.groupedBackground)
+            .screenCanvas()
             .navigationTitle("History")
         }
     }
@@ -78,10 +77,8 @@ struct HistoryView: View {
             VStack(spacing: 0) {
                 header
                 ScrollView { tabContent(selecting: true) }
-                    .background(Palette.groupedBackground)
             }
             .frame(width: 390)
-            .background(Palette.groupedBackground)
 
             Divider()
 
@@ -93,8 +90,8 @@ struct HistoryView: View {
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(Palette.groupedBackground)
         }
+        .screenCanvas()
         .onAppear {
             if selectedID == nil { selectedID = filteredReceipts.first?.persistentModelID }
         }
@@ -134,8 +131,9 @@ struct HistoryView: View {
                 }
             }
             .font(.subheadline)
-            .padding(.horizontal, 12).padding(.vertical, 9)
-            .background(Palette.fill, in: RoundedRectangle(cornerRadius: 11, style: .continuous))
+            .padding(.horizontal, 14).padding(.vertical, 10)
+            .background(.ultraThinMaterial, in: Capsule())
+            .overlay(Capsule().strokeBorder(Palette.separatorStrong, lineWidth: 0.5))
 
             Picker("View", selection: $mode) {
                 ForEach(HistoryMode.allCases) { Text($0.rawValue).tag($0) }
@@ -166,7 +164,6 @@ struct HistoryView: View {
             }
         }
         .padding(.horizontal, 20).padding(.bottom, 12).padding(.top, 4)
-        .background(Palette.groupedBackground)
         .overlay(Divider(), alignment: .bottom)
     }
 
@@ -398,7 +395,7 @@ struct HistoryView: View {
 
     private func card<Content: View>(@ViewBuilder _ content: () -> Content) -> some View {
         VStack(spacing: 0) { content() }
-            .background(Palette.card, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .contentCard(cornerRadius: 14)
             .padding(.horizontal, 20)
     }
 
