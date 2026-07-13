@@ -41,7 +41,7 @@ struct CustomCategorySheet: View {
                         TextField("Category name", text: $name)
                             .textInputAutocapitalization(.words)
                             .padding(.horizontal, 16).frame(height: 44)
-                            .background(Palette.card, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                            .inputField(cornerRadius: 12)
                     }
                     field("Emoji") { emojiGrid }
                     field("Color") { colorGrid }
@@ -49,7 +49,7 @@ struct CustomCategorySheet: View {
                     if editing != nil {
                         Button("Delete Category", role: .destructive) { confirmDelete = true }
                             .frame(maxWidth: .infinity).padding(.vertical, 14)
-                            .background(Palette.card, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                            .contentCard(cornerRadius: 14)
                     }
                 }
                 .padding(20)
@@ -96,7 +96,7 @@ struct CustomCategorySheet: View {
             }
         }
         .padding(12)
-        .background(Palette.card, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .contentCard(cornerRadius: 14)
     }
 
     private var colorGrid: some View {
@@ -111,7 +111,7 @@ struct CustomCategorySheet: View {
             }
         }
         .padding(16)
-        .background(Palette.card, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .contentCard(cornerRadius: 14)
     }
 
     private var premiumNote: some View {

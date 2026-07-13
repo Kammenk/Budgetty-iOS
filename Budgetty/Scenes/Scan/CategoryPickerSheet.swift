@@ -94,7 +94,7 @@ struct CategoryPickerSheet: View {
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, 14).padding(.horizontal, 8)
-            .background(Palette.card, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .contentCard(cornerRadius: 14)
             .overlay(
                 RoundedRectangle(cornerRadius: 14)
                     .strokeBorder(name.caseInsensitiveCompare(selection) == .orderedSame ? Palette.tint : .clear, lineWidth: 2)

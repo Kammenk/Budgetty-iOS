@@ -45,7 +45,7 @@ struct BudgetView: View {
                 .padding(.horizontal, 20).padding(.top, 6).padding(.bottom, 24)
             }
             .trackWideLandscape($wide)
-            .background(Palette.groupedBackground)
+            .screenCanvas()
             .navigationTitle("Budget")
             .sheet(item: $recurringEditor) { ed in
                 RecurringSheet(isIncome: ed.isIncome, existing: ed.existing)
@@ -172,7 +172,7 @@ struct BudgetView: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(18)
-            .background(Palette.card, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .contentCard(cornerRadius: 16)
         }
         .buttonStyle(.plain)
     }
@@ -191,7 +191,7 @@ struct BudgetView: View {
                     recurringEditor = RecurringEditor(isIncome: true, existing: nil)
                 }
             }
-            .background(Palette.card, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .contentCard(cornerRadius: 14)
         }
     }
 
@@ -207,7 +207,7 @@ struct BudgetView: View {
                     recurringEditor = RecurringEditor(isIncome: false, existing: nil)
                 }
             }
-            .background(Palette.card, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .contentCard(cornerRadius: 14)
         }
     }
 
@@ -298,7 +298,7 @@ struct BudgetView: View {
                         if idx < subs.count - 1 { Divider().padding(.leading, 54) }
                     }
                 }
-                .background(Palette.card, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                .contentCard(cornerRadius: 14)
             }
         }
     }
@@ -372,7 +372,7 @@ struct BudgetView: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(14)
-            .background(Palette.card, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .contentCard(cornerRadius: 14)
         }
         .buttonStyle(.plain)
     }

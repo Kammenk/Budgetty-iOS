@@ -123,7 +123,7 @@ struct LoginView: View {
             }
             .padding(.horizontal, 16).frame(height: 46)
         }
-        .background(Palette.card, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .inputField(cornerRadius: 12)
     }
 
     private var strengthMeter: some View {

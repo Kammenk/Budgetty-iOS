@@ -36,11 +36,15 @@ struct HomeView: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                Group {
-                    if hSize == .regular {
-                        if wide { wideStack } else { regularStack }
-                    } else {
-                        compactStack
+                VStack(spacing: 0) {
+                    homeHeader
+                        .padding(.bottom, 14)
+                    Group {
+                        if hSize == .regular {
+                            if wide { wideStack } else { regularStack }
+                        } else {
+                            compactStack
+                        }
                     }
                 }
                 .padding(.horizontal, 20)
@@ -48,13 +52,25 @@ struct HomeView: View {
                 .padding(.bottom, 24)
             }
             .trackWideLandscape($wide)
-            .background(Palette.groupedBackground)
-            .navigationTitle("Budgetty")
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    NavigationLink { AccountView() } label: { AvatarView(initials: auth.initials) }
-                }
+            .screenCanvas()
+            // The mockup puts the brand title and the avatar on ONE row, which the system large-title
+            // nav bar can't do (toolbar items sit in the small bar above the large title). So Home
+            // draws its own header row and hides the navigation bar.
+            .toolbar(.hidden, for: .navigationBar)
+        }
+    }
+
+    /// Custom header: the large "Budgetty" brand title with the account avatar trailing on the same
+    /// baseline row, exactly as in the mockup.
+    private var homeHeader: some View {
+        HStack {
+            Text("Budgetty")
+                .font(.largeTitle).fontWeight(.bold)
+            Spacer()
+            NavigationLink { AccountView() } label: {
+                AvatarView(initials: auth.initials, size: 36, fontSize: 14)
             }
+            .buttonStyle(.plain)
         }
     }
 
@@ -145,6 +161,18 @@ struct HomeView: View {
         }
         .padding(20)
         .background(Palette.heroGradient, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        // Mockup: `inset 0 1px 0 rgba(255,255,255,.18)` — the bright top edge that makes the card
+        // read as lit from above (it is NOT part of the gradient). A border stroke fading out
+        // downward follows the corner curve the way the CSS inset shadow does.
+        .overlay(
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .strokeBorder(
+                    LinearGradient(colors: [.white.opacity(0.18), .clear],
+                                   startPoint: .top, endPoint: .bottom),
+                    lineWidth: 1
+                )
+                .allowsHitTesting(false)
+        )
         .shadow(color: Color(argb: 0xFF6650A4).opacity(0.38), radius: 14, y: 8)
     }
 
@@ -165,7 +193,7 @@ struct HomeView: View {
             }
         }
         .padding(.horizontal, 18).padding(.vertical, 16)
-        .background(Palette.card, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .contentCard(cornerRadius: 16)
     }
 
     private var weekSpent: Decimal {
@@ -217,7 +245,7 @@ struct HomeView: View {
                         }
                     }
                 }
-                .background(Palette.card, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                .contentCard(cornerRadius: 14)
             }
         }
     }
@@ -232,7 +260,7 @@ struct HomeView: View {
                 .font(.caption).foregroundStyle(Palette.tertiaryLabel)
         }
         .frame(maxWidth: .infinity).padding(.vertical, 40)
-        .background(Palette.card, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .contentCard(cornerRadius: 14)
     }
 
     // MARK: - Helpers

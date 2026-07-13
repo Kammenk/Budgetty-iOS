@@ -81,24 +81,29 @@ struct ScanFlowView: View {
 
                 Spacer()
 
-                HStack {
-                    // Gallery
-                    Button { showLibrary = true } label: {
-                        Image(systemName: "photo.on.rectangle")
-                            .font(.system(size: 22)).foregroundStyle(.white)
-                            .frame(width: 50, height: 50)
-                            .background(.white.opacity(0.15), in: RoundedRectangle(cornerRadius: 12))
+                // Capture controls float as Liquid Glass over the viewfinder. The container lets the
+                // glass shapes share sampling/lighting and morph together (Tier 3 custom glass).
+                GlassEffectContainer(spacing: 28) {
+                    HStack {
+                        // Gallery
+                        Button { showLibrary = true } label: {
+                            Image(systemName: "photo.on.rectangle")
+                                .font(.system(size: 22)).foregroundStyle(.white)
+                                .frame(width: 50, height: 50)
+                        }
+                        .glassEffect(.regular.interactive(), in: .rect(cornerRadius: 14))
+                        Spacer()
+                        // Shutter — the capture primary; solid white so it reads as the hero control.
+                        Button {
+                            if CameraPicker.isAvailable { showCamera = true } else { showLibrary = true }
+                        } label: {
+                            Circle().strokeBorder(.white, lineWidth: 4).frame(width: 72, height: 72)
+                                .overlay(Circle().fill(.white).frame(width: 56, height: 56))
+                        }
+                        .glassEffect(.regular.interactive(), in: .circle)
+                        Spacer()
+                        Color.clear.frame(width: 50, height: 50) // balance
                     }
-                    Spacer()
-                    // Shutter
-                    Button {
-                        if CameraPicker.isAvailable { showCamera = true } else { showLibrary = true }
-                    } label: {
-                        Circle().strokeBorder(.white, lineWidth: 4).frame(width: 72, height: 72)
-                            .overlay(Circle().fill(.white).frame(width: 56, height: 56))
-                    }
-                    Spacer()
-                    Color.clear.frame(width: 50, height: 50) // balance
                 }
                 .padding(.horizontal, 40).padding(.bottom, 44)
             }
@@ -129,8 +134,8 @@ struct ScanFlowView: View {
         Button(action: action) {
             Image(systemName: symbol).font(.system(size: 14, weight: .semibold)).foregroundStyle(.white)
                 .frame(width: 34, height: 34)
-                .background(.white.opacity(0.2), in: Circle())
         }
+        .glassEffect(.regular.interactive(), in: .circle)
     }
 
     // MARK: - Failure
