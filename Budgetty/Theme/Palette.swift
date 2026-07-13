@@ -144,8 +144,14 @@ enum Palette {
     //   `box-shadow: 0 10px 28px rgba(25,12,60,.1)`
     // The white-alpha border is what makes the card rims read crisp on the dark canvas.
 
-    /// `--glass`: the tinted translucent card fill, layered over a system blur material.
-    static let glassFill = dynamic(light: 0x70FFFFFF, dark: 0x6B262138)
+    /// `--glass`: the tinted translucent card fill, layered over a system blur material. Light is
+    /// CSS-exact (rgba(255,255,255,.44)). Dark is NOT the raw `--glass` (rgba(38,33,56,.42)): in the
+    /// mockup that fill sits on a backdrop blurred to near the dark canvas (#0B0A0F) and renders at
+    /// rgb(22,20,34) (measured off a headless-Chrome render of `iOS Insights.dc.html`), whereas
+    /// `.ultraThinMaterial` hands us a bright desaturated gray (≈ rgb 40,40,45) that left cards ~17
+    /// points/channel too light. This value is the wash re-solved (same method as `matHeader`) so
+    /// material + fill lands on the mockup's rendered card color.
+    static let glassFill = dynamic(light: 0x70FFFFFF, dark: 0xBF100D1E)
     /// `--glass-b`: the white-alpha card rim.
     static let glassBorder = dynamic(light: 0x9EFFFFFF, dark: 0x24FFFFFF)
     /// The top inner specular highlight glass surfaces catch (mockup `--lg-spec-sm` first inset:
