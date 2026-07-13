@@ -58,8 +58,9 @@ struct HistoryView: View {
     private var singleColumn: some View {
         NavigationStack {
             VStack(spacing: 0) {
-                header
+                header(showTitle: true)
                     .adaptiveReadableWidth()
+                    .background { headerGlass }
                 ScrollView {
                     tabContent(selecting: false)
                         .adaptiveReadableWidth()
@@ -67,7 +68,22 @@ struct HistoryView: View {
             }
             .screenCanvas()
             .navigationTitle("History")
+            // The title lives INSIDE the glass header panel (with the search field, segmented
+            // toggle and chips all on one material), which the system large-title bar can't do —
+            // same pattern as Home's custom header row.
+            .toolbar(.hidden, for: .navigationBar)
         }
+    }
+
+    /// The fixed header's Liquid Glass panel: a `matHeader` wash over blur so the canvas's ambient
+    /// glows shimmer through (the mockup's soft violet gradient), closed by a `sep2` hairline.
+    private var headerGlass: some View {
+        Rectangle().fill(.ultraThinMaterial)
+            .overlay(Palette.matHeader)
+            .overlay(alignment: .bottom) {
+                Rectangle().fill(Palette.separatorStrong).frame(height: 0.5)
+            }
+            .ignoresSafeArea(edges: .top)
     }
 
     // MARK: - Two-pane master–detail (iPad landscape)
@@ -75,7 +91,8 @@ struct HistoryView: View {
     private var twoPaneLayout: some View {
         HStack(spacing: 0) {
             VStack(spacing: 0) {
-                header
+                header(showTitle: false)
+                    .overlay(Divider(), alignment: .bottom)
                 ScrollView { tabContent(selecting: true) }
             }
             .frame(width: 390)
@@ -119,8 +136,16 @@ struct HistoryView: View {
 
     // MARK: - Header (search + segmented + chips)
 
-    private var header: some View {
+    private func header(showTitle: Bool) -> some View {
         VStack(spacing: 10) {
+            if showTitle {
+                HStack {
+                    Text("History").font(.largeTitle).fontWeight(.bold)
+                        .foregroundStyle(Palette.label)
+                    Spacer()
+                }
+                .padding(.top, 2)
+            }
             HStack(spacing: 8) {
                 Image(systemName: "magnifyingglass").foregroundStyle(Palette.secondaryLabel)
                 TextField("Search", text: $search).font(.subheadline)
@@ -132,13 +157,14 @@ struct HistoryView: View {
             }
             .font(.subheadline)
             .padding(.horizontal, 14).padding(.vertical, 10)
+            .background(Palette.matControl, in: Capsule())
             .background(.ultraThinMaterial, in: Capsule())
-            .overlay(Capsule().strokeBorder(Palette.separatorStrong, lineWidth: 0.5))
+            .overlay(Capsule().strokeBorder(Palette.matControlBorder, lineWidth: 0.5))
+            .shadow(color: Color(argb: 0x0F140A32), radius: 5, y: 2)
 
-            Picker("View", selection: $mode) {
-                ForEach(HistoryMode.allCases) { Text($0.rawValue).tag($0) }
+            GlassSegmentedControl(options: Array(HistoryMode.allCases), selection: $mode) {
+                $0.rawValue
             }
-            .pickerStyle(.segmented)
 
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 7) {
@@ -164,7 +190,6 @@ struct HistoryView: View {
             }
         }
         .padding(.horizontal, 20).padding(.bottom, 12).padding(.top, 4)
-        .overlay(Divider(), alignment: .bottom)
     }
 
     private func chipLabel(_ title: String, active: Bool, icon: String? = nil, trailing: String? = nil) -> some View {
@@ -177,8 +202,19 @@ struct HistoryView: View {
         .foregroundStyle(active ? .white : Palette.label)
         .padding(.horizontal, 13).padding(.vertical, 6)
         .background {
-            if active { Capsule().fill(Palette.tint) }
-            else { Capsule().fill(Palette.card).overlay(Capsule().stroke(Palette.separator, lineWidth: 0.5)) }
+            if active {
+                Capsule().fill(Palette.tint)
+                    .overlay(Capsule().strokeBorder(
+                        LinearGradient(stops: [.init(color: .white.opacity(0.55), location: 0),
+                                               .init(color: .clear, location: 0.5)],
+                                       startPoint: .top, endPoint: .bottom),
+                        lineWidth: 1))
+                    .shadow(color: Color(argb: 0x4D6042B4), radius: 4, y: 2)
+            } else {
+                Capsule().fill(Palette.matControl)
+                    .background(.ultraThinMaterial, in: Capsule())
+                    .overlay(Capsule().strokeBorder(Palette.matControlBorder, lineWidth: 0.5))
+            }
         }
     }
 
