@@ -35,18 +35,24 @@ struct BudgetView: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                Group {
-                    if hSize == .regular {
-                        if wide { wideStack } else { regularStack }
-                    } else {
-                        compactStack
+                VStack(spacing: 0) {
+                    budgetHeader
+                        .padding(.bottom, 10)
+                    Group {
+                        if hSize == .regular {
+                            if wide { wideStack } else { regularStack }
+                        } else {
+                            compactStack
+                        }
                     }
                 }
                 .padding(.horizontal, 20).padding(.top, 6).padding(.bottom, 24)
             }
             .trackWideLandscape($wide)
             .screenCanvas()
-            .navigationTitle("Budget")
+            // The mockup puts the title at the very top of the scroll content (no nav-bar row above
+            // it), so draw our own header and hide the bar — the Home pattern.
+            .toolbar(.hidden, for: .navigationBar)
             .sheet(item: $recurringEditor) { ed in
                 RecurringSheet(isIncome: ed.isIncome, existing: ed.existing)
             }
@@ -58,6 +64,15 @@ struct BudgetView: View {
     }
 
     // MARK: - Layout
+
+    /// Custom header: the large "Budget" title, mirroring the mockup's in-content title row.
+    private var budgetHeader: some View {
+        HStack {
+            Text("Budget")
+                .font(.largeTitle).fontWeight(.bold)
+            Spacer()
+        }
+    }
 
     private var periodPicker: some View {
         GlassSegmentedControl(options: Array(BudgetPeriod.allCases), selection: $period) {

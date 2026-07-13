@@ -29,28 +29,25 @@ struct InsightsView: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                Group {
-                    if hSize == .regular {
-                        if wide { wideStack } else { regularStack }
-                    } else {
-                        compactStack
-                    }
-                }
-                .padding(.horizontal, 20).padding(.bottom, 24)
-            }
-            .trackWideLandscape($wide)
-            .screenCanvas()
-            .navigationTitle("Insights")
-            .toolbar {
-                // Customizing the section order/visibility applies to the iPhone layout only.
-                if hSize == .compact {
-                    ToolbarItem(placement: .topBarTrailing) {
-                        Button { showCustomize = true } label: {
-                            Image(systemName: "slider.horizontal.3")
+                VStack(spacing: 0) {
+                    insightsHeader
+                        .padding(.bottom, 2)
+                    Group {
+                        if hSize == .regular {
+                            if wide { wideStack } else { regularStack }
+                        } else {
+                            compactStack
                         }
                     }
                 }
+                .padding(.horizontal, 20).padding(.top, 6).padding(.bottom, 24)
             }
+            .trackWideLandscape($wide)
+            .screenCanvas()
+            // The mockup puts the title inside the scroll content with the customize control on the
+            // SAME row, which the system large-title nav bar can't do (toolbar items sit in the small
+            // bar above the large title). So draw our own header and hide the bar — the Home pattern.
+            .toolbar(.hidden, for: .navigationBar)
             .sheet(item: $categorySel) { CategoryTransactionsSheet(category: $0.name, items: monthItems) }
             .sheet(item: $storeSel) { StoreTransactionsSheet(store: $0.name, receipts: monthReceipts) }
             .sheet(isPresented: $showCustomize) {
@@ -60,6 +57,26 @@ struct InsightsView: View {
     }
 
     // MARK: - Layout
+
+    /// Custom header: the large "Insights" title with the customize control trailing on the same
+    /// baseline row. Customizing the section order/visibility applies to the iPhone layout only.
+    private var insightsHeader: some View {
+        HStack {
+            Text("Insights")
+                .font(.largeTitle).fontWeight(.bold)
+            Spacer()
+            if hSize == .compact {
+                Button { showCustomize = true } label: {
+                    Image(systemName: "slider.horizontal.3")
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(Palette.label)
+                        .frame(width: 36, height: 36)
+                        .background(Palette.fill, in: Circle())
+                }
+                .accessibilityLabel("Customize sections")
+            }
+        }
+    }
 
     private var incomeCards: some View {
         IncomeInsightsCards(income: recurring.filter(\.isIncome),
