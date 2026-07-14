@@ -18,6 +18,9 @@ enum HistoryMode: String, CaseIterable, Identifiable {
 struct HistoryView: View {
     @Query(sort: \Receipt.createdAt, order: .reverse) private var receipts: [Receipt]
     @Query private var budgets: [Budget]
+    @AppStorage(SettingsKey.dateFormat) private var dateFormatRaw = DateFormatOption.system.rawValue
+
+    private var dateFormat: DateFormatOption { DateFormatOption(rawValue: dateFormatRaw) ?? .system }
 
     @State private var mode: HistoryMode = {
         #if DEBUG
@@ -286,7 +289,7 @@ struct HistoryView: View {
             } else {
                 LazyVStack(spacing: 0) {
                     ForEach(dayGroups(of: filteredReceipts, date: \.createdAt), id: \.date) { group in
-                        sectionHeader(DayFormat.label(group.date),
+                        sectionHeader(DayFormat.label(group.date, dateFormat),
                                       trailing: group.items.reduce(Decimal.zero) { $0 + $1.paidTotal }.formatMoney())
                         card {
                             ForEach(Array(group.items.enumerated()), id: \.element.persistentModelID) { idx, r in
@@ -326,7 +329,7 @@ struct HistoryView: View {
             } else {
                 LazyVStack(spacing: 0) {
                     ForEach(dayGroups(of: filteredItems, date: \.createdAt), id: \.date) { group in
-                        sectionHeader(DayFormat.label(group.date),
+                        sectionHeader(DayFormat.label(group.date, dateFormat),
                                       trailing: group.items.reduce(Decimal.zero) { $0 + $1.lineTotal }.formatMoney())
                         card {
                             ForEach(Array(group.items.enumerated()), id: \.element.persistentModelID) { idx, item in
@@ -450,9 +453,9 @@ struct HistoryView: View {
 
 /// Relative day-section label: "Today · 5 Jul", "Yesterday · 4 Jul", "Wed · 2 Jul".
 enum DayFormat {
-    static func label(_ date: Date) -> String {
+    static func label(_ date: Date, _ fmt: DateFormatOption = .current) -> String {
         let cal = Calendar.current
-        let short: String = { let f = DateFormatter(); f.dateFormat = "d MMM"; return f.string(from: date) }()
+        let short = fmt.short(date)
         if cal.isDateInToday(date) { return "Today · \(short)" }
         if cal.isDateInYesterday(date) { return "Yesterday · \(short)" }
         let wd = DateFormatter(); wd.dateFormat = "EEE"

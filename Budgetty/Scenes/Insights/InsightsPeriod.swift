@@ -138,11 +138,10 @@ enum InsightsPeriod: Equatable {
         let f = DateFormatter()
         switch self {
         case .custom:
-            f.dateFormat = "d/M"
-            return f.string(from: interval.start)
+            return DateFormatOption.current.tiny(interval.start)
         case .stepped(let unit, _):
             switch unit {
-            case .week: f.dateFormat = "d/M"; return f.string(from: interval.start)
+            case .week: return DateFormatOption.current.tiny(interval.start)
             case .month: f.dateFormat = "MMM"; return f.string(from: interval.start)
             case .quarter: return "Q\(Self.quarterOf(interval.start))"
             case .halfYear:
@@ -184,15 +183,22 @@ enum InsightsPeriod: Equatable {
     /// month when the span crosses months ("28 Jan – 3 Feb").
     private static func spanLabel(from start: Date, to end: Date) -> String {
         let cal = Calendar.current
+        let fmt = DateFormatOption.current
         let sameMonth = cal.isDate(start, equalTo: end, toGranularity: .month)
         let currentYear = cal.component(.year, from: end) == cal.component(.year, from: .now)
             && cal.component(.year, from: start) == cal.component(.year, from: .now)
-        let f = DateFormatter()
-        f.dateFormat = currentYear ? "d MMM" : "d MMM yyyy"
-        if sameMonth {
-            let day = DateFormatter(); day.dateFormat = "d"
-            return "\(day.string(from: start))–\(f.string(from: end))"
+        if fmt == .system {
+            let f = DateIntervalFormatter()
+            f.dateTemplate = currentYear ? "d MMM" : "d MMM y"
+            return f.string(from: start, to: end)
         }
-        return "\(f.string(from: start)) – \(f.string(from: end))"
+        let short: (Date) -> String = { currentYear ? fmt.short($0) : fmt.shortWithYear($0) }
+        // Collapse "5 Jan – 11 Jan" to "5–11 Jan" only for the day-first shape; month-first
+        // ("Jan 5") and numeric ("05.01") shapes read wrong when the start loses its month.
+        if sameMonth, fmt == .dayMonthYear {
+            let day = DateFormatter(); day.dateFormat = "d"
+            return "\(day.string(from: start))–\(short(end))"
+        }
+        return "\(short(start)) – \(short(end))"
     }
 }

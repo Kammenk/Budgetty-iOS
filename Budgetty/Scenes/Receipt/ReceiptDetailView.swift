@@ -15,6 +15,7 @@ struct ReceiptDetailView: View {
 
     let receipt: Receipt
 
+    @AppStorage(SettingsKey.dateFormat) private var dateFormatRaw = DateFormatOption.system.rawValue
     @State private var editDraft: ReceiptDraft?
     @State private var confirmDelete = false
 
@@ -59,7 +60,7 @@ struct ReceiptDetailView: View {
             StoreAvatar(store: receipt.store, size: 52)
             VStack(alignment: .leading, spacing: 2) {
                 Text(receipt.store).font(.title3).fontWeight(.bold)
-                Text("\(Self.longDate(receipt.date)) · \(receipt.items.count) item\(receipt.items.count == 1 ? "" : "s")")
+                Text("\(longDate(receipt.date)) · \(receipt.items.count) item\(receipt.items.count == 1 ? "" : "s")")
                     .font(.caption).foregroundStyle(Palette.secondaryLabel)
             }
             Spacer(minLength: 8)
@@ -172,7 +173,7 @@ struct ReceiptDetailView: View {
             .padding(.leading, 16)
     }
 
-    static func longDate(_ date: Date) -> String {
-        let f = DateFormatter(); f.dateFormat = "d MMMM yyyy"; return f.string(from: date)
+    private func longDate(_ date: Date) -> String {
+        (DateFormatOption(rawValue: dateFormatRaw) ?? .system).long(date)
     }
 }
