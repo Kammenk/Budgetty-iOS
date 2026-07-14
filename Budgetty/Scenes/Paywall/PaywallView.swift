@@ -32,12 +32,13 @@ struct PaywallView: View {
     private struct Feature: Identifiable {
         let id = UUID(); let symbol: String; let title: String; let subtitle: String
     }
+    // Outline symbols per the mockup — the tiles carry the tint, the glyphs stay light-line.
     private let features = [
-        Feature(symbol: "camera.fill", title: "Unlimited scans", subtitle: "Scan as many receipts as you want"),
-        Feature(symbol: "paintpalette.fill", title: "Accent color themes", subtitle: "Personalise the look with 8 tints"),
-        Feature(symbol: "icloud.fill", title: "Cloud backup & sync", subtitle: "Your data safe and on all devices"),
-        Feature(symbol: "square.grid.2x2.fill", title: "Home screen widgets", subtitle: "Spending at a glance, on your home"),
-        Feature(symbol: "tag.fill", title: "10 custom categories", subtitle: "vs. 3 on the free plan"),
+        Feature(symbol: "camera", title: "Unlimited scans", subtitle: "Scan as many receipts as you want"),
+        Feature(symbol: "paintpalette", title: "Accent color themes", subtitle: "Personalise the look with 8 tints"),
+        Feature(symbol: "icloud", title: "Cloud backup & sync", subtitle: "Your data safe and on all devices"),
+        Feature(symbol: "square.grid.2x2", title: "Home screen widgets", subtitle: "Spending at a glance, on your home"),
+        Feature(symbol: "star", title: "10 custom categories", subtitle: "vs. 3 on the free plan"),
     ]
 
     var body: some View {
@@ -62,11 +63,28 @@ struct PaywallView: View {
             }
             .adaptiveReadableWidth(wide ? 900 : Dimens.contentMaxWidth)
         }
+        .ignoresSafeArea(edges: .top) // hero runs under the status bar (mockup)
         .trackWideLandscape($wide)
         .background(Palette.groupedBackground)
-        .navigationTitle("Premium")
-        .navigationBarTitleDisplayMode(.inline)
+        // Mockup chrome: no title bar — the violet hero runs to the very top with a glass close
+        // button floating over it.
+        .toolbar(.hidden, for: .navigationBar)
+        .overlay(alignment: .topTrailing) { closeButton }
         .safeAreaInset(edge: .bottom) { footer }
+    }
+
+    /// Glass close circle over the hero (mockup: white-alpha circle with an ✕).
+    private var closeButton: some View {
+        Button { dismiss() } label: {
+            Image(systemName: "xmark")
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(.white)
+                .frame(width: 32, height: 32)
+                .background(.white.opacity(0.18), in: Circle())
+                .overlay(Circle().strokeBorder(.white.opacity(0.25), lineWidth: 0.5))
+        }
+        .padding(.trailing, 16)
+        .safeAreaPadding(.top, 8)
     }
 
     private var featuresColumn: some View {
@@ -95,7 +113,7 @@ struct PaywallView: View {
                 .font(.subheadline).foregroundStyle(.white.opacity(0.85)).padding(.top, 6)
         }
         .frame(maxWidth: .infinity)
-        .padding(.vertical, 28)
+        .padding(.top, 76).padding(.bottom, 28) // clears the status bar now that the hero runs to y=0
         .background(Palette.heroGradient)
     }
 
@@ -155,9 +173,7 @@ struct PaywallView: View {
                     if busy { ProgressView().tint(.white) }
                     else { Text(premium ? "You're Premium ✓" : "Subscribe").font(.headline) }
                 }
-                .foregroundStyle(.white)
-                .frame(maxWidth: .infinity).frame(height: 52)
-                .background(Palette.tint, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                .ctaPill()
             }
             .disabled(premium || busy || selectedProduct == nil)
             Button("Restore purchases") { Task { await store.restore() } }

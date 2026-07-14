@@ -35,19 +35,18 @@ struct WidgetsView: View {
             .padding(20)
             .adaptiveReadableWidth()
         }
-        .background(Palette.groupedBackground)
+        .screenCanvas()
         .navigationTitle("Widgets")
-        .navigationBarTitleDisplayMode(.inline)
     }
 
     private var banner: some View {
         HStack(spacing: 10) {
-            Image(systemName: "info.circle.fill").foregroundStyle(Palette.tint)
+            Image(systemName: "info.circle").foregroundStyle(Palette.tint)
             Text("Touch & hold your Home Screen, tap ＋, and search “Budgetty” to add these.")
                 .font(.caption).foregroundStyle(Palette.secondaryLabel)
         }
         .padding(14).frame(maxWidth: .infinity, alignment: .leading)
-        .background(Palette.tintSoft, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .contentCard(cornerRadius: 12)
     }
 
     private var spendWidget: some View {

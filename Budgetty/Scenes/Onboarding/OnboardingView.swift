@@ -49,9 +49,8 @@ struct OnboardingView: View {
 
             Button(action: advance) {
                 Text(pages[step].cta)
-                    .font(.headline).foregroundStyle(.white)
-                    .frame(maxWidth: .infinity).frame(height: 54)
-                    .background(Palette.tint, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                    .font(.headline)
+                    .ctaPill(height: 54)
             }
             .padding(.horizontal, 28).padding(.bottom, 20)
         }

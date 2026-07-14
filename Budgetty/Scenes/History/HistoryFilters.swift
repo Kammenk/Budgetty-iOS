@@ -33,18 +33,14 @@ struct PriceRangeSheet: View {
 
     var body: some View {
         NavigationStack {
-            Form {
-                Section("Minimum") {
-                    HStack { Text(Decimal(lo).formatMoney()); Spacer() }
-                    Slider(value: $lo, in: 0...bound, step: 1)
-                        .onChange(of: lo) { _, v in if v > hi { hi = v } }
+            ScrollView {
+                VStack(spacing: 20) {
+                    rangeCard("Minimum", value: $lo) { v in if v > hi { hi = v } }
+                    rangeCard("Maximum", value: $hi) { v in if v < lo { lo = v } }
                 }
-                Section("Maximum") {
-                    HStack { Text(Decimal(hi).formatMoney()); Spacer() }
-                    Slider(value: $hi, in: 0...bound, step: 1)
-                        .onChange(of: hi) { _, v in if v < lo { lo = v } }
-                }
+                .padding(20)
             }
+            .background(Palette.groupedBackground)
             .navigationTitle("Price range").navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -57,6 +53,24 @@ struct PriceRangeSheet: View {
             .onAppear { lo = lower ?? 0; hi = upper ?? bound }
         }
     }
+
+    /// One glass card per bound (mockup: label + amount + slider on a glass row).
+    private func rangeCard(_ title: String, value: Binding<Double>,
+                           clamp: @escaping (Double) -> Void) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Text(title).font(.footnote).foregroundStyle(Palette.secondaryLabel)
+                Spacer()
+                Text(Decimal(value.wrappedValue).formatMoney())
+                    .font(.headline).foregroundStyle(Palette.label)
+            }
+            Slider(value: value, in: 0...bound, step: 1)
+                .tint(Palette.tint)
+                .onChange(of: value.wrappedValue) { _, v in clamp(v) }
+        }
+        .padding(16)
+        .contentCard(cornerRadius: 14)
+    }
 }
 
 /// Multi-select category (group) filter.
@@ -66,22 +80,33 @@ struct CategoryFilterSheet: View {
 
     var body: some View {
         NavigationStack {
-            List {
-                ForEach(Categories.groups, id: \.name) { g in
-                    Button {
-                        if selected.contains(g.name) { selected.remove(g.name) } else { selected.insert(g.name) }
-                    } label: {
-                        HStack(spacing: 12) {
-                            CategoryTile(category: g.name, size: 28)
-                            Text(g.name).foregroundStyle(Palette.label)
-                            Spacer()
-                            if selected.contains(g.name) {
-                                Image(systemName: "checkmark").foregroundStyle(Palette.tint).fontWeight(.semibold)
+            ScrollView {
+                VStack(spacing: 0) {
+                    ForEach(Array(Categories.groups.enumerated()), id: \.element.name) { idx, g in
+                        Button {
+                            if selected.contains(g.name) { selected.remove(g.name) } else { selected.insert(g.name) }
+                        } label: {
+                            HStack(spacing: 12) {
+                                CategoryTile(category: g.name, size: 28)
+                                Text(g.name).foregroundStyle(Palette.label)
+                                Spacer()
+                                if selected.contains(g.name) {
+                                    Image(systemName: "checkmark").foregroundStyle(Palette.tint).fontWeight(.semibold)
+                                }
                             }
+                            .padding(.horizontal, 16).padding(.vertical, 12)
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        if idx < Categories.groups.count - 1 {
+                            Rectangle().fill(Palette.separator).frame(height: 0.5).padding(.leading, 16)
                         }
                     }
                 }
+                .contentCard(cornerRadius: 14)
+                .padding(20)
             }
+            .background(Palette.groupedBackground)
             .navigationTitle("Categories").navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Clear") { selected = []; dismiss() } }

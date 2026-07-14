@@ -30,12 +30,8 @@ struct LoginView: View {
         ScrollView {
             VStack(spacing: 0) {
                 header
-                Picker("", selection: $isSignUp) {
-                    Text("Sign In").tag(false)
-                    Text("Sign Up").tag(true)
-                }
-                .pickerStyle(.segmented)
-                .padding(.bottom, 20)
+                modeToggle
+                    .padding(.bottom, 20)
 
                 fields
 
@@ -57,12 +53,10 @@ struct LoginView: View {
                 Button(action: submit) {
                     ZStack {
                         if busy { ProgressView().tint(.white) }
-                        else { Text(isSignUp ? "Create Account" : "Sign In").fontWeight(.semibold) }
+                        else { Text(isSignUp ? "Create Account" : "Sign In").font(.headline) }
                     }
-                    .foregroundStyle(.white)
-                    .frame(maxWidth: .infinity).frame(height: 50)
-                    .background(Palette.tint.opacity(canSubmit ? 1 : 0.5),
-                                in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    .ctaPill()
+                    .opacity(canSubmit ? 1 : 0.5)
                 }
                 .disabled(!canSubmit)
                 .padding(.top, 20)
@@ -90,6 +84,19 @@ struct LoginView: View {
         .alert("Check your email", isPresented: $resetSent) {
             Button("OK") {}
         } message: { Text("A password reset link is on its way.") }
+    }
+
+    /// Sign In | Sign Up as the shared Liquid Glass pill toggle (mockup), not the system picker.
+    private struct Mode: Identifiable, Equatable {
+        let signUp: Bool
+        var id: Bool { signUp }
+    }
+    private var modeToggle: some View {
+        GlassSegmentedControl(
+            options: [Mode(signUp: false), Mode(signUp: true)],
+            selection: Binding(get: { Mode(signUp: isSignUp) },
+                               set: { isSignUp = $0.signUp })
+        ) { $0.signUp ? "Sign Up" : "Sign In" }
     }
 
     private var header: some View {

@@ -158,19 +158,8 @@ struct ReviewView: View {
             }
             Button(action: onSave) {
                 Text("Save receipt · \(draft.total.formatMoney())")
-                    .font(.headline).foregroundStyle(.white)
-                    .frame(maxWidth: .infinity).frame(height: 52)
-                    .background(Palette.scanCTA, in: Capsule())
-                    .overlay( // glossy top sheen, same recipe as the Scan pill
-                        Capsule()
-                            .fill(LinearGradient(colors: [.white.opacity(0.45), .white.opacity(0.06), .clear],
-                                                 startPoint: .top, endPoint: .bottom))
-                            .blendMode(.plusLighter)
-                            .allowsHitTesting(false)
-                    )
-                    .overlay(Capsule().strokeBorder(.white.opacity(0.22), lineWidth: 0.5))
-                    .shadow(color: Palette.scanCTA.opacity(0.4), radius: 14, y: 6)
-                    .shadow(color: .black.opacity(0.2), radius: 6, y: 2)
+                    .font(.headline)
+                    .ctaPill()
             }
             .padding(.top, 4)
         }
