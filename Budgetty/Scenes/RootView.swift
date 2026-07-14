@@ -258,12 +258,13 @@ struct RootView: View {
         case "paywall": NavigationStack { PaywallView() }
         case "receipt": NavigationStack { DebugFirstReceiptDetail() }
         case "category": DebugCategoryPicker()
+        case "review": DebugReviewScreen()
         default: EmptyView().hidden()
         }
     }
 
     private var hasDebugPreview: Bool {
-        ["account", "paywall", "receipt", "category"].contains(ProcessInfo.processInfo.environment["SHOW_SCREEN"] ?? "")
+        ["account", "paywall", "receipt", "category", "review"].contains(ProcessInfo.processInfo.environment["SHOW_SCREEN"] ?? "")
     }
     #endif
 }
@@ -285,6 +286,24 @@ private struct DebugFirstReceiptDetail: View {
 private struct DebugCategoryPicker: View {
     @State private var selection = "Bakery"
     var body: some View { CategoryPickerSheet(selection: $selection) }
+}
+
+/// Seeded Review screen for the SHOW_SCREEN=review screenshot hook — the scan flow can't reach
+/// Review without a real extraction, so screenshots go through this instead.
+private struct DebugReviewScreen: View {
+    @State private var draft: ReceiptDraft = {
+        let d = ReceiptDraft()
+        d.store = "Kaufland"
+        d.discount = 3.20
+        d.items = [
+            DraftItem(name: "Bananas", quantity: 1, price: 2.10, category: "Fruits & Vegetables"),
+            DraftItem(name: "Wholegrain bread", quantity: 1, price: 1.89, category: "Bakery"),
+            DraftItem(name: "Gouda cheese 400g", quantity: 1, price: 3.49, category: "Dairy"),
+            DraftItem(name: "Milk 1L", quantity: 1, price: 1.09, category: "Dairy"),
+        ]
+        return d
+    }()
+    var body: some View { ReviewView(draft: draft, onCancel: {}, onSave: {}) }
 }
 #endif
 
