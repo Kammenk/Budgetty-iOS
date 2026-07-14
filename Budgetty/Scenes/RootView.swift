@@ -259,12 +259,19 @@ struct RootView: View {
         case "receipt": NavigationStack { DebugFirstReceiptDetail() }
         case "category": DebugCategoryPicker()
         case "review": DebugReviewScreen()
+        case "notifications": NavigationStack { NotificationsView() }
+        case "support": NavigationStack { SupportAboutView() }
+        case "widgets": NavigationStack { WidgetsView() }
+        case "lock": BiometricLockView(onUnlock: {})
+        case "memory": DebugMemorySheet()
         default: EmptyView().hidden()
         }
     }
 
     private var hasDebugPreview: Bool {
-        ["account", "paywall", "receipt", "category", "review"].contains(ProcessInfo.processInfo.environment["SHOW_SCREEN"] ?? "")
+        ["account", "paywall", "receipt", "category", "review",
+         "notifications", "support", "widgets", "lock", "memory"]
+            .contains(ProcessInfo.processInfo.environment["SHOW_SCREEN"] ?? "")
     }
     #endif
 }
@@ -304,6 +311,19 @@ private struct DebugReviewScreen: View {
         return d
     }()
     var body: some View { ReviewView(draft: draft, onCancel: {}, onSave: {}) }
+}
+#endif
+
+#if DEBUG
+/// Hosts the Category Memory sheet for the SHOW_SCREEN=memory screenshot hook.
+private struct DebugMemorySheet: View {
+    @State private var shown = true
+    var body: some View {
+        Color.clear.sheet(isPresented: $shown) {
+            CategoryMemorySheet(itemName: "Wholegrain bread", oldCategory: "Snacks & Sweets",
+                                newCategory: "Bakery") { _ in }
+        }
+    }
 }
 #endif
 

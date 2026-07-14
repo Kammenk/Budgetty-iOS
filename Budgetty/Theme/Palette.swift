@@ -297,3 +297,28 @@ extension View {
                 lineWidth: 1))
     }
 }
+
+// MARK: - Glass CTA pill
+
+extension View {
+    /// The signature Liquid Glass primary-action pill (the Scan pill / Review save recipe): rich
+    /// violet capsule with a glossy top sheen, a white-alpha rim, and a violet glow lifting it off
+    /// the canvas. Shared by every full-width CTA in the mockups — Subscribe, Continue, Sign In,
+    /// Apply, Save Receipt, Unlock.
+    func ctaPill(height: CGFloat = 52) -> some View {
+        self
+            .foregroundStyle(.white)
+            .frame(maxWidth: .infinity).frame(height: height)
+            .background(Palette.scanCTA, in: Capsule())
+            .overlay( // glossy top sheen
+                Capsule()
+                    .fill(LinearGradient(colors: [.white.opacity(0.45), .white.opacity(0.06), .clear],
+                                         startPoint: .top, endPoint: .bottom))
+                    .blendMode(.plusLighter)
+                    .allowsHitTesting(false)
+            )
+            .overlay(Capsule().strokeBorder(.white.opacity(0.22), lineWidth: 0.5))
+            .shadow(color: Palette.scanCTA.opacity(0.4), radius: 14, y: 6)
+            .shadow(color: .black.opacity(0.2), radius: 6, y: 2)
+    }
+}

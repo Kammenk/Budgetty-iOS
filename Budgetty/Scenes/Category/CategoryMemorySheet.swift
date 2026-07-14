@@ -34,15 +34,14 @@ struct CategoryMemorySheet: View {
                 Divider().padding(.leading, 16)
                 option("All “\(itemName)”", "Applies to all past & future matches", .all)
             }
-            .background(Palette.tertiaryBackground, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .contentCard(cornerRadius: 14)
             .padding(.horizontal, 20)
 
             Button {
                 onApply(scope); dismiss()
             } label: {
-                Text("Apply").font(.headline).foregroundStyle(.white)
-                    .frame(maxWidth: .infinity).frame(height: 50)
-                    .background(Palette.tint, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                Text("Apply").font(.headline)
+                    .ctaPill(height: 50)
             }
             .padding(.horizontal, 20).padding(.top, 16)
 
@@ -65,7 +64,7 @@ struct CategoryMemorySheet: View {
         }
         .padding(14)
         .frame(maxWidth: .infinity)
-        .background(Palette.tertiaryBackground, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .contentCard(cornerRadius: 16)
         .padding(.horizontal, 20)
     }
 

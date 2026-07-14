@@ -81,31 +81,37 @@ struct ScanFlowView: View {
 
                 Spacer()
 
-                // Capture controls float as Liquid Glass over the viewfinder. The container lets the
-                // glass shapes share sampling/lighting and morph together (Tier 3 custom glass).
-                GlassEffectContainer(spacing: 28) {
-                    HStack {
-                        // Gallery
-                        Button { showLibrary = true } label: {
-                            Image(systemName: "photo.on.rectangle")
-                                .font(.system(size: 22)).foregroundStyle(.white)
-                                .frame(width: 50, height: 50)
-                        }
-                        .glassEffect(.regular.interactive(), in: .rect(cornerRadius: 14))
-                        Spacer()
-                        // Shutter — the capture primary; solid white so it reads as the hero control.
-                        Button {
-                            if CameraPicker.isAvailable { showCamera = true } else { showLibrary = true }
-                        } label: {
-                            Circle().strokeBorder(.white, lineWidth: 4).frame(width: 72, height: 72)
-                                .overlay(Circle().fill(.white).frame(width: 56, height: 56))
-                        }
-                        .glassEffect(.regular.interactive(), in: .circle)
-                        Spacer()
-                        Color.clear.frame(width: 50, height: 50) // balance
+                // Capture controls ride ONE glass slab (mockup: gallery · shutter · flash in a single
+                // rounded glass bar), not separate floating buttons.
+                HStack {
+                    // Gallery
+                    Button { showLibrary = true } label: {
+                        Image(systemName: "photo.on.rectangle")
+                            .font(.system(size: 20)).foregroundStyle(.white.opacity(0.9))
+                            .frame(width: 52, height: 52)
+                            .background(.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                    }
+                    Spacer()
+                    // Shutter — the capture primary; solid white so it reads as the hero control.
+                    Button {
+                        if CameraPicker.isAvailable { showCamera = true } else { showLibrary = true }
+                    } label: {
+                        Circle().strokeBorder(.white, lineWidth: 4).frame(width: 72, height: 72)
+                            .overlay(Circle().fill(.white).frame(width: 56, height: 56))
+                    }
+                    Spacer()
+                    // Flash
+                    Button {} label: {
+                        Image(systemName: "bolt.fill")
+                            .font(.system(size: 20)).foregroundStyle(.white.opacity(0.9))
+                            .frame(width: 52, height: 52)
+                            .background(.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
                     }
                 }
-                .padding(.horizontal, 40).padding(.bottom, 44)
+                .padding(.horizontal, 24).padding(.vertical, 18)
+                // Dark-tinted glass so the slab reads like the mockup's smoked bar, not bright chrome.
+                .glassEffect(.regular.tint(.black.opacity(0.35)), in: .rect(cornerRadius: 44))
+                .padding(.horizontal, 24).padding(.bottom, 24)
             }
         }
     }
@@ -128,6 +134,33 @@ struct ScanFlowView: View {
                     )
                     .padding(30)
             )
+            // Camera corner brackets (mockup): four L-shaped ticks framing the capture area.
+            .overlay(
+                CornerBrackets(length: 26)
+                    .stroke(.white.opacity(0.7), style: StrokeStyle(lineWidth: 3, lineCap: .round))
+                    .padding(14)
+            )
+    }
+
+    /// Four L-shaped corner ticks framing the viewfinder (the mockup's camera brackets).
+    private struct CornerBrackets: Shape {
+        var length: CGFloat
+        func path(in rect: CGRect) -> Path {
+            var p = Path()
+            p.move(to: CGPoint(x: rect.minX, y: rect.minY + length))
+            p.addLine(to: CGPoint(x: rect.minX, y: rect.minY))
+            p.addLine(to: CGPoint(x: rect.minX + length, y: rect.minY))
+            p.move(to: CGPoint(x: rect.maxX - length, y: rect.minY))
+            p.addLine(to: CGPoint(x: rect.maxX, y: rect.minY))
+            p.addLine(to: CGPoint(x: rect.maxX, y: rect.minY + length))
+            p.move(to: CGPoint(x: rect.maxX, y: rect.maxY - length))
+            p.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY))
+            p.addLine(to: CGPoint(x: rect.maxX - length, y: rect.maxY))
+            p.move(to: CGPoint(x: rect.minX + length, y: rect.maxY))
+            p.addLine(to: CGPoint(x: rect.minX, y: rect.maxY))
+            p.addLine(to: CGPoint(x: rect.minX, y: rect.maxY - length))
+            return p
+        }
     }
 
     private func circleButton(_ symbol: String, action: @escaping () -> Void) -> some View {
@@ -147,8 +180,11 @@ struct ScanFlowView: View {
             Text("Couldn't read the receipt").font(.headline)
             Text(message).font(.subheadline).foregroundStyle(Palette.secondaryLabel)
                 .multilineTextAlignment(.center).padding(.horizontal, 40)
-            Button("Try again") { phase = .capture }
-                .buttonStyle(.borderedProminent).tint(Palette.tint)
+            Button { phase = .capture } label: {
+                Text("Try again").font(.headline)
+                    .ctaPill(height: 50)
+            }
+            .frame(maxWidth: 220)
             Button("Cancel") { dismiss() }.foregroundStyle(Palette.secondaryLabel)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
