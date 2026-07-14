@@ -280,4 +280,20 @@ extension View {
             .background(Palette.card, in: shape)
             .overlay(shape.strokeBorder(Palette.separatorStrong, lineWidth: 0.5))
     }
+
+    /// Glass control treatment for inline fields nested *inside* an opaque card (mockup `--mat-ctrl`
+    /// over `blur(8px)` + `--mat-ctrl-b` rim + small specular): a white-alpha wash over the card
+    /// fill, a white-alpha hairline, and the top specular catch. No blur material — the backdrop is
+    /// a flat card color, so blurring it is a no-op.
+    func glassControl(cornerRadius: CGFloat = 10) -> some View {
+        let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+        return self
+            .background(Palette.matControl, in: shape)
+            .overlay(shape.strokeBorder(Palette.matControlBorder, lineWidth: 0.5))
+            .overlay(shape.strokeBorder(
+                LinearGradient(stops: [.init(color: Palette.glassSpecular, location: 0),
+                                       .init(color: .clear, location: 0.35)],
+                               startPoint: .top, endPoint: .bottom),
+                lineWidth: 1))
+    }
 }

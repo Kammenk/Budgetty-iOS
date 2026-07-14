@@ -24,9 +24,10 @@ struct ReviewView: View {
     }
 
     var body: some View {
-        NavigationStack {
+        VStack(spacing: 0) {
+            header
             ScrollView {
-                VStack(spacing: 12) {
+                VStack(spacing: 10) {
                     storeAndDate
                     ForEach(draft.items) { item in
                         ItemCard(item: item, onDelete: { draft.remove(item) },
@@ -34,32 +35,45 @@ struct ReviewView: View {
                     }
                     addItemButton
                 }
-                .padding(16)
+                .padding(.horizontal, 20).padding(.vertical, 14)
                 .adaptiveReadableWidth()
             }
-            .background(Palette.groupedBackground)
-            .navigationTitle("Review Receipt")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel", role: .cancel, action: onCancel).tint(Palette.bad)
-                }
-            }
             .safeAreaInset(edge: .bottom) { footer }
-            .sheet(item: $categoryTarget) { target in
-                CategoryPickerSheet(
-                    selection: Binding(get: { target.category }, set: { target.category = $0 }),
-                    onPicked: { newCat in
-                        guard newCat != oldCategory else { return }
-                        let captured = MemoryCtx(item: target, old: oldCategory, new: newCat)
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { memoryCtx = captured }
-                    })
+        }
+        .background(Palette.groupedBackground.ignoresSafeArea())
+        .sheet(item: $categoryTarget) { target in
+            CategoryPickerSheet(
+                selection: Binding(get: { target.category }, set: { target.category = $0 }),
+                onPicked: { newCat in
+                    guard newCat != oldCategory else { return }
+                    let captured = MemoryCtx(item: target, old: oldCategory, new: newCat)
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { memoryCtx = captured }
+                })
+        }
+        .sheet(item: $memoryCtx) { ctx in
+            CategoryMemorySheet(itemName: ctx.item.name, oldCategory: ctx.old, newCategory: ctx.new) { scope in
+                applyMemory(ctx.item, newCategory: ctx.new, scope: scope)
             }
-            .sheet(item: $memoryCtx) { ctx in
-                CategoryMemorySheet(itemName: ctx.item.name, oldCategory: ctx.old, newCategory: ctx.new) { scope in
-                    applyMemory(ctx.item, newCategory: ctx.new, scope: scope)
-                }
-            }
+        }
+    }
+
+    // MARK: - Header
+
+    /// The mockup's sheet header: bold left-aligned title, plain-text Cancel (red) and Save (tint)
+    /// actions on the right, hairline underneath.
+    private var header: some View {
+        HStack(spacing: 16) {
+            Text("Review Receipt")
+                .font(.system(size: 18, weight: .bold)).foregroundStyle(Palette.label)
+            Spacer()
+            Button("Cancel", role: .cancel, action: onCancel)
+                .font(.system(size: 15, weight: .medium)).foregroundStyle(Palette.bad)
+            Button("Save", action: onSave)
+                .font(.system(size: 15, weight: .semibold)).foregroundStyle(Palette.tint)
+        }
+        .padding(.horizontal, 20).padding(.top, 14).padding(.bottom, 12)
+        .overlay(alignment: .bottom) {
+            Rectangle().fill(Palette.separator).frame(height: 0.5)
         }
     }
 
@@ -86,23 +100,33 @@ struct ReviewView: View {
 
     private var storeAndDate: some View {
         HStack(spacing: 10) {
-            VStack(alignment: .leading, spacing: 6) {
-                fieldLabel("Store")
-                TextField("Store", text: $draft.store)
-                    .font(.subheadline).textInputAutocapitalization(.words)
+            HStack(spacing: 10) {
+                StoreAvatar(store: draft.store, size: 28)
+                VStack(alignment: .leading, spacing: 2) {
+                    fieldLabel("Store", color: Palette.tint)
+                    TextField("Store", text: $draft.store)
+                        .font(.system(size: 14)).textInputAutocapitalization(.words)
+                }
+                Image(systemName: "square.and.pencil")
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(Palette.secondaryLabel)
             }
-            .padding(12)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .inputField(cornerRadius: 12)
+            .padding(.vertical, 12).padding(.horizontal, 14)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+            .background(Palette.tertiaryBackground,
+                        in: RoundedRectangle(cornerRadius: 12, style: .continuous))
 
-            VStack(alignment: .leading, spacing: 6) {
+            VStack(alignment: .leading, spacing: 2) {
                 fieldLabel("Date")
                 DatePicker("", selection: $draft.date, displayedComponents: .date)
                     .labelsHidden()
             }
-            .padding(12)
-            .inputField(cornerRadius: 12)
+            .padding(.vertical, 12).padding(.horizontal, 14)
+            .frame(maxHeight: .infinity, alignment: .leading)
+            .background(Palette.tertiaryBackground,
+                        in: RoundedRectangle(cornerRadius: 12, style: .continuous))
         }
+        .fixedSize(horizontal: false, vertical: true)
     }
 
     // MARK: - Add item
@@ -110,8 +134,8 @@ struct ReviewView: View {
     private var addItemButton: some View {
         Button { draft.addItem() } label: {
             HStack(spacing: 8) {
-                Image(systemName: "plus")
-                Text("Add item").fontWeight(.medium)
+                Image(systemName: "plus").font(.system(size: 15, weight: .semibold))
+                Text("Add item").font(.system(size: 15, weight: .medium))
             }
             .foregroundStyle(Palette.tint)
             .frame(maxWidth: .infinity)
@@ -119,7 +143,7 @@ struct ReviewView: View {
             .background(
                 RoundedRectangle(cornerRadius: 14, style: .continuous)
                     .strokeBorder(style: StrokeStyle(lineWidth: 1.5, dash: [5]))
-                    .foregroundStyle(Palette.separator)
+                    .foregroundStyle(Palette.separatorStrong)
             )
         }
     }
@@ -136,12 +160,25 @@ struct ReviewView: View {
                 Text("Save receipt · \(draft.total.formatMoney())")
                     .font(.headline).foregroundStyle(.white)
                     .frame(maxWidth: .infinity).frame(height: 52)
-                    .background(Palette.tint, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    .background(Palette.scanCTA, in: Capsule())
+                    .overlay( // glossy top sheen, same recipe as the Scan pill
+                        Capsule()
+                            .fill(LinearGradient(colors: [.white.opacity(0.45), .white.opacity(0.06), .clear],
+                                                 startPoint: .top, endPoint: .bottom))
+                            .blendMode(.plusLighter)
+                            .allowsHitTesting(false)
+                    )
+                    .overlay(Capsule().strokeBorder(.white.opacity(0.22), lineWidth: 0.5))
+                    .shadow(color: Palette.scanCTA.opacity(0.4), radius: 14, y: 6)
+                    .shadow(color: .black.opacity(0.2), radius: 6, y: 2)
             }
             .padding(.top, 4)
         }
         .padding(.horizontal, 20).padding(.top, 12).padding(.bottom, 8)
-        .background(.bar)
+        .background(Palette.groupedBackground)
+        .overlay(alignment: .top) {
+            Rectangle().fill(Palette.separator).frame(height: 0.5)
+        }
     }
 
     private func summaryRow(_ title: String, _ value: String, color: Color) -> some View {
@@ -153,9 +190,8 @@ struct ReviewView: View {
         .font(.subheadline)
     }
 
-    private func fieldLabel(_ text: String) -> some View {
-        Text(text).font(.system(size: 10, weight: .semibold)).textCase(.uppercase)
-            .foregroundStyle(Palette.secondaryLabel).tracking(0.4)
+    private func fieldLabel(_ text: String, color: Color = Palette.secondaryLabel) -> some View {
+        Text(text).font(.system(size: 10, weight: .semibold)).foregroundStyle(color)
     }
 }
 
@@ -170,7 +206,7 @@ private struct ItemCard: View {
             HStack(alignment: .top, spacing: 8) {
                 VStack(alignment: .leading, spacing: 3) {
                     label("Product")
-                    TextField("Item name", text: $item.name).font(.subheadline)
+                    TextField("Item name", text: $item.name).font(.system(size: 15))
                 }
                 Spacer(minLength: 8)
                 Button(action: onDelete) {
@@ -187,27 +223,27 @@ private struct ItemCard: View {
                             label("Category")
                             HStack(spacing: 4) {
                                 Text(Categories.emoji(for: item.category))
-                                Text(item.category).font(.subheadline).foregroundStyle(Palette.label)
+                                Text(item.category).font(.system(size: 14)).foregroundStyle(Palette.label)
                                     .lineLimit(1)
                             }
                         }
                         Spacer()
-                        Image(systemName: "chevron.down").font(.system(size: 11, weight: .semibold))
+                        Image(systemName: "chevron.down").font(.system(size: 12, weight: .semibold))
                             .foregroundStyle(Palette.secondaryLabel)
                     }
-                    .padding(10)
-                    .inputField(cornerRadius: 10)
+                    .padding(.vertical, 10).padding(.horizontal, 12)
+                    .glassControl(cornerRadius: 10)
                 }
                 .buttonStyle(.plain)
 
                 VStack(alignment: .leading, spacing: 2) {
                     label("Price")
                     TextField("0", value: $item.price, format: .number)
-                        .font(.subheadline).keyboardType(.decimalPad)
+                        .font(.system(size: 14)).keyboardType(.decimalPad)
                 }
-                .padding(10)
-                .frame(width: 92)
-                .inputField(cornerRadius: 10)
+                .padding(.vertical, 10).padding(.horizontal, 12)
+                .frame(width: 100)
+                .glassControl(cornerRadius: 10)
             }
         }
         .padding(14)
@@ -215,7 +251,7 @@ private struct ItemCard: View {
     }
 
     private func label(_ text: String) -> some View {
-        Text(text).font(.system(size: 10, weight: .semibold)).textCase(.uppercase)
-            .foregroundStyle(Palette.secondaryLabel).tracking(0.4)
+        Text(text).font(.system(size: 10, weight: .semibold))
+            .foregroundStyle(Palette.secondaryLabel)
     }
 }
