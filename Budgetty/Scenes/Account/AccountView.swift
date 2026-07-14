@@ -17,6 +17,7 @@ struct AccountView: View {
     @AppStorage(SettingsKey.appearance) private var appearanceRaw = AppearancePref.system.rawValue
     @AppStorage(SettingsKey.currency) private var currency = "EUR"
     @AppStorage(SettingsKey.language) private var language = "system"
+    @AppStorage(SettingsKey.dateFormat) private var dateFormatRaw = DateFormatOption.system.rawValue
     @AppStorage(SettingsKey.notifications) private var notifications = true
     @AppStorage(SettingsKey.faceID) private var faceID = false
     @AppStorage(SettingsKey.analytics) private var analytics = true
@@ -34,6 +35,7 @@ struct AccountView: View {
     @State private var backupError: String?
 
     private var appearance: AppearancePref { AppearancePref(rawValue: appearanceRaw) ?? .system }
+    private var dateFormat: DateFormatOption { DateFormatOption(rawValue: dateFormatRaw) ?? .system }
 
     var body: some View {
         ScrollView {
@@ -200,6 +202,14 @@ struct AccountView: View {
                 .buttonStyle(.plain)
             }
             divider
+            NavigationLink { dateFormatPicker } label: {
+                row("Date format", "calendar", Color(argb: 0xFFFF9500)) {
+                    value(dateFormat.settingLabel)
+                    chevron
+                }
+            }
+            .buttonStyle(.plain)
+            divider
             NavigationLink { LanguagePickerView(selection: $language) } label: {
                 row("Language", "globe", Color(argb: 0xFF0A84FF)) {
                     value(LanguageOption.name(language))
@@ -336,6 +346,30 @@ struct AccountView: View {
             }
         }
         .navigationTitle("Appearance")
+        .navigationBarTitleDisplayMode(.inline)
+    }
+
+    private var dateFormatPicker: some View {
+        List {
+            Section {
+                ForEach(DateFormatOption.allCases) { option in
+                    Button {
+                        dateFormatRaw = option.rawValue
+                    } label: {
+                        HStack {
+                            Text(option.pickerLabel).foregroundStyle(Palette.label)
+                            Spacer()
+                            if option == dateFormat {
+                                Image(systemName: "checkmark").foregroundStyle(Palette.tint).fontWeight(.semibold)
+                            }
+                        }
+                    }
+                }
+            } footer: {
+                Text("How dates appear on receipts and lists.")
+            }
+        }
+        .navigationTitle("Date format")
         .navigationBarTitleDisplayMode(.inline)
     }
 

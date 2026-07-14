@@ -12,6 +12,7 @@ enum SettingsKey {
     static let appearance = "pref.appearance"
     static let currency = "pref.currency"
     static let language = "pref.language"
+    static let dateFormat = "pref.dateFormat"
     static let notifications = "pref.notifications"
     static let faceID = "pref.faceID"
     static let analytics = "pref.analytics"

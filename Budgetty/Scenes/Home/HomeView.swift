@@ -299,13 +299,14 @@ struct AvatarView: View {
 /// One receipt row: store avatar, name + date/items, amount + discount, chevron.
 struct ReceiptRowView: View {
     let receipt: Receipt
+    @AppStorage(SettingsKey.dateFormat) private var dateFormatRaw = DateFormatOption.system.rawValue
 
     var body: some View {
         HStack(spacing: 12) {
             StoreAvatar(store: receipt.store)
             VStack(alignment: .leading, spacing: 2) {
                 Text(receipt.store).font(.body).foregroundStyle(Palette.label)
-                Text("\(Self.dateLabel(receipt.date)) · \(receipt.items.count) item\(receipt.items.count == 1 ? "" : "s")")
+                Text("\(dateLabel(receipt.date)) · \(receipt.items.count) item\(receipt.items.count == 1 ? "" : "s")")
                     .font(.caption).foregroundStyle(Palette.secondaryLabel)
             }
             Spacer(minLength: 8)
@@ -324,7 +325,7 @@ struct ReceiptRowView: View {
         .padding(.horizontal, 16).padding(.vertical, 12)
     }
 
-    static func dateLabel(_ date: Date) -> String {
-        let f = DateFormatter(); f.dateFormat = "d MMM"; return f.string(from: date)
+    private func dateLabel(_ date: Date) -> String {
+        (DateFormatOption(rawValue: dateFormatRaw) ?? .system).short(date)
     }
 }
