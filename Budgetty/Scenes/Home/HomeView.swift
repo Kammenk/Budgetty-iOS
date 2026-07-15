@@ -16,6 +16,22 @@ struct HomeView: View {
     @State private var wide = false
     @Query(sort: \Receipt.createdAt, order: .reverse) private var receipts: [Receipt]
     @Query private var budgets: [Budget]
+    @Query private var recurrings: [Recurring]
+
+    @AppStorage(HomeLayoutStore.orderKey) private var orderRaw = ""
+    @AppStorage(HomeLayoutStore.hiddenKey) private var hiddenRaw = HomeLayoutStore.defaultHidden
+    @State private var showCustomize = false
+
+    private var visibleSections: [HomeSection] {
+        let hidden = HomeLayoutStore.hidden(hiddenRaw)
+        return HomeLayoutStore.order(orderRaw).filter { !hidden.contains($0) }
+    }
+
+    /// This month's planned recurring bills (monthly equivalents) — paired with actual spend on the
+    /// hero card. Planning-only: clearly marked as not yet spent.
+    private var monthBills: Decimal {
+        recurrings.filter { !$0.isIncome }.reduce(.zero) { $0 + $1.monthlyEquivalent }
+    }
 
     private var hasBudget: Bool {
         budget(Budget.monthlyKey) != nil || budget(Budget.weeklyKey) != nil
@@ -54,6 +70,9 @@ struct HomeView: View {
             .reportsDockScroll()
             .trackWideLandscape($wide)
             .screenCanvas()
+            .sheet(isPresented: $showCustomize) {
+                HomeCustomizeSheet(orderRaw: $orderRaw, hiddenRaw: $hiddenRaw)
+            }
             // The mockup puts the brand title and the avatar on ONE row, which the system large-title
             // nav bar can't do (toolbar items sit in the small bar above the large title). So Home
             // draws its own header row and hides the navigation bar.
@@ -64,10 +83,23 @@ struct HomeView: View {
     /// Custom header: the large "Budgetty" brand title with the account avatar trailing on the same
     /// baseline row, exactly as in the mockup.
     private var homeHeader: some View {
-        HStack {
+        HStack(spacing: 12) {
             Text("Budgetty")
                 .font(.largeTitle).fontWeight(.bold)
             Spacer()
+            // Mockup: quiet pill next to the avatar opens the section customize sheet.
+            Button { showCustomize = true } label: {
+                HStack(spacing: 4) {
+                    Image(systemName: "star")
+                        .font(.system(size: 12, weight: .semibold))
+                    Text("Customize").font(.system(size: 13, weight: .semibold))
+                }
+                .foregroundStyle(Palette.tint)
+                .padding(.horizontal, 12).padding(.vertical, 6)
+                .background(Palette.fill, in: Capsule())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Customize sections")
             NavigationLink { AccountView() } label: {
                 AvatarView(initials: auth.initials, size: 36, fontSize: 14)
             }
@@ -77,12 +109,17 @@ struct HomeView: View {
 
     // MARK: - Layout
 
-    /// iPhone: one column.
+    /// iPhone: one column, in the user's customized section order (hidden sections skipped).
     private var compactStack: some View {
         VStack(spacing: 14) {
-            heroCard
-            if hasBudget { budgetsCard }
-            recentReceiptsSection
+            ForEach(visibleSections) { section in
+                switch section {
+                case .totalSpent: heroCard
+                case .weekComparison: if lastWeekSpent > 0 { weekCard }
+                case .budgets: if hasBudget { budgetsCard }
+                case .receipts: recentReceiptsSection
+                }
+            }
         }
     }
 
@@ -132,17 +169,22 @@ struct HomeView: View {
             }
             .padding(.bottom, 6)
 
-            Text(monthSpent.formatMoney())
-                .font(.system(size: 46, weight: .bold))
-                .foregroundStyle(.white)
-                .padding(.vertical, 4)
+            // Mockup: the big figure never truncates — very large amounts scroll horizontally.
+            ScrollView(.horizontal, showsIndicators: false) {
+                Text(monthSpent.formatMoney())
+                    .font(.system(size: 46, weight: .bold))
+                    .foregroundStyle(.white)
+            }
+            .padding(.vertical, 4)
 
             Text("\(monthReceipts.count) receipts · \(Self.daysProgress())")
                 .font(.footnote)
                 .foregroundStyle(.white.opacity(0.7))
                 .padding(.bottom, 14)
 
-            if let monthlyBudget {
+            if monthBills > 0 {
+                billsBlock
+            } else if let monthlyBudget {
                 ProgressBarView(fraction: frac, color: .white.opacity(0.85), height: 5,
                                 track: .white.opacity(0.22))
                 HStack {
@@ -177,6 +219,85 @@ struct HomeView: View {
         .shadow(color: Color(argb: 0xFF6650A4).opacity(0.38), radius: 14, y: 8)
     }
 
+    // MARK: - Bills strip (mockup "1b planned strip")
+
+    /// Actual spend paired with this month's planned recurring bills: a two-segment strip (solid
+    /// spent, hatched planned), a legend, and the combined "With bills" total. The hatching keeps
+    /// the planned portion visually lighter than money already spent.
+    private var billsBlock: some View {
+        let withBills = monthSpent + monthBills
+        let spentShare = Self.fraction(monthSpent, of: withBills)
+
+        return VStack(alignment: .leading, spacing: 0) {
+            GeometryReader { geo in
+                HStack(spacing: 2) {
+                    Capsule().fill(.white.opacity(0.85))
+                        .frame(width: max(0, geo.size.width * spentShare - 1))
+                    hatchedFill(in: Capsule())
+                }
+            }
+            .frame(height: 6)
+            .padding(.bottom, 10)
+
+            legendRow(swatch: AnyView(RoundedRectangle(cornerRadius: 2.5).fill(.white.opacity(0.85))),
+                      label: "Spent", value: monthSpent.formatMoney())
+            legendRow(swatch: AnyView(hatchedFill(in: RoundedRectangle(cornerRadius: 2.5))),
+                      label: "Bills · planned", value: monthBills.formatMoney(), valueOpacity: 0.9)
+                .padding(.top, 6)
+
+            Rectangle().fill(.white.opacity(0.25)).frame(height: 1)
+                .padding(.top, 10).padding(.bottom, 8)
+
+            HStack(alignment: .firstTextBaseline, spacing: 12) {
+                Text("With bills").font(.system(size: 13, weight: .bold))
+                Spacer(minLength: 0)
+                Text(withBills.formatMoney())
+                    .font(.system(size: 17, weight: .bold)).lineLimit(1)
+            }
+            .foregroundStyle(.white)
+
+            Text("Bills are planned — not yet spent.")
+                .font(.system(size: 11)).foregroundStyle(.white.opacity(0.6))
+                .padding(.top, 6)
+        }
+    }
+
+    private func legendRow(swatch: AnyView, label: String, value: String,
+                           valueOpacity: Double = 1) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 12) {
+            HStack(spacing: 6) {
+                swatch.frame(width: 8, height: 8)
+                Text(label).font(.system(size: 12.5)).foregroundStyle(.white.opacity(0.78))
+            }
+            Spacer(minLength: 0)
+            Text(value)
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(.white.opacity(valueOpacity)).lineLimit(1)
+        }
+    }
+
+    /// The mockup's hatched "planned" texture: thin 135° white stripes inside a stroked shape.
+    private func hatchedFill<S: InsettableShape>(in shape: S) -> some View {
+        shape.fill(.clear)
+            .overlay(HatchStripes().stroke(.white.opacity(0.55), lineWidth: 2).clipShape(shape))
+            .overlay(shape.strokeBorder(.white.opacity(0.4), lineWidth: 1))
+    }
+
+    /// Diagonal 135° stripe lines covering the given rect.
+    private struct HatchStripes: Shape {
+        func path(in rect: CGRect) -> Path {
+            var p = Path()
+            let step: CGFloat = 4.5
+            var x = rect.minX - rect.height
+            while x < rect.maxX {
+                p.move(to: CGPoint(x: x, y: rect.maxY))
+                p.addLine(to: CGPoint(x: x + rect.height, y: rect.minY))
+                x += step
+            }
+            return p
+        }
+    }
+
     // MARK: - Budgets
 
     private var budgetsCard: some View {
@@ -202,6 +323,41 @@ struct HomeView: View {
         return receipts
             .filter { cal.isDate($0.createdAt, equalTo: .now, toGranularity: .weekOfYear) }
             .reduce(.zero) { $0 + $1.paidTotal }
+    }
+
+    private var lastWeekSpent: Decimal {
+        let cal = Calendar.current
+        guard let lastWeek = cal.date(byAdding: .weekOfYear, value: -1, to: .now) else { return 0 }
+        return receipts
+            .filter { cal.isDate($0.createdAt, equalTo: lastWeek, toGranularity: .weekOfYear) }
+            .reduce(.zero) { $0 + $1.paidTotal }
+    }
+
+    // MARK: - Week comparison
+
+    /// "This week" quick stat: the week's spend with a delta vs last week (Android's
+    /// QuickStatsStrip). Only rendered when there was spending last week to compare against.
+    private var weekCard: some View {
+        let delta = Self.fraction(weekSpent - lastWeekSpent, of: lastWeekSpent)
+        let up = weekSpent > lastWeekSpent
+        return VStack(alignment: .leading, spacing: 6) {
+            Text("This week")
+                .font(.caption).textCase(.uppercase).tracking(0.6)
+                .foregroundStyle(Palette.secondaryLabel)
+            Text(weekSpent.formatMoney())
+                .font(.title2).fontWeight(.bold).foregroundStyle(Palette.label)
+                .lineLimit(1)
+            HStack(spacing: 4) {
+                Image(systemName: up ? "arrow.up.right" : "arrow.down.right")
+                    .font(.system(size: 11, weight: .bold))
+                Text("\(abs(Int((delta * 100).rounded())))% vs last week")
+                    .font(.caption).fontWeight(.medium)
+            }
+            .foregroundStyle(up ? Palette.bad : Palette.good)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 18).padding(.vertical, 16)
+        .contentCard(cornerRadius: 16)
     }
 
     private func budgetRow(title: String, spent: Decimal, limit: Decimal) -> some View {

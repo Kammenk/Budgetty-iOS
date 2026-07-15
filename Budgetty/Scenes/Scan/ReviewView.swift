@@ -18,6 +18,35 @@ struct ReviewView: View {
     @State private var categoryTarget: DraftItem?
     @State private var oldCategory = ""
     @State private var memoryCtx: MemoryCtx?
+    @State private var noticeDismissed = false
+    @State private var showDroppedAlert = false
+
+    // MARK: - Total-reconciliation checks (Android parity)
+
+    /// Mismatch beyond this is real, below it is cent-rounding: 1% of the anchor, floor 15 cents.
+    private func tolerance(_ anchor: Decimal) -> Decimal {
+        max(anchor * Decimal(string: "0.01")!, Decimal(string: "0.15")!)
+    }
+
+    /// Blocking, data-losing direction: the items sum to noticeably LESS than the receipt's printed
+    /// subtotal — a line was dropped or under-read, and the shortfall would otherwise vanish silently
+    /// into extra charges. Recomputes live, so fixing/adding the line clears it.
+    private var droppedShortfall: Decimal? {
+        guard let sub = draft.printedSubtotal, sub > 0 else { return nil }
+        return (sub - draft.subtotal) > tolerance(sub) ? sub : nil
+    }
+
+    /// Soft, opposite direction: the items sum to MORE than the printed subtotal (an over-read or a
+    /// price typo). Informational only — saving stays allowed.
+    private var overReadAnchor: Decimal? {
+        guard let sub = draft.printedSubtotal, sub > 0 else { return nil }
+        return (draft.subtotal - sub) > tolerance(sub) ? sub : nil
+    }
+
+    /// Route Save through the dropped-line check: confirm on a shortfall, else save straight away.
+    private func attemptSave() {
+        if droppedShortfall != nil { showDroppedAlert = true } else { onSave() }
+    }
 
     private struct MemoryCtx: Identifiable {
         let id = UUID(); let item: DraftItem; let old: String; let new: String
@@ -29,6 +58,9 @@ struct ReviewView: View {
             ScrollView {
                 VStack(spacing: 10) {
                     storeAndDate
+                    if let anchor = overReadAnchor, !noticeDismissed {
+                        mismatchNotice(anchor)
+                    }
                     ForEach(draft.items) { item in
                         ItemCard(item: item, onDelete: { draft.remove(item) },
                                  onEditCategory: { oldCategory = item.category; categoryTarget = item })
@@ -41,6 +73,14 @@ struct ReviewView: View {
             .safeAreaInset(edge: .bottom) { footer }
         }
         .background(Palette.groupedBackground.ignoresSafeArea())
+        .alert("Some lines may be missing", isPresented: $showDroppedAlert) {
+            Button("Review items", role: .cancel) {}
+            Button("Save anyway") { onSave() }
+        } message: {
+            if let sub = droppedShortfall {
+                Text("The items we read add up to \(draft.subtotal.formatMoney()), but the receipt subtotal is \(sub.formatMoney()). Double-check the items before saving.")
+            }
+        }
         .sheet(item: $categoryTarget) { target in
             CategoryPickerSheet(
                 selection: Binding(get: { target.category }, set: { target.category = $0 }),
@@ -68,7 +108,7 @@ struct ReviewView: View {
             Spacer()
             Button("Cancel", role: .cancel, action: onCancel)
                 .font(.system(size: 15, weight: .medium)).foregroundStyle(Palette.bad)
-            Button("Save", action: onSave)
+            Button("Save", action: attemptSave)
                 .font(.system(size: 15, weight: .semibold)).foregroundStyle(Palette.tint)
         }
         .padding(.horizontal, 20).padding(.top, 14).padding(.bottom, 12)
@@ -129,6 +169,33 @@ struct ReviewView: View {
         .fixedSize(horizontal: false, vertical: true)
     }
 
+    // MARK: - Price-mismatch notice
+
+    /// Soft, dismissible over-read banner (mockup): warn-tinted card at the top of the item list.
+    private func mismatchNotice(_ anchor: Decimal) -> some View {
+        HStack(alignment: .top, spacing: 10) {
+            Image(systemName: "exclamationmark.triangle")
+                .font(.system(size: 14, weight: .semibold)).foregroundStyle(Palette.warn)
+                .padding(.top, 1)
+            Text("Totals don't quite match — items add up to **\(draft.subtotal.formatMoney())**, the receipt shows **\(anchor.formatMoney())**. You can still save.")
+                .font(.system(size: 13)).foregroundStyle(Palette.label)
+                .lineSpacing(2)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            Button { noticeDismissed = true } label: {
+                Image(systemName: "xmark")
+                    .font(.system(size: 9, weight: .bold)).foregroundStyle(Palette.secondaryLabel)
+                    .frame(width: 22, height: 22)
+                    .background(Palette.fill, in: Circle())
+            }
+        }
+        .padding(.horizontal, 12).padding(.vertical, 11)
+        .background(Palette.warn.opacity(0.13), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .strokeBorder(Palette.warn.opacity(0.35), lineWidth: 0.5)
+        )
+    }
+
     // MARK: - Add item
 
     private var addItemButton: some View {
@@ -156,7 +223,7 @@ struct ReviewView: View {
             if draft.discount > 0 {
                 summaryRow("Discount", "−\(draft.discount.formatMoney())", color: Palette.good)
             }
-            Button(action: onSave) {
+            Button(action: attemptSave) {
                 Text("Save receipt · \(draft.total.formatMoney())")
                     .font(.headline)
                     .ctaPill()

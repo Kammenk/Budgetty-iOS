@@ -3,7 +3,7 @@
 //  Budgetty
 //
 //  Create or edit a user category: live preview, name, emoji grid, color swatches, and the free/
-//  premium cap note. Mirrors Android's custom-category limits (3 free / 10 premium).
+//  premium cap note. Mirrors Android's custom-category limits (3 free / unlimited premium).
 //
 
 import SwiftUI
@@ -118,8 +118,10 @@ struct CustomCategorySheet: View {
         HStack(spacing: 10) {
             Image(systemName: "star.fill").font(.caption).foregroundStyle(Palette.tint)
             Text(atLimit
-                 ? "You've reached your \(limit) custom categories. Upgrade to Premium for \(Categories.maxCustomLimit)."
-                 : "\(premium ? "Premium" : "Free") plan: \(customCategories.count) of \(limit) custom categories.")
+                 ? "You've reached your \(limit) custom categories. Upgrade to Premium for unlimited."
+                 : premium
+                 ? "Premium plan: \(customCategories.count) custom categories, no limit."
+                 : "Free plan: \(customCategories.count) of \(limit) custom categories.")
                 .font(.caption).foregroundStyle(Palette.tint)
         }
         .padding(.horizontal, 16).padding(.vertical, 12)

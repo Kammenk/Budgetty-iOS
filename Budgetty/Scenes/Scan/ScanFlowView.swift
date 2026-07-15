@@ -21,8 +21,17 @@ struct ScanFlowView: View {
     @State private var isManual = false
 
     @State private var showCamera = false
+    @State private var showDocScanner = false
     @State private var showLibrary = false
     @State private var pickedItem: PhotosPickerItem?
+
+    @AppStorage(SettingsKey.premium) private var premium = false
+    @AppStorage(SettingsKey.scanQuotaUsed) private var scansUsed = 0
+    @State private var showPaywall = false
+
+    /// Free scans remaining; AI capture is gated on it (manual entry never is).
+    private var scansLeft: Int { max(0, ScanQuota.freeLimit - scansUsed) }
+    private var quotaExhausted: Bool { !premium && scansLeft == 0 }
 
     var body: some View {
         content
@@ -30,7 +39,11 @@ struct ScanFlowView: View {
             .fullScreenCover(isPresented: $showCamera) {
                 CameraPicker { handle($0) }.ignoresSafeArea()
             }
+            .fullScreenCover(isPresented: $showDocScanner) {
+                DocumentScannerPicker { handle($0) }.ignoresSafeArea()
+            }
             .photosPicker(isPresented: $showLibrary, selection: $pickedItem, matching: .images)
+            .sheet(isPresented: $showPaywall) { NavigationStack { PaywallView() } }
             .onChange(of: pickedItem) { _, item in
                 guard let item else { return }
                 Task {
@@ -69,7 +82,17 @@ struct ScanFlowView: View {
                 }
                 .padding(.horizontal, 20).padding(.top, 8)
 
-                viewfinder.padding(.horizontal, 28).padding(.top, 16)
+                // Free-tier allowance, right under the title (mockup): quiet caption, photo+file only.
+                if !premium && scansLeft > 0 {
+                    Text("\(scansLeft) of \(ScanQuota.freeLimit) free scans left (photo or file). Manual entry is always free.")
+                        .font(.system(size: 12.5)).foregroundStyle(.white.opacity(0.62))
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 24).padding(.top, 6)
+                }
+
+                viewfinder
+                    .overlay { if quotaExhausted { exhaustedCard } }
+                    .padding(.horizontal, 28).padding(.top, 16)
 
                 Text("Position the receipt, then capture")
                     .font(.footnote).foregroundStyle(.white.opacity(0.6))
@@ -91,14 +114,20 @@ struct ScanFlowView: View {
                             .frame(width: 52, height: 52)
                             .background(.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
                     }
+                    .disabled(quotaExhausted).opacity(quotaExhausted ? 0.35 : 1)
                     Spacer()
                     // Shutter — the capture primary; solid white so it reads as the hero control.
+                    // Guided document scanner first (edge-detect/deskew/de-glare + retake); plain
+                    // camera where VisionKit is unsupported; photo picker on the Simulator.
                     Button {
-                        if CameraPicker.isAvailable { showCamera = true } else { showLibrary = true }
+                        if DocumentScannerPicker.isAvailable { showDocScanner = true }
+                        else if CameraPicker.isAvailable { showCamera = true }
+                        else { showLibrary = true }
                     } label: {
                         Circle().strokeBorder(.white, lineWidth: 4).frame(width: 72, height: 72)
                             .overlay(Circle().fill(.white).frame(width: 56, height: 56))
                     }
+                    .disabled(quotaExhausted).opacity(quotaExhausted ? 0.35 : 1)
                     Spacer()
                     // Flash
                     Button {} label: {
@@ -124,14 +153,17 @@ struct ScanFlowView: View {
                 RoundedRectangle(cornerRadius: 6)
                     .strokeBorder(style: StrokeStyle(lineWidth: 0.5, dash: [6]))
                     .foregroundStyle(.white.opacity(0.3))
-                    .overlay(
-                        VStack(spacing: 8) {
-                            Image(systemName: "doc.text.viewfinder")
-                                .font(.system(size: 30)).foregroundStyle(.white.opacity(0.5))
-                            Text("Align receipt in frame")
-                                .font(.footnote).foregroundStyle(.white.opacity(0.5))
+                    .overlay {
+                        // The align hint yields to the quota takeover card riding this frame.
+                        if !quotaExhausted {
+                            VStack(spacing: 8) {
+                                Image(systemName: "doc.text.viewfinder")
+                                    .font(.system(size: 30)).foregroundStyle(.white.opacity(0.5))
+                                Text("Align receipt in frame")
+                                    .font(.footnote).foregroundStyle(.white.opacity(0.5))
+                            }
                         }
-                    )
+                    }
                     .padding(30)
             )
             // Camera corner brackets (mockup): four L-shaped ticks framing the capture area.
@@ -226,8 +258,38 @@ struct ScanFlowView: View {
         phase = .review
     }
 
+    /// The quota-exhausted takeover riding the viewfinder (mockup): lock badge, message, Premium CTA.
+    private var exhaustedCard: some View {
+        VStack(spacing: 0) {
+            Circle().fill(.white.opacity(0.18))
+                .frame(width: 52, height: 52)
+                .overlay {
+                    Image(systemName: "lock")
+                        .font(.system(size: 20, weight: .medium)).foregroundStyle(.white)
+                }
+                .padding(.bottom, 14)
+            Text("You've used all \(ScanQuota.freeLimit) free scans")
+                .font(.system(size: 17, weight: .bold)).foregroundStyle(.white)
+                .padding(.bottom, 6)
+            Text("Go Premium to scan more — manual entry is always free.")
+                .font(.system(size: 13.5)).foregroundStyle(.white.opacity(0.65))
+                .multilineTextAlignment(.center).lineSpacing(2)
+                .padding(.bottom, 18)
+            Button { showPaywall = true } label: {
+                Text("Go Premium").font(.headline)
+                    .ctaPill(height: 50)
+            }
+        }
+        .padding(22)
+        .background(.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .padding(.horizontal, 20)
+    }
+
     private func save() {
         draft.persist(into: context, isManual: isManual)
+        // Only a successful, finalized scan counts against the free quota — failed reads and
+        // abandoned reviews never got here, and manual entry is always free.
+        if !isManual { scansUsed += 1 }
         dismiss()
     }
 

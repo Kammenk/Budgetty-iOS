@@ -10,7 +10,8 @@
 import SwiftUI
 
 enum InsightSection: String, CaseIterable, Identifiable {
-    case trend, breakdown, stats, topCategories, topStores, income
+    case trend, breakdown, stats, highlights, comparison, budget, topCategories, topStores,
+         biggestPurchases, income
     var id: String { rawValue }
 
     var title: String {
@@ -18,8 +19,12 @@ enum InsightSection: String, CaseIterable, Identifiable {
         case .trend: "Trend"
         case .breakdown: "Breakdown"
         case .stats: "Stats"
+        case .highlights: "Highlights"
+        case .comparison: "Period comparison"
+        case .budget: "Budget"
         case .topCategories: "Top categories"
         case .topStores: "Top stores"
+        case .biggestPurchases: "Biggest purchases"
         case .income: "Income & bills"
         }
     }
@@ -29,8 +34,12 @@ enum InsightSection: String, CaseIterable, Identifiable {
         case .trend: "chart.bar.fill"
         case .breakdown: "chart.pie.fill"
         case .stats: "square.grid.2x2.fill"
+        case .highlights: "sparkles"
+        case .comparison: "arrow.left.arrow.right"
+        case .budget: "target"
         case .topCategories: "list.number"
         case .topStores: "storefront.fill"
+        case .biggestPurchases: "crown.fill"
         case .income: "creditcard.fill"
         }
     }

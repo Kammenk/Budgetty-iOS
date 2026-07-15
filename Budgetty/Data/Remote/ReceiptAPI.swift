@@ -29,6 +29,11 @@ struct ExtractResponse: Decodable {
     var subtotal: Double?
     /// Tax added on top of item prices (0 when prices already include tax); nil/0 if none.
     var tax: Double?
+    /// Combined non-tip, non-product add-on charges (delivery + service + bag/booking fees), already
+    /// part of `total`; materialized client-side as a "Delivery & fees" line item. nil/0 when none.
+    var deliveryAndFees: Double?
+    /// Gratuity/tip, kept separate from `deliveryAndFees`; also already part of `total`.
+    var tip: Double?
     /// Model self-assessment: false when the image was too poor to read line items reliably.
     var readable: Bool?
     /// Article/item count printed on the receipt; nil/0 if not printed.

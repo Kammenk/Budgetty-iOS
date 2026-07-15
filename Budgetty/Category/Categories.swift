@@ -24,9 +24,9 @@ enum Categories {
     /// The catch-all a custom category's transactions fall back to when it is deleted.
     static let other = "Other"
 
-    /// Custom-category caps: free tier vs. Premium.
+    /// Custom-category caps: `freeCustomLimit` on the free tier, effectively unlimited with Premium.
     static let freeCustomLimit = 3
-    static let maxCustomLimit = 10
+    static let maxCustomLimit = Int.max
 
     // MARK: - Raw definitions (name, emoji, parent), in display order
 
@@ -59,17 +59,17 @@ enum Categories {
         // ❤️ Health & Wellness
         Def(name: "Health & Wellness", emoji: "❤️", parent: nil),
         Def(name: "Health & Pharmacy", emoji: "💊", parent: "Health & Wellness"),
-        Def(name: "Medical", emoji: "🏥", parent: "Health & Wellness"),
-        Def(name: "Sports & Fitness", emoji: "🏋️", parent: "Health & Wellness"),
+        Def(name: "Medical", emoji: "🩺", parent: "Health & Wellness"),
+        Def(name: "Sports & Fitness", emoji: "💪", parent: "Health & Wellness"),
         // 🍽️ Dining & Entertainment
         Def(name: "Dining & Entertainment", emoji: "🍽️", parent: nil),
         Def(name: "Restaurant & Dining", emoji: "🍴", parent: "Dining & Entertainment"),
-        Def(name: "Entertainment", emoji: "🎟️", parent: "Dining & Entertainment"),
+        Def(name: "Entertainment", emoji: "🎬", parent: "Dining & Entertainment"),
         // 🛍️ Shopping & Lifestyle
         Def(name: "Shopping & Lifestyle", emoji: "🛍️", parent: nil),
-        Def(name: "Clothing & Accessories", emoji: "👗", parent: "Shopping & Lifestyle"),
-        Def(name: "Electronics", emoji: "🔌", parent: "Shopping & Lifestyle"),
-        Def(name: "Garden & Plants", emoji: "🌱", parent: "Shopping & Lifestyle"),
+        Def(name: "Clothing & Accessories", emoji: "👕", parent: "Shopping & Lifestyle"),
+        Def(name: "Electronics", emoji: "💻", parent: "Shopping & Lifestyle"),
+        Def(name: "Garden & Plants", emoji: "🪴", parent: "Shopping & Lifestyle"),
         Def(name: "Home Improvement", emoji: "🛠️", parent: "Shopping & Lifestyle"),
         Def(name: "Tobacco & Alcohol", emoji: "🍷", parent: "Shopping & Lifestyle"),
         // 🚗 Transportation
@@ -78,13 +78,23 @@ enum Categories {
         Def(name: "Car Maintenance", emoji: "🔧", parent: "Transportation"),
         // 📋 Services & Subscriptions
         Def(name: "Services & Subscriptions", emoji: "📋", parent: nil),
-        Def(name: "Subscriptions & Services", emoji: "🔔", parent: "Services & Subscriptions"),
-        Def(name: "Education", emoji: "📚", parent: "Services & Subscriptions"),
-        Def(name: "Travel & Accommodation", emoji: "✈️", parent: "Services & Subscriptions"),
-        Def(name: "Insurance & Utilities", emoji: "⚡", parent: "Services & Subscriptions"),
-        Def(name: "Rent", emoji: "🏘️", parent: "Services & Subscriptions"),
-        Def(name: "Office & Work Supplies", emoji: "📎", parent: "Services & Subscriptions"),
+        Def(name: "Subscriptions & Services", emoji: "🔁", parent: "Services & Subscriptions"),
+        Def(name: "Education", emoji: "🎓", parent: "Services & Subscriptions"),
+        Def(name: "Travel & Accommodation", emoji: "🧳", parent: "Services & Subscriptions"),
+        Def(name: "Insurance & Utilities", emoji: "🛡️", parent: "Services & Subscriptions"),
+        Def(name: "Rent", emoji: "🔑", parent: "Services & Subscriptions"),
+        Def(name: "Office & Work Supplies", emoji: "🗂️", parent: "Services & Subscriptions"),
         Def(name: "Gifts & Charitable Donations", emoji: "🎁", parent: "Services & Subscriptions"),
+        // Appended below their group headers on purpose (Video Games → Dining, Investments → Services):
+        // sub-category hues are assigned by walking `defs` in order (farthest-point), so inserting these
+        // mid-list would recolor every sub after them. Appending leaves all existing colors untouched;
+        // `children()` filters by parent, so they still render inside their own group.
+        Def(name: "Video Games", emoji: "🎮", parent: "Dining & Entertainment"),
+        Def(name: "Investments", emoji: "📈", parent: "Services & Subscriptions"),
+        // 🪙 Gratuity on a delivery/restaurant order — its own line, kept apart from the food.
+        Def(name: "Tips", emoji: "🪙", parent: "Dining & Entertainment"),
+        // 🛵 Combined delivery + service + bag/booking fees on a delivery-app order.
+        Def(name: "Delivery", emoji: "🛵", parent: "Other"),
         // 📦 Catch-all
         Def(name: "Other", emoji: "📦", parent: nil),
     ]
