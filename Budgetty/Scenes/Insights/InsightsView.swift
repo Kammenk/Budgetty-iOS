@@ -557,7 +557,7 @@ struct InsightsView: View {
         .background(Palette.fill, in: Capsule())
     }
 
-    private func breakdownSegment(_ title: String, active: Bool, action: @escaping () -> Void) -> some View {
+    private func breakdownSegment(_ title: LocalizedStringKey, active: Bool, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Text(title)
                 .font(.system(size: 12, weight: .semibold))

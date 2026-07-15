@@ -52,7 +52,7 @@ struct CategoryBudgetSheet: View {
 
     // MARK: - Rows
 
-    private func amountRow(title: String, key: String) -> some View {
+    private func amountRow(title: LocalizedStringKey, key: String) -> some View {
         HStack {
             Text(title)
             Spacer()

@@ -72,7 +72,7 @@ struct SupportAboutView: View {
         .navigationTitle("Support & About")
     }
 
-    private func sectionHeader(_ title: String) -> some View {
+    private func sectionHeader(_ title: LocalizedStringKey) -> some View {
         Text(title)
             .font(.footnote)
             .foregroundStyle(Palette.secondaryLabel)
@@ -84,7 +84,7 @@ struct SupportAboutView: View {
         Rectangle().fill(Palette.separator).frame(height: 0.5)
     }
 
-    private func link(_ title: String, _ symbol: String, _ tint: Color) -> some View {
+    private func link(_ title: LocalizedStringKey, _ symbol: String, _ tint: Color) -> some View {
         Button {} label: {
             HStack(spacing: 12) {
                 SettingsIcon(symbol: symbol, background: tint)

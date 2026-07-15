@@ -130,7 +130,7 @@ struct PaywallView: View {
         }
     }
 
-    private func planCard(_ p: Plan, title: String, detail: String, price: String, sub: String?, badge: String?) -> some View {
+    private func planCard(_ p: Plan, title: LocalizedStringKey, detail: String, price: String, sub: String?, badge: String?) -> some View {
         let selected = plan == p
         return Button {
             plan = p

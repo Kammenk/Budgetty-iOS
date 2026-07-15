@@ -129,7 +129,7 @@ struct CustomCategorySheet: View {
         .background(Palette.tintSoft, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
     }
 
-    private func field<Content: View>(_ label: String, @ViewBuilder _ content: () -> Content) -> some View {
+    private func field<Content: View>(_ label: LocalizedStringKey, @ViewBuilder _ content: () -> Content) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(label).font(.caption).fontWeight(.semibold).textCase(.uppercase).tracking(0.6)
                 .foregroundStyle(Palette.secondaryLabel).padding(.leading, 16)

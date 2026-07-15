@@ -285,7 +285,7 @@ struct AccountView: View {
 
     // MARK: - Row building blocks
 
-    private func sectionHeader(_ title: String) -> some View {
+    private func sectionHeader(_ title: LocalizedStringKey) -> some View {
         Text(title)
             .font(.footnote)
             .foregroundStyle(Palette.secondaryLabel)
@@ -314,7 +314,7 @@ struct AccountView: View {
         }
     }
 
-    private func row<Trailing: View>(_ title: String, _ symbol: String, _ tint: Color,
+    private func row<Trailing: View>(_ title: LocalizedStringKey, _ symbol: String, _ tint: Color,
                                       icon: Color = .white,
                                       @ViewBuilder trailing: () -> Trailing) -> some View {
         HStack(spacing: 12) {

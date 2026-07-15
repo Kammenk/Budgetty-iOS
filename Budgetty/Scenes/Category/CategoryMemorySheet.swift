@@ -76,7 +76,7 @@ struct CategoryMemorySheet: View {
         .frame(maxWidth: .infinity)
     }
 
-    private func option(_ title: String, _ subtitle: String, _ value: MemoryScope) -> some View {
+    private func option(_ title: LocalizedStringKey, _ subtitle: LocalizedStringKey, _ value: MemoryScope) -> some View {
         Button {
             scope = value
         } label: {

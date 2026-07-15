@@ -49,7 +49,7 @@ struct IncomeInsightsCards: View {
         }
     }
 
-    private func comparisonRow(_ title: String, _ value: Decimal, _ color: Color) -> some View {
+    private func comparisonRow(_ title: LocalizedStringKey, _ value: Decimal, _ color: Color) -> some View {
         let frac = monthlyIncome > 0 ? min(dbl(value) / dbl(monthlyIncome), 1) : 0
         return VStack(spacing: 4) {
             HStack {
@@ -105,7 +105,7 @@ struct IncomeInsightsCards: View {
         }
     }
 
-    private func legend(_ title: String, _ value: Decimal, _ color: Color) -> some View {
+    private func legend(_ title: LocalizedStringKey, _ value: Decimal, _ color: Color) -> some View {
         HStack(spacing: 6) {
             Circle().fill(color).frame(width: 8, height: 8)
             VStack(alignment: .leading, spacing: 1) {
@@ -158,7 +158,7 @@ struct IncomeInsightsCards: View {
         }
     }
 
-    private func card<Content: View>(_ title: String, @ViewBuilder _ content: () -> Content) -> some View {
+    private func card<Content: View>(_ title: LocalizedStringKey, @ViewBuilder _ content: () -> Content) -> some View {
         VStack(alignment: .leading, spacing: 14) {
             Text(title).font(.headline)
             content()

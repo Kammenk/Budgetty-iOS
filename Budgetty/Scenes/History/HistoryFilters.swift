@@ -55,7 +55,7 @@ struct PriceRangeSheet: View {
     }
 
     /// One glass card per bound (mockup: label + amount + slider on a glass row).
-    private func rangeCard(_ title: String, value: Binding<Double>,
+    private func rangeCard(_ title: LocalizedStringKey, value: Binding<Double>,
                            clamp: @escaping (Double) -> Void) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {

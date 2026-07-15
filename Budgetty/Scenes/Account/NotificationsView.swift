@@ -45,7 +45,7 @@ struct NotificationsView: View {
         .navigationTitle("Notifications")
     }
 
-    private func sectionHeader(_ title: String) -> some View {
+    private func sectionHeader(_ title: LocalizedStringKey) -> some View {
         Text(title)
             .font(.footnote)
             .foregroundStyle(Palette.secondaryLabel)
@@ -57,7 +57,7 @@ struct NotificationsView: View {
         Rectangle().fill(Palette.separator).frame(height: 0.5)
     }
 
-    private func toggle(_ title: String, _ subtitle: String, _ symbol: String, _ tint: Color,
+    private func toggle(_ title: LocalizedStringKey, _ subtitle: LocalizedStringKey, _ symbol: String, _ tint: Color,
                         _ binding: Binding<Bool>) -> some View {
         Toggle(isOn: binding) {
             HStack(spacing: 12) {

@@ -142,7 +142,7 @@ struct ReceiptDetailView: View {
         }
     }
 
-    private func totalRow(_ title: String, _ value: String, color: Color, bold: Bool = false) -> some View {
+    private func totalRow(_ title: LocalizedStringKey, _ value: String, color: Color, bold: Bool = false) -> some View {
         HStack {
             Text(title).font(.body).foregroundStyle(Palette.label)
             Spacer()

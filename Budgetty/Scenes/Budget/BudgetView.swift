@@ -259,7 +259,7 @@ struct BudgetView: View {
         }
     }
 
-    private func addRow(_ title: String, action: @escaping () -> Void) -> some View {
+    private func addRow(_ title: LocalizedStringKey, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             HStack(spacing: 12) {
                 RoundedRectangle(cornerRadius: 8, style: .continuous).fill(Palette.fill)
@@ -394,7 +394,7 @@ struct BudgetView: View {
 
     // MARK: - Bits
 
-    private func sectionHeader(_ title: String) -> some View {
+    private func sectionHeader(_ title: LocalizedStringKey) -> some View {
         HStack {
             Text(title).font(.caption).fontWeight(.semibold).textCase(.uppercase)
                 .foregroundStyle(Palette.secondaryLabel).tracking(0.5)
