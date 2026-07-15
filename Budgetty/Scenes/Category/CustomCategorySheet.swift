@@ -55,7 +55,7 @@ struct CustomCategorySheet: View {
                 .padding(20)
             }
             .background(Palette.groupedBackground)
-            .navigationTitle(editing == nil ? "New Category" : "Edit Category")
+            .navigationTitle(editing == nil ? "New category" : "Edit category")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }

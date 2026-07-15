@@ -171,7 +171,7 @@ struct BudgetView: View {
                     HStack {
                         Text("\(spent.formatMoney()) spent · \(Int(frac * 100))%")
                         Spacer()
-                        Text("\((b.amount - spent).formatMoney()) remaining").fontWeight(.semibold)
+                        Text("\((b.amount - spent).formatMoney()) left").fontWeight(.semibold)
                             .foregroundStyle(color)
                     }
                     .font(.footnote).foregroundStyle(Palette.secondaryLabel)
@@ -377,7 +377,7 @@ struct BudgetView: View {
                         .font(.caption).foregroundStyle(color)
                     ProgressBarView(fraction: frac, color: Color(argb: Categories.color(for: group)), height: 4)
                 } else {
-                    Text("Set budget").font(.caption).foregroundStyle(Palette.tint)
+                    Text("Set a budget").font(.caption).foregroundStyle(Palette.tint)
                     ProgressBarView(fraction: 0, color: .clear, height: 4)
                 }
                 if subCount > 0 {

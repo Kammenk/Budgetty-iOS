@@ -53,7 +53,7 @@ struct LoginView: View {
                 Button(action: submit) {
                     ZStack {
                         if busy { ProgressView().tint(.white) }
-                        else { Text(isSignUp ? "Create Account" : "Sign In").font(.headline) }
+                        else { Text(isSignUp ? "Create account" : "Sign in").font(.headline) }
                     }
                     .ctaPill()
                     .opacity(canSubmit ? 1 : 0.5)
@@ -62,9 +62,9 @@ struct LoginView: View {
                 .padding(.top, 20)
 
                 HStack(spacing: 4) {
-                    Text(isSignUp ? "Already have an account?" : "Don't have an account?")
+                    Text(isSignUp ? "Have an account?" : "Don't have an account?")
                         .foregroundStyle(Palette.secondaryLabel)
-                    Button(isSignUp ? "Sign In" : "Sign Up") { withAnimation { isSignUp.toggle() } }
+                    Button(isSignUp ? "Sign in" : "Sign Up") { withAnimation { isSignUp.toggle() } }
                         .fontWeight(.semibold).foregroundStyle(Palette.tint)
                 }
                 .font(.subheadline).padding(.top, 24)
@@ -96,7 +96,7 @@ struct LoginView: View {
             options: [Mode(signUp: false), Mode(signUp: true)],
             selection: Binding(get: { Mode(signUp: isSignUp) },
                                set: { isSignUp = $0.signUp })
-        ) { $0.signUp ? "Sign Up" : "Sign In" }
+        ) { $0.signUp ? "Sign Up" : "Sign in" }
     }
 
     private var header: some View {
