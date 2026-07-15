@@ -35,7 +35,7 @@ screens, iPad adaptive + landscape, StoreKit 2). Everything below is drift since
 > of those waits on the mockups; §§1/3/6/7 need no design and can start any time.
 
 ### 1. Category taxonomy catch-up — Video Games, Investments, Tips, Delivery + emoji refresh
-**Status:** NOT PORTED (verified 2026-07-14: `Categories.swift` has no "Video Games")
+**Status:** PORTED `9f08eef` (2026-07-15, sim-verified iPhone 17 Pro) — all 4 categories + the 10.2.0 12-emoji refresh; insert-missing seed covers existing installs
 **Android:** 10.2.0 (2026-07-08) added Video Games + Investments and refreshed 12 emojis
 with muted mockup-hue colors; commit `5eb7592` (2026-07-12) added **Tips** and **Delivery**
 so scanned fee/tip line items get real categories.
@@ -57,7 +57,7 @@ so scanned fee/tip line items get real categories.
 `ui/util/CategoryNames.kt`) — when iOS localizes (§6), reuse those finished translations.
 
 ### 2. Guided document-scanner capture + dropped-line guard
-**Status:** NOT PORTED
+**Status:** PORTED `9f08eef` (2026-07-15, sim-verified iPhone 17 Pro) — VisionKit doc scanner + blocking dropped-line alert + the soft over-read notice
 **Android:** 10.3.0 (2026-07-11), merge `606f0ea`.
 **Behavior rules:**
 - Capture step uses a guided document scanner (edge detection, deskew, de-glare,
@@ -77,13 +77,13 @@ older **soft** PriceMismatchNotice from the 07-07 baseline (grep "mismatch/doubl
 hits; the extractor silently absorbs gaps into extraCharges). Port both tiers together.
 
 ### 3. Delivery/tip line items + extra-charges add-on in totals math
-**Status:** PARTIALLY PRESENT (verified 2026-07-14). iOS already carries `extraCharges` in the
+**Status:** PORTED `9f08eef` (2026-07-15, sim-verified iPhone 17 Pro) — deliveryAndFees/tip decoded, charge line items materialized, residual math aligned. (Was: PARTIALLY PRESENT — iOS already carried `extraCharges` in the
 model, backup, and draft totals (`ReceiptDraft.total = subtotal − discount + additiveCharges`),
 derived as the **residual gap** to the printed total in `ReceiptExtractor.swift`. What's missing
 is only the `5eb7592` upgrade: decode the new `deliveryAndFees`/`tip` DTO fields, materialize
 them as visible "Delivery & fees" / "Tip" line items (needs §1's Tips/Delivery categories
 first), and compute extra-charges as the residual after those to avoid double-counting.
-The shared server ALREADY returns these fields to iOS scans
+The shared server ALREADY returned these fields to iOS scans.)
 **Android:** commit `5eb7592` (2026-07-12, shipped in the 10.4.0 build);
 server change in `functions/receiptPrompt.js` is deployed (affects both apps today).
 **Behavior rules:**
@@ -101,8 +101,7 @@ client), `data/remote/ReceiptDtos.kt`, `ui/upload/UploadViewModel.kt`.
 `Scenes/Receipt/ReceiptDetailView.swift`.
 
 ### 4. Free-scan quota: 10 scans on the free tier
-**Status:** NOT PORTED — grep found NO quota code in the iOS app at all (2026-07-14);
-if true, free iOS users currently scan without limit. Verify, then mirror.
+**Status:** PORTED `9f08eef` (2026-07-15, sim-verified iPhone 17 Pro) — ScanQuota (10 lifetime, consumed on finalize, reset on account deletion) + capture-screen caption/lock states + paywall trigger.
 **Android:** quota raised to 10 in `5eb7592`; enforcement in
 `app/src/main/java/com/budgetty/app/data/quota/ScanQuota.kt`. Exact semantics (verified
 2026-07-14): FREE_LIMIT = 10 is a **lifetime** total, no monthly reset; a scan is consumed
@@ -112,7 +111,7 @@ stored device-level, not per-user — an accepted follow-up there.)
 **iOS refs:** none found — likely new code near the scan entry point + paywall trigger.
 
 ### 5. Recurring bills on the Home summary card
-**Status:** NOT PORTED
+**Status:** PORTED `9f08eef` (2026-07-15, sim-verified iPhone 17 Pro) — hero-card planned strip per the updated iOS Home mockup
 **Android:** 10.4.0 (2026-07-14), merge `fa2ef68` (feature commit `326845b`).
 **Behavior rules:**
 - "Total spent" card pairs receipt-backed spending with planned recurring bills: a slim
@@ -136,7 +135,7 @@ Android keys → iOS keys and convert the 21 finished locales from
 before porting features that add strings, or every port doubles the extraction work.
 
 ### 7. Unlimited premium custom categories
-**Status:** NOT PORTED (verified 2026-07-14: `Categories.swift` still `maxCustomLimit = 10`)
+**Status:** PORTED `9f08eef` (2026-07-15, sim-verified iPhone 17 Pro) — `maxCustomLimit = Int.max`, sheet copy reworded
 **Android:** `5eb7592` (2026-07-12) — premium custom categories now **unlimited**
 (`MAX_CUSTOM_LIMIT = Int.MAX_VALUE`); free stays at 3.
 **iOS refs:** `Budgetty/Category/Categories.swift:28-29`,
@@ -144,9 +143,7 @@ before porting features that add strings, or every port doubles the extraction w
 reword to "unlimited" for premium).
 
 ### 8. Insights: missing sections + breakdown toggle + Avg/day stat
-**Status:** NOT PORTED (verified 2026-07-14 against `InsightsSection.kt` — Android has 14
-customizable sections, iOS `InsightsCustomize.swift` has 6: trend, breakdown, stats,
-topCategories, topStores, income)
+**Status:** PORTED `9f08eef` (2026-07-15, sim-verified iPhone 17 Pro) — Highlights, Period comparison, Budget-vs-actual, Biggest purchases, Groups↔All breakdown toggle, Avg/day tile, on-pace caption (iOS now 10 sections)
 **Missing on iOS entirely:** HIGHLIGHTS (incl. spending pace), PERIOD_COMPARISON (vs previous
 period cards), BUDGET (budget-vs-actual), BIGGEST_PURCHASES. iOS income bundle does cover all
 5 income cards (vs-spending, savings rate, fixed/flexible, upcoming bills, by source ✓).
@@ -159,8 +156,7 @@ has Total spent / Receipts / Avg-per-receipt / Saved only).
 check `iOS Insights Extra Cards.dc.html` for LG coverage, request variants for the rest.
 
 ### 9. Home "Customize sections" (show/hide + reorder)
-**Status:** NOT PORTED (verified 2026-07-14: iOS has the customize sheet on Insights only;
-`Scenes/Home/HomeView.swift` has no section order/hide support)
+**Status:** PORTED `9f08eef` (2026-07-15, sim-verified iPhone 17 Pro) — HomeCustomize sheet + header pill; week-comparison card added, hidden by default
 **Android:** `ui/home/HomeSection.kt` + settings-persisted order/hidden set, phone-only by
 design. Mirror the existing iOS `InsightsCustomize` pattern.
 
@@ -210,4 +206,4 @@ headers, receipt detail, Insights).
 
 ---
 
-*Last synced: 2026-07-14 (full code cross-check: §§1-6 verified, §3 downgraded to partial, §§7-10 added) — Android `main`/`eb9a1b7` (+ unmerged `insights-questionnaire`) · iOS `main`/`653e001`.*
+*Last synced: 2026-07-15 (parity batch `9f08eef` ports §§1-5 and 7-9; REMAINING: §6 localization, §10 widgets-optional, and the Android-side date-format port) — Android `main`/`eb9a1b7` (+ unmerged `insights-questionnaire`) · iOS `android-parity`/`9f08eef`.*
