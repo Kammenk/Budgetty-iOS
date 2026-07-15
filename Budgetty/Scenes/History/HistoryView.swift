@@ -17,7 +17,8 @@ enum HistoryMode: String, CaseIterable, Identifiable {
 
 struct HistoryView: View {
     @Query(sort: \Receipt.createdAt, order: .reverse) private var receipts: [Receipt]
-    @Query private var budgets: [Budget]
+    @Query(sort: \Recurring.createdAt) private var recurring: [Recurring]
+    @Environment(\.selectTab) private var selectTab
     @AppStorage(SettingsKey.dateFormat) private var dateFormatRaw = DateFormatOption.system.rawValue
 
     private var dateFormat: DateFormatOption { DateFormatOption(rawValue: dateFormatRaw) ?? .system }
@@ -151,45 +152,51 @@ struct HistoryView: View {
                 }
                 .padding(.top, 2)
             }
-            HStack(spacing: 8) {
-                Image(systemName: "magnifyingglass").foregroundStyle(Palette.secondaryLabel)
-                TextField("Search", text: $search).font(.subheadline)
-                if !search.isEmpty {
-                    Button { search = "" } label: {
-                        Image(systemName: "xmark.circle.fill").foregroundStyle(Palette.tertiaryLabel)
+            // Search + filters apply to receipts/items only; the Budgets tab is a read-only plan
+            // snapshot (not searchable or time-scoped), so both are hidden there — matching Android.
+            if mode != .budgets {
+                HStack(spacing: 8) {
+                    Image(systemName: "magnifyingglass").foregroundStyle(Palette.secondaryLabel)
+                    TextField("Search", text: $search).font(.subheadline)
+                    if !search.isEmpty {
+                        Button { search = "" } label: {
+                            Image(systemName: "xmark.circle.fill").foregroundStyle(Palette.tertiaryLabel)
+                        }
                     }
                 }
+                .font(.subheadline)
+                .padding(.horizontal, 14).padding(.vertical, 10)
+                .background(Palette.matControl, in: Capsule())
+                .background(.ultraThinMaterial, in: Capsule())
+                .overlay(Capsule().strokeBorder(Palette.matControlBorder, lineWidth: 0.5))
+                .shadow(color: Color(argb: 0x0F140A32), radius: 5, y: 2)
             }
-            .font(.subheadline)
-            .padding(.horizontal, 14).padding(.vertical, 10)
-            .background(Palette.matControl, in: Capsule())
-            .background(.ultraThinMaterial, in: Capsule())
-            .overlay(Capsule().strokeBorder(Palette.matControlBorder, lineWidth: 0.5))
-            .shadow(color: Color(argb: 0x0F140A32), radius: 5, y: 2)
 
             GlassSegmentedControl(options: Array(HistoryMode.allCases), selection: $mode) {
                 $0.rawValue
             }
 
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 7) {
-                    if hasActiveFilters {
-                        Button { clearFilters() } label: { chipLabel("Clear", active: true, icon: "xmark") }
-                    }
-                    Menu {
-                        Picker("Sort", selection: $sort) {
-                            ForEach(HistorySort.allCases) { Text($0.rawValue).tag($0) }
+            if mode != .budgets {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 7) {
+                        if hasActiveFilters {
+                            Button { clearFilters() } label: { chipLabel("Clear", active: true, icon: "xmark") }
                         }
-                    } label: { chipLabel("Sort", active: false, trailing: "chevron.down") }
-                    Button { showDate = true } label: {
-                        chipLabel("Date", active: dateRange != nil, trailing: "chevron.down")
-                    }
-                    Button { showCategory = true } label: {
-                        chipLabel(categoryFilter.isEmpty ? "Category" : "Category (\(categoryFilter.count))",
-                                  active: !categoryFilter.isEmpty, trailing: "chevron.down")
-                    }
-                    Button { showPrice = true } label: {
-                        chipLabel("Price", active: priceLo != nil || priceHi != nil, trailing: "chevron.down")
+                        Menu {
+                            Picker("Sort", selection: $sort) {
+                                ForEach(HistorySort.allCases) { Text($0.rawValue).tag($0) }
+                            }
+                        } label: { chipLabel("Sort", active: false, trailing: "chevron.down") }
+                        Button { showDate = true } label: {
+                            chipLabel("Date", active: dateRange != nil, trailing: "chevron.down")
+                        }
+                        Button { showCategory = true } label: {
+                            chipLabel(categoryFilter.isEmpty ? "Category" : "Category (\(categoryFilter.count))",
+                                      active: !categoryFilter.isEmpty, trailing: "chevron.down")
+                        }
+                        Button { showPrice = true } label: {
+                            chipLabel("Price", active: priceLo != nil || priceHi != nil, trailing: "chevron.down")
+                        }
                     }
                 }
             }
@@ -365,59 +372,123 @@ struct HistoryView: View {
         .padding(.horizontal, 16).padding(.vertical, 11)
     }
 
-    // MARK: - Budgets tab
+    // MARK: - Budgets tab (money-plan snapshot: income + recurring, mirroring the Budget screen)
 
-    private var categoryBudgets: [Budget] {
-        budgets.filter { $0.key.hasPrefix("CAT:") }
-            .sorted { $0.key < $1.key }
-    }
+    private var income: [Recurring] { recurring.filter(\.isIncome) }
+    private var bills: [Recurring] { recurring.filter { !$0.isIncome } }
+    private var monthlyIncome: Decimal { income.reduce(.zero) { $0 + $1.monthlyEquivalent } }
+    private var monthlyBills: Decimal { bills.reduce(.zero) { $0 + $1.monthlyEquivalent } }
+    private var hasBudgetPlan: Bool { !income.isEmpty || !bills.isEmpty }
 
-    private func monthSpend(forCategory cat: String) -> Decimal {
-        let cal = Calendar.current
-        return allItems
-            .filter { cal.isDate($0.createdAt, equalTo: .now, toGranularity: .month) }
-            .filter { $0.category.caseInsensitiveCompare(cat) == .orderedSame
-                || Categories.groupOf($0.category).caseInsensitiveCompare(cat) == .orderedSame }
-            .reduce(.zero) { $0 + $1.lineTotal }
-    }
-
+    /// A read-only snapshot of the money plan (income + recurring payments) mirrored from the Budget
+    /// screen, topped by a "left after bills" summary — the Android History Budgets tab. It reflects
+    /// the current plan (not time-scoped), so it links out to Budget to make changes.
     private var budgetsTab: some View {
         Group {
-            if categoryBudgets.isEmpty {
-                HistoryEmpty(symbol: "chart.pie", text: "No category budgets set")
-            } else {
-                let monthTotal = categoryBudgets.reduce(Decimal.zero) { $0 + monthSpend(forCategory: String($1.key.dropFirst(4))) }
-                LazyVStack(spacing: 0) {
-                    sectionHeader("\(HomeView.monthLabel(.now)) · \(monthTotal.formatMoney()) spent", trailing: nil)
-                    card {
-                        ForEach(Array(categoryBudgets.enumerated()), id: \.element.persistentModelID) { idx, b in
-                            let cat = String(b.key.dropFirst(4))
-                            budgetRow(category: cat, spent: monthSpend(forCategory: cat), limit: b.amount)
-                            if idx < categoryBudgets.count - 1 { Divider().padding(.leading, 60) }
-                        }
+            if !hasBudgetPlan {
+                VStack(spacing: 14) {
+                    HistoryEmpty(symbol: "chart.pie", text: "No budget plan yet")
+                    Button { selectTab?(.budget) } label: {
+                        Text("Set up your budget  →")
+                            .font(.subheadline).fontWeight(.semibold).foregroundStyle(Palette.tint)
                     }
+                    .buttonStyle(.plain)
                 }
-                .padding(.bottom, 24)
+            } else {
+                LazyVStack(spacing: 10) {
+                    budgetsSummaryCard
+                    if !income.isEmpty {
+                        budgetsSectionCard(title: "Income", total: monthlyIncome,
+                                           rows: income, isIncome: true)
+                    }
+                    if !bills.isEmpty {
+                        budgetsSectionCard(title: "Recurring payments", total: monthlyBills,
+                                           rows: bills, isIncome: false)
+                    }
+                    Button { selectTab?(.budget) } label: {
+                        Text("Manage in Budget  →")
+                            .font(.subheadline).fontWeight(.semibold).foregroundStyle(Palette.tint)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 6)
+                    }
+                    .buttonStyle(.plain)
+                }
+                .padding(.horizontal, 20).padding(.top, 10).padding(.bottom, 24)
             }
         }
     }
 
-    private func budgetRow(category: String, spent: Decimal, limit: Decimal) -> some View {
-        let frac = HomeView.fraction(spent, of: limit)
-        let color: Color = frac >= 1 ? Palette.bad : (frac >= 0.85 ? Palette.warn : Palette.good)
-        return HStack(spacing: 12) {
-            CategoryTile(category: category, size: 32, soft: true)
-            VStack(spacing: 5) {
-                HStack {
-                    Text(Categories.displayName(category)).font(.subheadline).foregroundStyle(Palette.label)
-                    Spacer()
-                    Text("\(spent.formatMoney()) / \(limit.formatMoney())")
-                        .font(.subheadline).fontWeight(.semibold).foregroundStyle(color)
-                }
-                ProgressBarView(fraction: frac, color: color, height: 5)
+    /// income − recurring bills = what's left after fixed costs for the month.
+    private var budgetsSummaryCard: some View {
+        let left = monthlyIncome - monthlyBills
+        return VStack(alignment: .leading, spacing: 0) {
+            Text("Monthly").font(.caption).fontWeight(.semibold).textCase(.uppercase)
+                .foregroundStyle(Palette.secondaryLabel).tracking(0.5)
+                .padding(.bottom, 8)
+            summaryLine("Income", amount: "+\(monthlyIncome.formatMoney())", color: Palette.good)
+            Divider()
+            summaryLine("Recurring bills", amount: "−\(monthlyBills.formatMoney())",
+                        color: Palette.secondaryLabel)
+            Divider().padding(.bottom, 8)
+            HStack {
+                Text("Left after bills").font(.subheadline).fontWeight(.bold)
+                    .foregroundStyle(Palette.label)
+                Spacer()
+                Text(left.formatMoney()).font(.title3).fontWeight(.bold)
+                    .foregroundStyle(left >= 0 ? Palette.good : Palette.bad)
             }
+            .padding(.top, 4)
         }
         .padding(.horizontal, 16).padding(.vertical, 14)
+        .contentCard(cornerRadius: 16)
+    }
+
+    private func summaryLine(_ label: LocalizedStringKey, amount: String, color: Color) -> some View {
+        HStack {
+            Text(label).font(.subheadline).foregroundStyle(Palette.label)
+            Spacer()
+            Text(amount).font(.subheadline).fontWeight(.semibold).foregroundStyle(color)
+        }
+        .padding(.vertical, 5)
+    }
+
+    /// A card with a "Title … €X / mo" header and its read-only income/bill rows.
+    private func budgetsSectionCard(title: LocalizedStringKey, total: Decimal,
+                                    rows: [Recurring], isIncome: Bool) -> some View {
+        VStack(spacing: 0) {
+            HStack {
+                Text(title).font(.subheadline).fontWeight(.bold).foregroundStyle(Palette.label)
+                Spacer()
+                Text("\(total.formatMoney()) / mo").font(.caption).foregroundStyle(Palette.secondaryLabel)
+            }
+            .padding(.horizontal, 16).padding(.top, 12).padding(.bottom, 10)
+            ForEach(Array(rows.enumerated()), id: \.element.persistentModelID) { _, r in
+                Divider().padding(.leading, 60)
+                budgetsMoneyRow(r, isIncome: isIncome)
+            }
+        }
+        .contentCard(cornerRadius: 16)
+    }
+
+    private func budgetsMoneyRow(_ r: Recurring, isIncome: Bool) -> some View {
+        HStack(spacing: 12) {
+            if isIncome {
+                RoundedRectangle(cornerRadius: 8, style: .continuous).fill(Palette.good.opacity(0.16))
+                    .frame(width: 34, height: 34)
+                    .overlay(Text("💰").font(.system(size: 16)))
+            } else {
+                CategoryTile(category: r.category.isEmpty ? Categories.defaultName : r.category, size: 34)
+            }
+            VStack(alignment: .leading, spacing: 2) {
+                Text(r.label).font(.subheadline).foregroundStyle(Palette.label)
+                Text(BudgetView.cadenceSubtitle(r)).font(.caption).foregroundStyle(Palette.secondaryLabel)
+            }
+            Spacer(minLength: 8)
+            Text(isIncome ? "+\(r.amount.formatMoney())" : r.amount.formatMoney())
+                .font(.subheadline).fontWeight(.semibold)
+                .foregroundStyle(isIncome ? Palette.good : Palette.label)
+        }
+        .padding(.horizontal, 16).padding(.vertical, 12)
     }
 
     // MARK: - Shared building blocks

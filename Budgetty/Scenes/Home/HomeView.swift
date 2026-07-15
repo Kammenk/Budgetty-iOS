@@ -13,6 +13,7 @@ import SwiftData
 struct HomeView: View {
     @Environment(AuthModel.self) private var auth
     @Environment(\.horizontalSizeClass) private var hSize
+    @Environment(\.selectTab) private var selectTab
     @State private var wide = false
     @Query(sort: \Receipt.createdAt, order: .reverse) private var receipts: [Receipt]
     @Query private var budgets: [Budget]
@@ -159,13 +160,11 @@ struct HomeView: View {
                     .font(.subheadline).fontWeight(.medium)
                     .foregroundStyle(.white.opacity(0.8))
                 Spacer()
-                HStack(spacing: 4) {
-                    Text(Self.monthLabel(.now)).font(.caption).fontWeight(.semibold)
-                    Image(systemName: "chevron.down").font(.system(size: 10, weight: .bold))
-                }
-                .foregroundStyle(.white)
-                .padding(.horizontal, 10).padding(.vertical, 4)
-                .background(.white.opacity(0.2), in: RoundedRectangle(cornerRadius: 8))
+                // A static period label — no chevron, so it doesn't read as a tappable control.
+                Text(Self.monthLabel(.now)).font(.caption).fontWeight(.semibold)
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 10).padding(.vertical, 4)
+                    .background(.white.opacity(0.2), in: RoundedRectangle(cornerRadius: 8))
             }
             .padding(.bottom, 6)
 
@@ -301,16 +300,24 @@ struct HomeView: View {
     // MARK: - Budgets
 
     private var budgetsCard: some View {
-        VStack(spacing: 14) {
+        // A single budget period is active — Monthly wins if both or neither is set — so Home shows
+        // just the active limit (Android's BudgetProgressCard), the inverse of the Budget screen's
+        // Monthly/Weekly toggle where the user picks the period.
+        let monthly = budget(Budget.monthlyKey)
+        let weekly = budget(Budget.weeklyKey)
+        let showMonthly = monthly != nil || weekly == nil
+        return VStack(spacing: 14) {
             HStack {
                 Text("Budgets").font(.headline)
                 Spacer()
-                Text("See All").font(.subheadline).foregroundStyle(Palette.tint)
+                Button { selectTab?(.budget) } label: {
+                    Text("See All").font(.subheadline).foregroundStyle(Palette.tint)
+                }
+                .buttonStyle(.plain)
             }
-            if let m = budget(Budget.monthlyKey) {
+            if showMonthly, let m = monthly {
                 budgetRow(title: "Monthly", spent: monthSpent, limit: m)
-            }
-            if let w = budget(Budget.weeklyKey) {
+            } else if let w = weekly {
                 budgetRow(title: "Weekly", spent: weekSpent, limit: w)
             }
         }
@@ -384,7 +391,10 @@ struct HomeView: View {
                     .foregroundStyle(Palette.secondaryLabel)
                     .tracking(0.6)
                 Spacer()
-                Text("See All").font(.subheadline).foregroundStyle(Palette.tint)
+                Button { selectTab?(.history) } label: {
+                    Text("See All").font(.subheadline).foregroundStyle(Palette.tint)
+                }
+                .buttonStyle(.plain)
             }
             .padding(.horizontal, 16)
             .padding(.top, 4)
