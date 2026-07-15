@@ -16,7 +16,7 @@ import SwiftData
 enum AppTab: Hashable, CaseIterable {
     case home, history, insights, budget
 
-    var title: String {
+    var title: LocalizedStringKey {
         switch self {
         case .home: "Home"; case .history: "History"
         case .insights: "Insights"; case .budget: "Budget"

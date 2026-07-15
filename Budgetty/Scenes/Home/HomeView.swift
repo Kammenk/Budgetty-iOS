@@ -177,7 +177,7 @@ struct HomeView: View {
             }
             .padding(.vertical, 4)
 
-            Text("\(monthReceipts.count) receipts · \(Self.daysProgress())")
+            Text("\(String(localized: "\(monthReceipts.count) receipts")) · \(Self.daysProgress())")
                 .font(.footnote)
                 .foregroundStyle(.white.opacity(0.7))
                 .padding(.bottom, 14)
@@ -262,7 +262,7 @@ struct HomeView: View {
         }
     }
 
-    private func legendRow(swatch: AnyView, label: String, value: String,
+    private func legendRow(swatch: AnyView, label: LocalizedStringKey, value: String,
                            valueOpacity: Double = 1) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: 12) {
             HStack(spacing: 6) {
@@ -360,7 +360,7 @@ struct HomeView: View {
         .contentCard(cornerRadius: 16)
     }
 
-    private func budgetRow(title: String, spent: Decimal, limit: Decimal) -> some View {
+    private func budgetRow(title: LocalizedStringKey, spent: Decimal, limit: Decimal) -> some View {
         let frac = Self.fraction(spent, of: limit)
         let color: Color = frac >= 1 ? Palette.bad : (frac >= 0.85 ? Palette.warn : Palette.good)
         return VStack(spacing: 7) {
@@ -435,7 +435,7 @@ struct HomeView: View {
         let cal = Calendar.current
         let day = cal.component(.day, from: .now)
         let range = cal.range(of: .day, in: .month, for: .now)?.count ?? 30
-        return "\(day) of \(range) days"
+        return String(localized: "\(day) of \(range) days")
     }
 }
 
@@ -462,7 +462,7 @@ struct ReceiptRowView: View {
             StoreAvatar(store: receipt.store)
             VStack(alignment: .leading, spacing: 2) {
                 Text(receipt.store).font(.body).foregroundStyle(Palette.label)
-                Text("\(dateLabel(receipt.date)) · \(receipt.items.count) item\(receipt.items.count == 1 ? "" : "s")")
+                Text("\(dateLabel(receipt.date)) · \(itemCountLabel(receipt.items.count))")
                     .font(.caption).foregroundStyle(Palette.secondaryLabel)
             }
             Spacer(minLength: 8)

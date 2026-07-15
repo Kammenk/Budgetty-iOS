@@ -20,8 +20,8 @@ enum PeriodUnit: String, CaseIterable, Identifiable {
     /// Name of the unit in the stepper's dropdown.
     var menuLabel: String {
         switch self {
-        case .week: "Week"; case .month: "Month"
-        case .quarter: "Quarter"; case .halfYear: "Half-year"
+        case .week: String(localized: "Week"); case .month: String(localized: "Month")
+        case .quarter: String(localized: "Quarter"); case .halfYear: String(localized: "Half-year")
         }
     }
 
@@ -109,24 +109,24 @@ enum InsightsPeriod: Equatable {
             let start = interval.start
             switch unit {
             case .week:
-                if offset == 0 { return "This week" }
-                if offset == -1 { return "Last week" }
+                if offset == 0 { return String(localized: "This week") }
+                if offset == -1 { return String(localized: "Last week") }
                 let last = cal.date(byAdding: .day, value: -1, to: interval.end) ?? interval.end
                 return Self.spanLabel(from: start, to: last)
             case .month:
-                if offset == 0 { return "This month" }
-                if offset == -1 { return "Last month" }
+                if offset == 0 { return String(localized: "This month") }
+                if offset == -1 { return String(localized: "Last month") }
                 let f = DateFormatter()
                 f.dateFormat = cal.component(.year, from: start) == cal.component(.year, from: .now)
                     ? "LLLL" : "LLLL yyyy"
                 return f.string(from: start)
             case .quarter:
-                if offset == 0 { return "This quarter" }
-                if offset == -1 { return "Last quarter" }
+                if offset == 0 { return String(localized: "This quarter") }
+                if offset == -1 { return String(localized: "Last quarter") }
                 return "Q\(Self.quarterOf(start)) \(cal.component(.year, from: start))"
             case .halfYear:
-                if offset == 0 { return "This half" }
-                if offset == -1 { return "Last half" }
+                if offset == 0 { return String(localized: "This half-year") }
+                if offset == -1 { return String(localized: "Last half-year") }
                 let h = cal.component(.month, from: start) <= 6 ? 1 : 2
                 return "H\(h) \(cal.component(.year, from: start))"
             }
@@ -154,11 +154,11 @@ enum InsightsPeriod: Equatable {
     /// "this month" / "this week" / … — the caption under the donut total and in empty states.
     var contextNoun: String {
         switch self {
-        case .custom: "this period"
+        case .custom: String(localized: "this period")
         case .stepped(let unit, _):
             switch unit {
-            case .week: "this week"; case .month: "this month"
-            case .quarter: "this quarter"; case .halfYear: "this half-year"
+            case .week: String(localized: "this week"); case .month: String(localized: "this month")
+            case .quarter: String(localized: "this quarter"); case .halfYear: String(localized: "this half-year")
             }
         }
     }
@@ -166,11 +166,11 @@ enum InsightsPeriod: Equatable {
     /// "vs last month" / "vs last week" / … — the trend delta pill's comparison caption.
     var compareNoun: String {
         switch self {
-        case .custom: "vs previous"
+        case .custom: String(localized: "vs previous")
         case .stepped(let unit, _):
             switch unit {
-            case .week: "vs last week"; case .month: "vs last month"
-            case .quarter: "vs last quarter"; case .halfYear: "vs last half"
+            case .week: String(localized: "vs last week"); case .month: String(localized: "vs last month")
+            case .quarter: String(localized: "vs last quarter"); case .halfYear: String(localized: "vs last half")
             }
         }
     }

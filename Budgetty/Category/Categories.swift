@@ -199,6 +199,73 @@ enum Categories {
         return predefined.map(\.emoji).filter { seen.insert($0).inserted }
     }()
 
+
+    // MARK: - Localized display names
+
+    /// Android `CategoryNames.kt` equivalent: category identity strings stay English in the DB,
+    /// the rules engine, and the scan pipeline — only DISPLAY goes through this lookup. Custom
+    /// categories (no entry) fall back to their user-given name unchanged.
+    private static let displayKey: [String: String] = [
+        "Groceries": "cat_groceries",
+        "Bakery": "cat_bakery",
+        "Dairy": "cat_dairy",
+        "Meat & Poultry": "cat_meat_poultry",
+        "Fish & Seafood": "cat_fish_seafood",
+        "Fruits & Vegetables": "cat_fruits_vegetables",
+        "Snacks & Sweets": "cat_snacks_sweets",
+        "Frozen Foods": "cat_frozen_foods",
+        "Nuts & Snacks": "cat_nuts_snacks",
+        "Canned & Preserved": "cat_canned_preserved",
+        "Grains & Pasta": "cat_grains_pasta",
+        "Condiments & Sauces": "cat_condiments_sauces",
+        "Beverages": "cat_beverages",
+        "Household & Personal": "cat_household_personal",
+        "Household Cleaning": "cat_household_cleaning",
+        "Personal Care": "cat_personal_care",
+        "Beauty": "cat_beauty",
+        "Baby Products": "cat_baby_products",
+        "Pet Supplies": "cat_pet_supplies",
+        "Paper Products": "cat_paper_products",
+        "Kitchen Supplies": "cat_kitchen_supplies",
+        "Health & Wellness": "cat_health_wellness",
+        "Health & Pharmacy": "cat_health_pharmacy",
+        "Medical": "cat_medical",
+        "Sports & Fitness": "cat_sports_fitness",
+        "Dining & Entertainment": "cat_dining_entertainment",
+        "Restaurant & Dining": "cat_restaurant_dining",
+        "Entertainment": "cat_entertainment",
+        "Video Games": "cat_video_games",
+        "Tips": "cat_tips",
+        "Shopping & Lifestyle": "cat_shopping_lifestyle",
+        "Clothing & Accessories": "cat_clothing_accessories",
+        "Electronics": "cat_electronics",
+        "Garden & Plants": "cat_garden_plants",
+        "Home Improvement": "cat_home_improvement",
+        "Tobacco & Alcohol": "cat_tobacco_alcohol",
+        "Transportation": "cat_transportation",
+        "Fuel": "cat_fuel",
+        "Car Maintenance": "cat_car_maintenance",
+        "Services & Subscriptions": "cat_services_subscriptions",
+        "Subscriptions & Services": "cat_subscriptions_services",
+        "Investments": "cat_investments",
+        "Education": "cat_education",
+        "Travel & Accommodation": "cat_travel_accommodation",
+        "Insurance & Utilities": "cat_insurance_utilities",
+        "Rent": "cat_rent",
+        "Office & Work Supplies": "cat_office_work_supplies",
+        "Gifts & Charitable Donations": "cat_gifts_donations",
+        "Delivery": "cat_delivery",
+        "Other": "cat_other",
+    ]
+
+    /// The localized display name for `name` (case-insensitive; identity for custom/unknown).
+    static func displayName(_ name: String) -> String {
+        let key = displayKey[name]
+            ?? displayKey.first { $0.key.caseInsensitiveCompare(name) == .orderedSame }?.value
+        guard let key else { return name }
+        return Bundle.main.localizedString(forKey: key, value: name, table: nil)
+    }
+
     // MARK: - Color math (pure, mirrors Android)
 
     /// Shortest distance in degrees (0...180) between two hues around the wheel.

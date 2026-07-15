@@ -154,7 +154,7 @@ struct BudgetView: View {
                                         key: overallKey, existing: overallBudget)
         } label: {
             VStack(alignment: .leading, spacing: 0) {
-                Text("\(period.rawValue) budget")
+                Text(LocalizedStringKey("\(period.rawValue) budget"))
                     .font(.subheadline).foregroundStyle(Palette.secondaryLabel)
                     .padding(.bottom, 8)
                 if let b = overallBudget {
@@ -179,7 +179,7 @@ struct BudgetView: View {
                 } else {
                     HStack(spacing: 6) {
                         Image(systemName: "plus.circle.fill")
-                        Text("Set a \(period.rawValue.lowercased()) budget")
+                        Text(LocalizedStringKey("Set a \(period.rawValue.lowercased()) budget"))
                     }
                     .font(.headline).foregroundStyle(Palette.tint)
                     .padding(.vertical, 6)
@@ -368,7 +368,7 @@ struct BudgetView: View {
         } label: {
             VStack(alignment: .leading, spacing: 6) {
                 Text(Categories.emoji(for: group)).font(.system(size: 22))
-                Text(group).font(.subheadline).fontWeight(.semibold).foregroundStyle(Palette.label)
+                Text(Categories.displayName(group)).font(.subheadline).fontWeight(.semibold).foregroundStyle(Palette.label)
                     .lineLimit(1)
                 if let b = budget {
                     let frac = HomeView.fraction(spent, of: b.amount)

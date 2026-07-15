@@ -110,7 +110,7 @@ struct WidgetsView: View {
             .shadow(color: .black.opacity(0.08), radius: 8, y: 4)
     }
 
-    private func section<Content: View>(_ title: String, @ViewBuilder _ content: () -> Content) -> some View {
+    private func section<Content: View>(_ title: LocalizedStringKey, @ViewBuilder _ content: () -> Content) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             Text(title).font(.caption).fontWeight(.semibold).textCase(.uppercase).tracking(0.6)
                 .foregroundStyle(Palette.secondaryLabel)

@@ -88,7 +88,7 @@ struct CategoryFilterSheet: View {
                         } label: {
                             HStack(spacing: 12) {
                                 CategoryTile(category: g.name, size: 28)
-                                Text(g.name).foregroundStyle(Palette.label)
+                                Text(Categories.displayName(g.name)).foregroundStyle(Palette.label)
                                 Spacer()
                                 if selected.contains(g.name) {
                                     Image(systemName: "checkmark").foregroundStyle(Palette.tint).fontWeight(.semibold)

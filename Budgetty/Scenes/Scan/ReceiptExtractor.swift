@@ -78,10 +78,10 @@ struct APIReceiptExtractor: ReceiptExtractor {
         // model's explicit amounts, so they're captured even when the printed grand total is misread.
         var chargeItems: [ExtractedDraftItem] = []
         if let fee = Self.chargeAmount(resp.deliveryAndFees) {
-            chargeItems.append(ExtractedDraftItem(name: "Delivery & fees", quantity: 1, price: fee, category: "Delivery"))
+            chargeItems.append(ExtractedDraftItem(name: String(localized: "Delivery & fees"), quantity: 1, price: fee, category: "Delivery"))
         }
         if let tip = Self.chargeAmount(resp.tip) {
-            chargeItems.append(ExtractedDraftItem(name: "Tip", quantity: 1, price: tip, category: "Tips"))
+            chargeItems.append(ExtractedDraftItem(name: String(localized: "Tip"), quantity: 1, price: tip, category: "Tips"))
         }
         let chargesTotal = chargeItems.reduce(Decimal.zero) { $0 + $1.price }
 

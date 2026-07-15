@@ -40,7 +40,7 @@ struct CategoryBudgetSheet: View {
                     }
                 }
             }
-            .navigationTitle("\(Categories.emoji(for: group)) \(group)")
+            .navigationTitle("\(Categories.emoji(for: group)) \(Categories.displayName(group))")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
@@ -68,7 +68,7 @@ struct CategoryBudgetSheet: View {
         let amt = amounts[key] ?? 0
         return VStack(spacing: 6) {
             HStack(spacing: 10) {
-                Text(sub.name)
+                Text(Categories.displayName(sub.name))
                 Spacer()
                 Text(sp > 0 ? "\(sp.formatMoney()) spent" : "No spend")
                     .font(.caption).foregroundStyle(.secondary)

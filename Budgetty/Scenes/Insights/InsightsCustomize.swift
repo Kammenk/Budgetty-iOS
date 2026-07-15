@@ -14,7 +14,7 @@ enum InsightSection: String, CaseIterable, Identifiable {
          biggestPurchases, income
     var id: String { rawValue }
 
-    var title: String {
+    var title: LocalizedStringKey {
         switch self {
         case .trend: "Trend"
         case .breakdown: "Breakdown"

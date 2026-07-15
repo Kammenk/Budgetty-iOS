@@ -38,12 +38,12 @@ struct InsightHighlight: Identifiable {
         }
         switch kind {
         case .newCategory(let amount):
-            return AttributedString("First spend in ") + bold(category) + AttributedString(" — \(amount.formatMoney())")
+            return AttributedString("First spend in ") + bold(Categories.displayName(category)) + AttributedString(" — \(amount.formatMoney())")
         case .move(let percent, let up):
-            return bold(category) + AttributedString(up ? " up " : " down ") + bold("\(percent)%")
+            return bold(Categories.displayName(category)) + AttributedString(up ? " up " : " down ") + bold("\(percent)%")
                 + AttributedString(" \(compareNoun)")
         case .share(let percent):
-            return bold(category) + AttributedString(" made up ") + bold("\(percent)%")
+            return bold(Categories.displayName(category)) + AttributedString(" made up ") + bold("\(percent)%")
                 + AttributedString(" of spending")
         }
     }
@@ -225,7 +225,7 @@ struct BudgetVsActualCard: View {
                 Text("Budget").font(.headline)
                 Spacer()
                 if let daysLeft {
-                    Text("\(daysLeft) day\(daysLeft == 1 ? "" : "s") left")
+                    Text("\(daysLeft) days left")
                         .font(.system(size: 13)).foregroundStyle(Palette.secondaryLabel)
                 }
             }

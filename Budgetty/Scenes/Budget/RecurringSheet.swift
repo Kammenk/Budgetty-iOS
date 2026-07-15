@@ -24,7 +24,7 @@ struct RecurringSheet: View {
     @State private var category = Categories.defaultName
     @State private var showCategory = false
 
-    private var title: String { isIncome ? "Income" : "Recurring Payment" }
+    private var title: LocalizedStringKey { isIncome ? "Income" : "Recurring Payment" }
 
     var body: some View {
         NavigationStack {
@@ -64,7 +64,7 @@ struct RecurringSheet: View {
                         } label: {
                             HStack {
                                 Text(Categories.emoji(for: category))
-                                Text(category).foregroundStyle(Palette.label)
+                                Text(Categories.displayName(category)).foregroundStyle(Palette.label)
                                 Spacer()
                                 Image(systemName: "chevron.right").foregroundStyle(Palette.tertiaryLabel)
                                     .font(.system(size: 13, weight: .semibold))
