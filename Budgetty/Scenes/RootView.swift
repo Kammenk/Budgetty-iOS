@@ -78,11 +78,15 @@ struct RootView: View {
     /// iPad: floating top tab bar / sidebar; Scan rides the tab-bar bottom accessory.
     @ViewBuilder
     private var mainTabs: some View {
-        if hSize == .compact {
-            compactShell
-        } else {
-            styledTabView.tabViewBottomAccessory { scanAccessory }
+        Group {
+            if hSize == .compact {
+                compactShell
+            } else {
+                styledTabView.tabViewBottomAccessory { scanAccessory }
+            }
         }
+        // Let tab-root views (Home's "See All" links) switch tabs, matching Android's card navigation.
+        .environment(\.selectTab) { tab = $0 }
     }
 
     private var styledTabView: some View {
