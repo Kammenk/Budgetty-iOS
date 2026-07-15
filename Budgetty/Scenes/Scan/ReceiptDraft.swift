@@ -34,6 +34,9 @@ final class ReceiptDraft: Identifiable {
     var taxOnTop: Bool
     var extraCharges: Decimal
     var items: [DraftItem]
+    /// The scanned receipt's printed subtotal (lifted by materialized charge rows) — the anchor the
+    /// review screen's mismatch checks compare the live item sum against. nil for manual/edited drafts.
+    var printedSubtotal: Decimal?
 
     /// When set, saving updates this existing receipt in place instead of inserting a new one.
     private var editing: Receipt?
@@ -59,6 +62,7 @@ final class ReceiptDraft: Identifiable {
         tax = r.tax
         taxOnTop = r.taxOnTop
         extraCharges = r.extraCharges
+        printedSubtotal = r.printedSubtotal
         items = r.items.map { DraftItem(name: $0.name, quantity: $0.quantity, price: $0.price, category: $0.category) }
     }
 

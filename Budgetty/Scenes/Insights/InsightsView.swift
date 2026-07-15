@@ -18,6 +18,9 @@ struct InsightsView: View {
     @State private var showCustomize = false
     @Query(sort: \Receipt.createdAt, order: .reverse) private var receipts: [Receipt]
     @Query(sort: \Recurring.createdAt) private var recurring: [Recurring]
+    @Query private var budgets: [Budget]
+    @Query private var storedCategories: [Category]
+    @AppStorage("insights.breakdownAllCats") private var breakdownAllCats = false
 
     /// The window the whole screen is scoped to; the stepper walks it one unit at a time.
     @State private var period: InsightsPeriod = {
@@ -129,9 +132,51 @@ struct InsightsView: View {
         case .trend: trendCard
         case .breakdown: breakdownCard
         case .stats: statGrid
+        case .highlights: highlightsSection
+        case .comparison: comparisonSection
+        case .budget: budgetSection
         case .topCategories: topCategoriesCard
         case .topStores: topStoresCard
+        case .biggestPurchases: biggestSection
         case .income: incomeCards
+        }
+    }
+
+    // MARK: - Extra analysis cards (Android parity)
+
+    @ViewBuilder
+    private var highlightsSection: some View {
+        let highlights = InsightHighlight.compute(current: periodItems, previous: previousItems)
+        if !highlights.isEmpty {
+            HighlightsCard(highlights: highlights, compareNoun: period.compareNoun)
+        }
+    }
+
+    /// Only appears once there's a previous-period total to compare against.
+    @ViewBuilder
+    private var comparisonSection: some View {
+        if previousTotal > 0 {
+            PeriodComparisonCard(
+                currentTotal: totalSpent, previousTotal: previousTotal,
+                currentLabel: period.contextNoun.prefix(1).capitalized + period.contextNoun.dropFirst(),
+                previousLabel: previousPeriodLabel,
+                compareNoun: period.compareNoun
+            )
+        }
+    }
+
+    @ViewBuilder
+    private var budgetSection: some View {
+        if let budget = periodBudget, budget > 0 {
+            BudgetVsActualCard(spent: totalSpent, budget: budget, daysLeft: daysLeftInPeriod)
+        }
+    }
+
+    @ViewBuilder
+    private var biggestSection: some View {
+        let purchases = biggestPurchases
+        if !purchases.isEmpty {
+            BiggestPurchasesCard(purchases: purchases) { categoryColor($0) }
         }
     }
 
@@ -145,10 +190,14 @@ struct InsightsView: View {
                 RegularColumns {
                     trendCard
                     statGrid
+                    highlightsSection
+                    budgetSection
                     topCategoriesCard
                 } right: {
                     breakdownCard
+                    comparisonSection
                     topStoresCard
+                    biggestSection
                     incomeCards
                 }
             }
@@ -166,11 +215,15 @@ struct InsightsView: View {
                 ThreeColumns {
                     trendCard
                     statGrid
+                    highlightsSection
                 } second: {
                     breakdownCard
+                    comparisonSection
+                    budgetSection
                     topCategoriesCard
                 } third: {
                     topStoresCard
+                    biggestSection
                     incomeCards
                 }
             }
@@ -283,6 +336,78 @@ struct InsightsView: View {
     private var totalSpent: Decimal { periodReceipts.reduce(.zero) { $0 + $1.paidTotal } }
     private var totalSaved: Decimal { periodReceipts.reduce(.zero) { $0 + $1.discount } }
 
+    private var previousReceipts: [Receipt] {
+        let window = period.previous().interval
+        return receipts.filter { window.contains($0.createdAt) }
+    }
+    private var previousItems: [LineItem] { previousReceipts.flatMap(\.items) }
+    private var previousTotal: Decimal { previousReceipts.reduce(.zero) { $0 + $1.paidTotal } }
+
+    /// "Last month" / "Last week" / … — derived from the compare caption ("vs last month").
+    private var previousPeriodLabel: String {
+        let stripped = period.compareNoun.replacingOccurrences(of: "vs ", with: "")
+        return stripped.prefix(1).capitalized + stripped.dropFirst()
+    }
+
+    /// The budget matching the period unit: monthly budget on month periods, weekly on week
+    /// periods. Quarter/half scaling is deferred on Android too.
+    private var periodBudget: Decimal? {
+        guard case .stepped(let unit, _) = period else { return nil }
+        switch unit {
+        case .month: return budgets.first { $0.key == Budget.monthlyKey }?.amount
+        case .week: return budgets.first { $0.key == Budget.weeklyKey }?.amount
+        default: return nil
+        }
+    }
+
+    /// Remaining days of the in-progress period (nil for past/future/custom windows).
+    private var daysLeftInPeriod: Int? {
+        guard case .stepped(_, 0) = period else { return nil }
+        let cal = Calendar.current
+        let days = cal.dateComponents([.day], from: cal.startOfDay(for: .now), to: period.interval.end).day ?? 0
+        return max(0, days - 1)
+    }
+
+    /// Days of the period elapsed so far (a past period counts in full), at least 1.
+    private var elapsedDays: Int {
+        let cal = Calendar.current
+        let interval = period.interval
+        let start = cal.startOfDay(for: interval.start)
+        let total = max(1, cal.dateComponents([.day], from: start, to: interval.end).day ?? 1)
+        let elapsed = (cal.dateComponents([.day], from: start, to: cal.startOfDay(for: .now)).day ?? 0) + 1
+        return min(max(1, elapsed), total)
+    }
+
+    /// The period's spend projected to its end at the current pace — only for the in-progress
+    /// current period with at least two elapsed days (Android's rule).
+    private var projectedTotal: Decimal? {
+        guard case .stepped(_, 0) = period, totalSpent > 0, Date.now < period.interval.end else { return nil }
+        let cal = Calendar.current
+        let interval = period.interval
+        let totalDays = max(1, cal.dateComponents([.day], from: cal.startOfDay(for: interval.start),
+                                                  to: interval.end).day ?? 1)
+        let elapsed = elapsedDays
+        guard elapsed >= 2, elapsed < totalDays else { return nil }
+        return totalSpent * Decimal(totalDays) / Decimal(elapsed)
+    }
+
+    /// The period's top line items by line total, paired with their receipt's store.
+    private var biggestPurchases: [(item: LineItem, store: String)] {
+        periodReceipts
+            .flatMap { r in r.items.map { (item: $0, store: r.store) } }
+            .sorted { $0.item.lineTotal > $1.item.lineTotal }
+            .prefix(5)
+            .map { $0 }
+    }
+
+    /// Category color: stored rows first (covers custom categories), predefined palette otherwise.
+    private func categoryColor(_ name: String) -> Color {
+        if let stored = storedCategories.first(where: { $0.name.caseInsensitiveCompare(name) == .orderedSame }) {
+            return Color(argb: stored.colorArgb)
+        }
+        return Color(argb: Categories.color(for: name))
+    }
+
     /// Spend rolled up to top-level groups, descending.
     private var groupSlices: [(name: String, value: Decimal)] {
         var sums: [String: Decimal] = [:]
@@ -336,6 +461,12 @@ struct InsightsView: View {
                 }
             }
             .frame(height: 104)
+
+            // Spending pace: the in-progress period's projected total (mockup caption).
+            if let projected = projectedTotal {
+                Text("On pace for about \(projected.formatMoney())")
+                    .font(.caption).foregroundStyle(Palette.secondaryLabel)
+            }
         }
         .padding(18)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -370,14 +501,26 @@ struct InsightsView: View {
 
     // MARK: - Breakdown
 
+    /// Spend per raw category (custom categories keep their own slice), descending — the
+    /// breakdown's "All" granularity.
+    private var categorySlices: [(name: String, value: Decimal)] {
+        var sums: [String: Decimal] = [:]
+        for item in periodItems { sums[item.category, default: .zero] += item.lineTotal }
+        return sums.map { (name: $0.key, value: $0.value) }.sorted { $0.value > $1.value }
+    }
+
     private var breakdownCard: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text("Breakdown").font(.headline)
-            let slices = groupSlices
+            HStack {
+                Text("Breakdown").font(.headline)
+                Spacer()
+                breakdownToggle
+            }
+            let slices = breakdownAllCats ? categorySlices : groupSlices
             let netTotal = slices.reduce(Decimal.zero) { $0 + $1.value }
             HStack(spacing: 4) {
                 ZStack {
-                    DonutChart(slices: slices.map { (Color(argb: Categories.color(for: $0.name)), dbl($0.value)) })
+                    DonutChart(slices: slices.map { (categoryColor($0.name), dbl($0.value)) })
                         .frame(width: 150, height: 150)
                     VStack(spacing: 0) {
                         Text("Total").font(.caption2).foregroundStyle(Palette.secondaryLabel)
@@ -390,7 +533,7 @@ struct InsightsView: View {
             LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 7) {
                 ForEach(slices, id: \.name) { s in
                     HStack(spacing: 7) {
-                        Circle().fill(Color(argb: Categories.color(for: s.name)))
+                        Circle().fill(categoryColor(s.name))
                             .frame(width: 9, height: 9)
                         Text(s.name).font(.caption).foregroundStyle(Palette.label).lineLimit(1)
                         Spacer(minLength: 4)
@@ -404,6 +547,27 @@ struct InsightsView: View {
         .contentCard(cornerRadius: 16)
     }
 
+    /// Groups ↔ all-categories granularity switch on the Breakdown card (Android parity).
+    private var breakdownToggle: some View {
+        HStack(spacing: 2) {
+            breakdownSegment("Groups", active: !breakdownAllCats) { breakdownAllCats = false }
+            breakdownSegment("All", active: breakdownAllCats) { breakdownAllCats = true }
+        }
+        .padding(2)
+        .background(Palette.fill, in: Capsule())
+    }
+
+    private func breakdownSegment(_ title: String, active: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(title)
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(active ? Palette.label : Palette.secondaryLabel)
+                .padding(.horizontal, 10).padding(.vertical, 4)
+                .background(active ? AnyShapeStyle(Palette.matControl) : AnyShapeStyle(.clear), in: Capsule())
+        }
+        .buttonStyle(.plain)
+    }
+
     // MARK: - Stat grid
 
     private var statGrid: some View {
@@ -411,6 +575,7 @@ struct InsightsView: View {
             statTile("Total spent", totalSpent.formatMoney(), color: Palette.label)
             statTile("Receipts", "\(periodReceipts.count)", color: Palette.label)
             statTile("Avg / receipt", avgPerReceipt.formatMoney(), color: Palette.label)
+            statTile("Avg / day", avgPerDay.formatMoney(), color: Palette.label)
             statTile("Saved", totalSaved.formatMoney(), color: Palette.good)
         }
     }
@@ -418,6 +583,11 @@ struct InsightsView: View {
     private var avgPerReceipt: Decimal {
         guard !periodReceipts.isEmpty else { return .zero }
         return totalSpent / Decimal(periodReceipts.count)
+    }
+
+    private var avgPerDay: Decimal {
+        guard totalSpent > 0 else { return .zero }
+        return totalSpent / Decimal(elapsedDays)
     }
 
     private func statTile(_ title: String, _ value: String, color: Color) -> some View {

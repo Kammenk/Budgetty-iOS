@@ -19,6 +19,18 @@ enum SettingsKey {
     static let premium = "pref.premium"           // effective Premium flag (subscription OR tester)
     static let testerPremium = "pref.testerPremium" // hidden 11-tap tester unlock, kept separate
     static let onboarded = "pref.onboarded"
+    static let scanQuotaUsed = "quota.scansUsed"  // lifetime finalized AI scans (see ScanQuota)
+}
+
+/// The free tier's receipt-scan allowance (Android parity). The count is a **lifetime** total with
+/// no monthly reset: a scan is consumed only when a scanned receipt is actually finalized/saved —
+/// failed reads and abandoned reviews never burn one — and it clears only on account deletion.
+/// Manual entry is always free. (Device-level like Android; per-user split is a known follow-up.)
+enum ScanQuota {
+    static let freeLimit = 10
+    static var used: Int { UserDefaults.standard.integer(forKey: SettingsKey.scanQuotaUsed) }
+    static var remaining: Int { max(0, freeLimit - used) }
+    static func reset() { UserDefaults.standard.removeObject(forKey: SettingsKey.scanQuotaUsed) }
 }
 
 /// App appearance preference, applied at the root via `.preferredColorScheme`.
