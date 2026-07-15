@@ -126,7 +126,7 @@ Material — request/adapt a Liquid Glass variant for iOS Home).
 **Strings:** +3 (changelog 10.4.0).
 
 ### 6. Localization — iOS is English-only
-**Status:** NOT PORTED (verified 2026-07-14: no `.xcstrings`/`.lproj`/`.strings` in repo)
+**Status:** PORTED `b49dd68` (2026-07-15, sim-verified in Bulgarian) — Localizable.xcstrings, 182 keys × 21 locales converted from Android + cat_* display names + plurals; 69 iOS-only literals remain English (see `LOCALIZATION_TODO.md`)
 **Android:** 21 languages at full string parity (commit `f7d2677`), 19 currencies with
 region auto-detect.
 **Port plan:** introduce a String Catalog, extract hard-coded UI strings, then map
@@ -161,7 +161,7 @@ check `iOS Insights Extra Cards.dc.html` for LG coverage, request variants for t
 design. Mirror the existing iOS `InsightsCustomize` pattern.
 
 ### 10. Widgets: 1 type on iOS vs 3 on Android
-**Status:** PARTIAL (verified 2026-07-14: `BudgettyWidget/` ships only `SpendingWidget`,
+**Status:** PORTED (2026-07-15, build-verified) — 3 widget types × 2 sizes per the iOS Widgets mockup: Spend Total (spend + top categories), Budget Ring, Recent Receipts; snapshot extended with top categories + receipt count
 small+medium). Android has 3 widget types × 2 sizes (Jetpack Glance, 2026-06-30).
 Low priority; decide which two remaining types are worth WidgetKit equivalents.
 

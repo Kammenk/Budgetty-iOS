@@ -199,7 +199,7 @@
 				uk,
 				ur,
 				vi,
-				zh-Hans,
+				"zh-Hans",
 			);
 			mainGroup = 69BE82552FFB885100006F98;
 			minimizedProjectReferenceProxies = 1;

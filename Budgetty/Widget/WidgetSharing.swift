@@ -17,9 +17,12 @@ struct WidgetSnapshot: Codable {
     var monthSpent: Double
     var monthlyBudget: Double
     var currencyCode: String
+    var monthReceiptCount: Int
     var rows: [Row]
+    var topCategories: [TopCat]
 
     struct Row: Codable { var store: String; var amount: Double; var date: String }
+    struct TopCat: Codable { var emoji: String; var amount: Double; var colorArgb: Int }
 }
 
 enum WidgetSharing {
@@ -45,12 +48,25 @@ enum WidgetSharing {
         }
         let mf = DateFormatter(); mf.dateFormat = "MMMM yyyy"
 
+        // Top spend categories this month (rolled up to groups, like the Insights breakdown).
+        var catSums: [String: Decimal] = [:]
+        for item in month.flatMap(\.items) {
+            catSums[Categories.groupOf(item.category), default: .zero] += item.lineTotal
+        }
+        let topCats = catSums.sorted { $0.value > $1.value }.prefix(3).map { (name, value) in
+            WidgetSnapshot.TopCat(emoji: Categories.emoji(for: name),
+                                  amount: (value as NSDecimalNumber).doubleValue,
+                                  colorArgb: Categories.color(for: name))
+        }
+
         let snapshot = WidgetSnapshot(
             monthLabel: mf.string(from: .now),
             monthSpent: (spent as NSDecimalNumber).doubleValue,
             monthlyBudget: (monthlyBudget as NSDecimalNumber).doubleValue,
             currencyCode: UserDefaults.standard.string(forKey: SettingsKey.currency) ?? "EUR",
-            rows: Array(rows))
+            monthReceiptCount: month.count,
+            rows: Array(rows),
+            topCategories: Array(topCats))
 
         guard let data = try? JSONEncoder().encode(snapshot),
               let defaults = UserDefaults(suiteName: suite) else { return }

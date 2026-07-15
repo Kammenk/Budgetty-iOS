@@ -12,5 +12,7 @@ import SwiftUI
 struct BudgettyWidgetBundle: WidgetBundle {
     var body: some Widget {
         SpendingWidget()
+        BudgetRingWidget()
+        RecentReceiptsWidget()
     }
 }

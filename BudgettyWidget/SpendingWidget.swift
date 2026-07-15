@@ -64,30 +64,57 @@ struct SpendingWidgetView: View {
         .containerBackground(for: .widget) { brandGradient }
     }
 
+    // Mockup: medium Spend Total = big number + budget on the left, a top-categories mini-chart
+    // on the right, over the brand gradient.
     private var medium: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack {
-                Text("Budgetty · \(snap.monthLabel)").font(.caption).bold().foregroundStyle(brand).lineLimit(1)
+        HStack(spacing: 14) {
+            VStack(alignment: .leading, spacing: 0) {
+                HStack(spacing: 6) {
+                    Image(systemName: "doc.text.fill").font(.system(size: 11)).foregroundStyle(.white.opacity(0.85))
+                    Text("Budgetty").font(.caption2).bold().foregroundStyle(.white.opacity(0.8))
+                }
                 Spacer()
-                Text(snap.money(snap.monthSpent)).font(.headline)
+                Text(snap.money(snap.monthSpent)).font(.system(size: 34, weight: .bold))
+                    .foregroundStyle(.white).minimumScaleFactor(0.6).lineLimit(1)
+                Text(snap.monthlyBudget > 0
+                     ? "\(snap.monthLabel) · \(Int(snap.budgetFraction * 100))% used"
+                     : snap.monthLabel)
+                    .font(.caption2).foregroundStyle(.white.opacity(0.7)).lineLimit(1)
             }
-            Divider()
-            if snap.rows.isEmpty {
-                Text("No receipts yet").font(.caption).foregroundStyle(.secondary)
-            } else {
-                ForEach(Array(snap.rows.prefix(3).enumerated()), id: \.offset) { _, r in
-                    HStack {
-                        Text(r.store).font(.subheadline).lineLimit(1)
-                        Text("· \(r.date)").font(.caption2).foregroundStyle(.secondary)
-                        Spacer()
-                        Text(snap.money(r.amount)).font(.subheadline).bold()
+            .frame(width: 130, alignment: .leading)
+
+            Rectangle().fill(.white.opacity(0.2)).frame(width: 0.5)
+
+            VStack(alignment: .leading, spacing: 7) {
+                Text("Top categories").font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(.white.opacity(0.65))
+                if snap.topCategories.isEmpty {
+                    Text("No spending yet").font(.caption2).foregroundStyle(.white.opacity(0.6))
+                } else {
+                    let maxV = snap.topCategories.map(\.amount).max() ?? 1
+                    ForEach(Array(snap.topCategories.enumerated()), id: \.offset) { _, c in
+                        HStack(spacing: 6) {
+                            Text(c.emoji).font(.system(size: 13))
+                            GeometryReader { geo in
+                                Capsule().fill(.white.opacity(0.22))
+                                    .overlay(alignment: .leading) {
+                                        Capsule().fill(.white.opacity(0.72))
+                                            .frame(width: geo.size.width * (maxV > 0 ? c.amount / maxV : 0))
+                                    }
+                            }
+                            .frame(height: 4)
+                            Text(snap.money(c.amount)).font(.system(size: 10))
+                                .foregroundStyle(.white.opacity(0.75)).lineLimit(1)
+                                .frame(width: 42, alignment: .trailing)
+                        }
                     }
                 }
+                Spacer(minLength: 0)
             }
-            Spacer(minLength: 0)
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-        .containerBackground(for: .widget) { Color(.systemBackground) }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+        .containerBackground(for: .widget) { brandGradient }
     }
 }
 
@@ -96,8 +123,8 @@ struct SpendingWidget: Widget {
         StaticConfiguration(kind: "BudgettySpending", provider: SpendingProvider()) { entry in
             SpendingWidgetView(entry: entry)
         }
-        .configurationDisplayName("Spending")
-        .description("Your month's spending and recent receipts.")
+        .configurationDisplayName("Spend Total")
+        .description("Your month's spending, budget, and top categories.")
         .supportedFamilies([.systemSmall, .systemMedium])
     }
 }
