@@ -72,27 +72,39 @@ enum LanguageOption {
     static let all: [(code: String, name: String)] = [
         ("system", "System default"),
         ("en", "English"),
+        ("ar", "العربية"),
         ("bg", "Български"),
+        ("bn", "বাংলা"),
         ("de", "Deutsch"),
         ("es", "Español"),
         ("fr", "Français"),
+        ("hi", "हिन्दी"),
+        ("id", "Bahasa Indonesia"),
         ("it", "Italiano"),
-        ("pt", "Português"),
+        ("ja", "日本語"),
+        ("ko", "한국어"),
         ("nl", "Nederlands"),
         ("pl", "Polski"),
-        ("ro", "Română"),
-        ("cs", "Čeština"),
-        ("sv", "Svenska"),
-        ("da", "Dansk"),
-        ("fi", "Suomi"),
-        ("el", "Ελληνικά"),
-        ("hu", "Magyar"),
+        ("pt", "Português"),
+        ("ru", "Русский"),
         ("tr", "Türkçe"),
         ("uk", "Українська"),
-        ("ru", "Русский"),
-        ("ja", "日本語"),
+        ("ur", "اردو"),
+        ("vi", "Tiếng Việt"),
+        ("zh-Hans", "简体中文"),
     ]
     static func name(_ code: String) -> String {
         all.first { $0.code == code }?.name ?? "English"
     }
+
+    /// Apply the in-app language choice: an AppleLanguages override (takes effect on next
+    /// launch, like Android's locale switch minus the live re-inflate).
+    static func apply(_ code: String) {
+        if code == "system" {
+            UserDefaults.standard.removeObject(forKey: "AppleLanguages")
+        } else {
+            UserDefaults.standard.set([code], forKey: "AppleLanguages")
+        }
+    }
 }
+

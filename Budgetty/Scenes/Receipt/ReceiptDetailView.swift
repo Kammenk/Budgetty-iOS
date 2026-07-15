@@ -60,7 +60,7 @@ struct ReceiptDetailView: View {
             StoreAvatar(store: receipt.store, size: 52)
             VStack(alignment: .leading, spacing: 2) {
                 Text(receipt.store).font(.title3).fontWeight(.bold)
-                Text("\(longDate(receipt.date)) · \(receipt.items.count) item\(receipt.items.count == 1 ? "" : "s")")
+                Text("\(longDate(receipt.date)) · \(itemCountLabel(receipt.items.count))")
                     .font(.caption).foregroundStyle(Palette.secondaryLabel)
             }
             Spacer(minLength: 8)
@@ -106,9 +106,9 @@ struct ReceiptDetailView: View {
 
     private func subtitle(_ item: LineItem) -> String {
         if item.quantity > 1 {
-            return "\(item.category) · qty \(item.quantity) × \(item.price.formatMoney())"
+            return "\(Categories.displayName(item.category)) · qty \(item.quantity) × \(item.price.formatMoney())"
         }
-        return "\(item.category) · qty \(item.quantity)"
+        return "\(Categories.displayName(item.category)) · qty \(item.quantity)"
     }
 
     // MARK: - Totals

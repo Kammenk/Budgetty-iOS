@@ -71,7 +71,7 @@ struct CategoryMemorySheet: View {
     private func miniTile(_ category: String) -> some View {
         VStack(spacing: 4) {
             CategoryTile(category: category, size: 44)
-            Text(category).font(.caption2).foregroundStyle(Palette.secondaryLabel).lineLimit(1)
+            Text(Categories.displayName(category)).font(.caption2).foregroundStyle(Palette.secondaryLabel).lineLimit(1)
         }
         .frame(maxWidth: .infinity)
     }

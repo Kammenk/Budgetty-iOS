@@ -535,7 +535,7 @@ struct InsightsView: View {
                     HStack(spacing: 7) {
                         Circle().fill(categoryColor(s.name))
                             .frame(width: 9, height: 9)
-                        Text(s.name).font(.caption).foregroundStyle(Palette.label).lineLimit(1)
+                        Text(Categories.displayName(s.name)).font(.caption).foregroundStyle(Palette.label).lineLimit(1)
                         Spacer(minLength: 4)
                         Text(s.value.formatMoney()).font(.caption).fontWeight(.semibold)
                     }
@@ -590,7 +590,7 @@ struct InsightsView: View {
         return totalSpent / Decimal(elapsedDays)
     }
 
-    private func statTile(_ title: String, _ value: String, color: Color) -> some View {
+    private func statTile(_ title: LocalizedStringKey, _ value: String, color: Color) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(title).font(.caption).foregroundStyle(Palette.secondaryLabel)
             Text(value).font(.title3).fontWeight(.bold).foregroundStyle(color)
@@ -611,7 +611,7 @@ struct InsightsView: View {
                 Button { categorySel = Sel(name: s.name) } label: {
                     VStack(spacing: 5) {
                         HStack {
-                            Text("\(Categories.emoji(for: s.name)) \(s.name)")
+                            Text("\(Categories.emoji(for: s.name)) \(Categories.displayName(s.name))")
                                 .font(.subheadline).foregroundStyle(Palette.label).lineLimit(1)
                             Spacer()
                             Text(s.value.formatMoney()).font(.subheadline).fontWeight(.semibold)

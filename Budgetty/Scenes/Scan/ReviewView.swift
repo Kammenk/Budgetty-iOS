@@ -237,7 +237,7 @@ struct ReviewView: View {
         }
     }
 
-    private func summaryRow(_ title: String, _ value: String, color: Color) -> some View {
+    private func summaryRow(_ title: LocalizedStringKey, _ value: String, color: Color) -> some View {
         HStack {
             Text(title).foregroundStyle(Palette.secondaryLabel)
             Spacer()
@@ -246,7 +246,7 @@ struct ReviewView: View {
         .font(.subheadline)
     }
 
-    private func fieldLabel(_ text: String, color: Color = Palette.secondaryLabel) -> some View {
+    private func fieldLabel(_ text: LocalizedStringKey, color: Color = Palette.secondaryLabel) -> some View {
         Text(text).font(.system(size: 10, weight: .semibold)).foregroundStyle(color)
     }
 }
@@ -279,7 +279,7 @@ private struct ItemCard: View {
                             label("Category")
                             HStack(spacing: 4) {
                                 Text(Categories.emoji(for: item.category))
-                                Text(item.category).font(.system(size: 14)).foregroundStyle(Palette.label)
+                                Text(Categories.displayName(item.category)).font(.system(size: 14)).foregroundStyle(Palette.label)
                                     .lineLimit(1)
                             }
                         }
@@ -306,7 +306,7 @@ private struct ItemCard: View {
         .background(Palette.tertiaryBackground, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
     }
 
-    private func label(_ text: String) -> some View {
+    private func label(_ text: LocalizedStringKey) -> some View {
         Text(text).font(.system(size: 10, weight: .semibold))
             .foregroundStyle(Palette.secondaryLabel)
     }

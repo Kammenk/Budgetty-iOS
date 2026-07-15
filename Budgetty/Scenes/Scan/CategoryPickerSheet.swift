@@ -89,7 +89,7 @@ struct CategoryPickerSheet: View {
                 RoundedRectangle(cornerRadius: 12, style: .continuous).fill(color)
                     .frame(width: 44, height: 44)
                     .overlay(Text(emoji).font(.system(size: 22)))
-                Text(name).font(.caption).fontWeight(.medium).foregroundStyle(Palette.label)
+                Text(Categories.displayName(name)).font(.caption).fontWeight(.medium).foregroundStyle(Palette.label)
                     .multilineTextAlignment(.center).lineLimit(2)
             }
             .frame(maxWidth: .infinity)

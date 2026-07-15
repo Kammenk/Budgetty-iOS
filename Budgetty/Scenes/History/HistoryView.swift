@@ -197,7 +197,7 @@ struct HistoryView: View {
         .padding(.horizontal, 20).padding(.bottom, 12).padding(.top, 4)
     }
 
-    private func chipLabel(_ title: String, active: Bool, icon: String? = nil, trailing: String? = nil) -> some View {
+    private func chipLabel(_ title: LocalizedStringKey, active: Bool, icon: String? = nil, trailing: String? = nil) -> some View {
         HStack(spacing: 4) {
             if let icon { Image(systemName: icon).font(.system(size: 9, weight: .bold)) }
             Text(title)
@@ -355,7 +355,7 @@ struct HistoryView: View {
             CategoryTile(category: item.category)
             VStack(alignment: .leading, spacing: 1) {
                 Text(item.name).font(.subheadline).foregroundStyle(Palette.label)
-                Text("\(item.category) · \(item.receipt?.store ?? "")")
+                Text("\(Categories.displayName(item.category)) · \(item.receipt?.store ?? "")")
                     .font(.caption).foregroundStyle(Palette.secondaryLabel).lineLimit(1)
             }
             Spacer(minLength: 8)
@@ -409,7 +409,7 @@ struct HistoryView: View {
             CategoryTile(category: category, size: 32, soft: true)
             VStack(spacing: 5) {
                 HStack {
-                    Text(category).font(.subheadline).foregroundStyle(Palette.label)
+                    Text(Categories.displayName(category)).font(.subheadline).foregroundStyle(Palette.label)
                     Spacer()
                     Text("\(spent.formatMoney()) / \(limit.formatMoney())")
                         .font(.subheadline).fontWeight(.semibold).foregroundStyle(color)

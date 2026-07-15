@@ -13,7 +13,7 @@ enum HomeSection: String, CaseIterable, Identifiable {
     case totalSpent, weekComparison, budgets, receipts
     var id: String { rawValue }
 
-    var title: String {
+    var title: LocalizedStringKey {
         switch self {
         case .totalSpent: "Total spent"
         case .weekComparison: "Week comparison"

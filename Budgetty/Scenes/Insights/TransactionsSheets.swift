@@ -48,7 +48,7 @@ struct CategoryTransactionsSheet: View {
                 .padding(.horizontal, 20).padding(.vertical, 16)
             }
             .background(Palette.groupedBackground)
-            .navigationTitle(category).navigationBarTitleDisplayMode(.inline)
+            .navigationTitle(Categories.displayName(category)).navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
         }
     }

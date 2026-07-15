@@ -307,7 +307,7 @@ struct AccountView: View {
         Text(text).font(.subheadline).foregroundStyle(Palette.secondaryLabel)
     }
 
-    private func label(_ title: String, _ symbol: String, _ tint: Color) -> some View {
+    private func label(_ title: LocalizedStringKey, _ symbol: String, _ tint: Color) -> some View {
         HStack(spacing: 12) {
             SettingsIcon(symbol: symbol, background: tint)
             Text(title).foregroundStyle(Palette.label)
@@ -398,6 +398,7 @@ struct LanguagePickerView: View {
                 ForEach(LanguageOption.all, id: \.code) { l in
                     Button {
                         selection = l.code
+                        LanguageOption.apply(l.code)
                         dismiss()
                     } label: {
                         HStack(spacing: 12) {
