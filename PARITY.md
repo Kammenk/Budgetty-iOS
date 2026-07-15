@@ -179,11 +179,16 @@ Low priority; decide which two remaining types are worth WidgetKit equivalents.
 ## iOS → Android (pending)
 
 ### A. Date format preference (Account → Preferences)
-**Status:** NOT ON ANDROID
-**iOS:** merge `7edb44c`, feature commit `b0bbf6f` (2026-07-1x) — user-selectable date
-format applied app-wide. Spec: `git -C "/Users/kamenkostov/Budgetty iOS/Budgetty" show b0bbf6f`.
-**Android target:** Account screen preferences + wherever dates render (History day
-headers, receipt detail, Insights).
+**Status:** DONE on Android (Android `b2cc450`, 2026-07-15, build-verified not device-run).
+Correction: the tracker's earlier "NOT ON ANDROID" was stale — Android already had the full
+preference (`DateFormatOption` enum with 4 options, SettingsStore key, Account picker
+`account_date_format`, `AppFormats.datePattern` set in MainActivity, applied by `formatDate()`
+on receipt detail + Home rows). The genuine gap was the year-less **short** formatters
+(`formatDayMonth`, `formatDayHeader`) using hard-coded patterns, so History day headers ignored
+the choice. `b2cc450` adds `DateFormatOption.dayMonthPattern` + `AppFormats.dayMonthPattern` and
+routes History day headers, upload/recurring rows, and Insights trend day labels through it.
+NB: Android's 4 options (DAY_MONTH_YEAR / DMY_SLASH / MDY_SLASH / ISO) differ from iOS's
+(system / dmy / mdy / dots) — no "System" option on Android; not worth reconciling.
 
 ---
 
