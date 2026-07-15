@@ -60,8 +60,13 @@ current plan and links out to Budget to change it. Replace the content with:
 - **"Manage in Budget →"** link at the bottom → Budget tab.
 - **Empty state** — "No budget plan yet" + a "**Set up your budget →**" link to the Budget tab.
 
-**Open follow-up (not yet done in code):** on this tab Android replaces the receipts/items filter
-row (Sort / Date / Category / Price) with a single period chip, since a plan snapshot isn't
-searchable. The iOS Budgets tab still shows the full filter row. If the mockup wants parity here,
-please show the Budgets tab with the filter chips **removed** (optionally a Monthly/Weekly period
-chip only) so we can follow it in a later pass.
+**Controls on this tab:** the search field and the receipts/items filter row (Sort / Date /
+Category / Price) are **hidden** — a plan snapshot isn't searchable or time-scoped. Only the
+Receipts / Items / Budgets mode toggle remains above the content. Please draw the Budgets tab this
+way (no search bar, no filter chips).
+
+**Optional further parity (not done):** Android also puts a single **period chip** (a date-range
+dropdown) in the now-empty filter slot, which scales the summary card's income/bills. iOS shows a
+fixed **MONTHLY** summary instead — adding a functional period selector would need the date-range
+scaling infrastructure iOS doesn't yet have, so it's deferred. A mockup for it isn't needed unless
+we decide to build that scaling.

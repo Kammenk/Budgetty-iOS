@@ -152,45 +152,51 @@ struct HistoryView: View {
                 }
                 .padding(.top, 2)
             }
-            HStack(spacing: 8) {
-                Image(systemName: "magnifyingglass").foregroundStyle(Palette.secondaryLabel)
-                TextField("Search", text: $search).font(.subheadline)
-                if !search.isEmpty {
-                    Button { search = "" } label: {
-                        Image(systemName: "xmark.circle.fill").foregroundStyle(Palette.tertiaryLabel)
+            // Search + filters apply to receipts/items only; the Budgets tab is a read-only plan
+            // snapshot (not searchable or time-scoped), so both are hidden there — matching Android.
+            if mode != .budgets {
+                HStack(spacing: 8) {
+                    Image(systemName: "magnifyingglass").foregroundStyle(Palette.secondaryLabel)
+                    TextField("Search", text: $search).font(.subheadline)
+                    if !search.isEmpty {
+                        Button { search = "" } label: {
+                            Image(systemName: "xmark.circle.fill").foregroundStyle(Palette.tertiaryLabel)
+                        }
                     }
                 }
+                .font(.subheadline)
+                .padding(.horizontal, 14).padding(.vertical, 10)
+                .background(Palette.matControl, in: Capsule())
+                .background(.ultraThinMaterial, in: Capsule())
+                .overlay(Capsule().strokeBorder(Palette.matControlBorder, lineWidth: 0.5))
+                .shadow(color: Color(argb: 0x0F140A32), radius: 5, y: 2)
             }
-            .font(.subheadline)
-            .padding(.horizontal, 14).padding(.vertical, 10)
-            .background(Palette.matControl, in: Capsule())
-            .background(.ultraThinMaterial, in: Capsule())
-            .overlay(Capsule().strokeBorder(Palette.matControlBorder, lineWidth: 0.5))
-            .shadow(color: Color(argb: 0x0F140A32), radius: 5, y: 2)
 
             GlassSegmentedControl(options: Array(HistoryMode.allCases), selection: $mode) {
                 $0.rawValue
             }
 
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 7) {
-                    if hasActiveFilters {
-                        Button { clearFilters() } label: { chipLabel("Clear", active: true, icon: "xmark") }
-                    }
-                    Menu {
-                        Picker("Sort", selection: $sort) {
-                            ForEach(HistorySort.allCases) { Text($0.rawValue).tag($0) }
+            if mode != .budgets {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 7) {
+                        if hasActiveFilters {
+                            Button { clearFilters() } label: { chipLabel("Clear", active: true, icon: "xmark") }
                         }
-                    } label: { chipLabel("Sort", active: false, trailing: "chevron.down") }
-                    Button { showDate = true } label: {
-                        chipLabel("Date", active: dateRange != nil, trailing: "chevron.down")
-                    }
-                    Button { showCategory = true } label: {
-                        chipLabel(categoryFilter.isEmpty ? "Category" : "Category (\(categoryFilter.count))",
-                                  active: !categoryFilter.isEmpty, trailing: "chevron.down")
-                    }
-                    Button { showPrice = true } label: {
-                        chipLabel("Price", active: priceLo != nil || priceHi != nil, trailing: "chevron.down")
+                        Menu {
+                            Picker("Sort", selection: $sort) {
+                                ForEach(HistorySort.allCases) { Text($0.rawValue).tag($0) }
+                            }
+                        } label: { chipLabel("Sort", active: false, trailing: "chevron.down") }
+                        Button { showDate = true } label: {
+                            chipLabel("Date", active: dateRange != nil, trailing: "chevron.down")
+                        }
+                        Button { showCategory = true } label: {
+                            chipLabel(categoryFilter.isEmpty ? "Category" : "Category (\(categoryFilter.count))",
+                                      active: !categoryFilter.isEmpty, trailing: "chevron.down")
+                        }
+                        Button { showPrice = true } label: {
+                            chipLabel("Price", active: priceLo != nil || priceHi != nil, trailing: "chevron.down")
+                        }
                     }
                 }
             }
