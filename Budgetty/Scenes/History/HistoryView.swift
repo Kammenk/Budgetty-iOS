@@ -173,7 +173,7 @@ struct HistoryView: View {
             }
 
             GlassSegmentedControl(options: Array(HistoryMode.allCases), selection: $mode) {
-                $0.rawValue
+                LocalizedStringKey($0.rawValue)
             }
 
             if mode != .budgets {

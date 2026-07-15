@@ -13,6 +13,13 @@ import SwiftData
 private enum BudgetPeriod: String, CaseIterable, Identifiable {
     case monthly = "Monthly", weekly = "Weekly"
     var id: String { rawValue }
+    /// Localized period word, for interpolating into the "%@ budget" strings.
+    var localized: String {
+        switch self {
+        case .monthly: String(localized: "Monthly")
+        case .weekly: String(localized: "Weekly")
+        }
+    }
 }
 
 struct BudgetView: View {
@@ -77,7 +84,7 @@ struct BudgetView: View {
 
     private var periodPicker: some View {
         GlassSegmentedControl(options: Array(BudgetPeriod.allCases), selection: $period) {
-            $0.rawValue
+            LocalizedStringKey($0.rawValue)
         }
     }
 
@@ -150,11 +157,11 @@ struct BudgetView: View {
 
     private var overallCard: some View {
         Button {
-            budgetEditor = BudgetEditor(id: overallKey, title: "\(period.rawValue) Budget",
+            budgetEditor = BudgetEditor(id: overallKey, title: "\(period.localized) \(String(localized: "Budget"))",
                                         key: overallKey, existing: overallBudget)
         } label: {
             VStack(alignment: .leading, spacing: 0) {
-                Text(LocalizedStringKey("\(period.rawValue) budget"))
+                Text(LocalizedStringKey("\(period.localized) budget"))
                     .font(.subheadline).foregroundStyle(Palette.secondaryLabel)
                     .padding(.bottom, 8)
                 if let b = overallBudget {
@@ -179,7 +186,7 @@ struct BudgetView: View {
                 } else {
                     HStack(spacing: 6) {
                         Image(systemName: "plus.circle.fill")
-                        Text(LocalizedStringKey("Set a \(period.rawValue.lowercased()) budget"))
+                        Text(LocalizedStringKey("Set a \(period.localized) budget"))
                     }
                     .font(.headline).foregroundStyle(Palette.tint)
                     .padding(.vertical, 6)
@@ -405,10 +412,10 @@ struct BudgetView: View {
 
     static func cadenceSubtitle(_ r: Recurring) -> String {
         switch r.cadence {
-        case .monthly: "Monthly · \(RecurringSheet.ordinal(r.dueDay))"
-        case .weekly: "Weekly · \(RecurringSheet.weekdayName(r.dueDay))s"
-        case .yearly: "Yearly · \(RecurringSheet.ordinal(r.dueDay))"
-        case .once: "One-time"
+        case .monthly: "\(String(localized: "Monthly")) · \(RecurringSheet.ordinal(r.dueDay))"
+        case .weekly: "\(String(localized: "Weekly")) · \(RecurringSheet.weekdayName(r.dueDay))s"
+        case .yearly: "\(String(localized: "Yearly")) · \(RecurringSheet.ordinal(r.dueDay))"
+        case .once: String(localized: "One-time")
         }
     }
 }

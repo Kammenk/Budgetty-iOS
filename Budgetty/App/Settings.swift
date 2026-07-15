@@ -37,7 +37,13 @@ enum ScanQuota {
 enum AppearancePref: String, CaseIterable, Identifiable {
     case system, light, dark
     var id: String { rawValue }
-    var label: String { rawValue.capitalized }
+    var label: String {
+        switch self {
+        case .system: String(localized: "System")
+        case .light: String(localized: "Light")
+        case .dark: String(localized: "Dark")
+        }
+    }
     var colorScheme: ColorScheme? {
         switch self {
         case .system: nil
@@ -47,51 +53,49 @@ enum AppearancePref: String, CaseIterable, Identifiable {
     }
 }
 
-/// Currencies offered in the picker (code, symbol, name). EUR default.
+/// Currencies offered in the picker (code, symbol, name). Europe-only cut (matches Android): kept
+/// EUR/GBP/CHF/SEK/NOK and the home currencies of the other supported markets (DKK/PLN/CZK/RON).
+/// Bulgaria uses EUR. EUR default; a removed currency saved by an existing user falls back to EUR.
 enum CurrencyOption {
     static let all: [(code: String, symbol: String, name: String)] = [
         ("EUR", "€", "Euro"),
-        ("USD", "$", "US Dollar"),
         ("GBP", "£", "British Pound"),
-        ("BGN", "лв", "Bulgarian Lev"),
-        ("CHF", "Fr", "Swiss Franc"),
+        ("CHF", "CHF", "Swiss Franc"),
         ("SEK", "kr", "Swedish Krona"),
+        ("NOK", "kr", "Norwegian Krone"),
+        ("DKK", "kr", "Danish Krone"),
         ("PLN", "zł", "Polish Złoty"),
         ("CZK", "Kč", "Czech Koruna"),
         ("RON", "lei", "Romanian Leu"),
-        ("JPY", "¥", "Japanese Yen"),
     ]
+    /// Symbol for a stored code; unknown/removed codes fall back to the euro (Android parity).
     static func symbol(_ code: String) -> String {
-        all.first { $0.code == code }?.symbol ?? code
+        all.first { $0.code == code }?.symbol ?? "€"
     }
 }
 
-/// App languages offered in the picker (BCP-47 code + native display name). "System" follows the
-/// device language; the rest match the Android build's 21-language set.
+/// App languages offered in the picker (BCP-47 code + native display name). "System default" follows
+/// the device language; the rest match the Android build's 16 European locales. Native names are
+/// intentionally left untranslated (each shown in its own language).
 enum LanguageOption {
     static let all: [(code: String, name: String)] = [
-        ("system", "System default"),
+        ("system", String(localized: "System default")),
         ("en", "English"),
-        ("ar", "العربية"),
         ("bg", "Български"),
-        ("bn", "বাংলা"),
+        ("cs", "Čeština"),
+        ("da", "Dansk"),
         ("de", "Deutsch"),
         ("es", "Español"),
+        ("fi", "Suomi"),
         ("fr", "Français"),
-        ("hi", "हिन्दी"),
-        ("id", "Bahasa Indonesia"),
         ("it", "Italiano"),
-        ("ja", "日本語"),
-        ("ko", "한국어"),
+        ("nb", "Norsk"),
         ("nl", "Nederlands"),
         ("pl", "Polski"),
         ("pt", "Português"),
+        ("ro", "Română"),
         ("ru", "Русский"),
-        ("tr", "Türkçe"),
-        ("uk", "Українська"),
-        ("ur", "اردو"),
-        ("vi", "Tiếng Việt"),
-        ("zh-Hans", "简体中文"),
+        ("sv", "Svenska"),
     ]
     static func name(_ code: String) -> String {
         all.first { $0.code == code }?.name ?? "English"

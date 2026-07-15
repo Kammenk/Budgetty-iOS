@@ -25,12 +25,12 @@ enum DateFormatOption: String, CaseIterable, Identifiable {
 
     /// Picker row title — the concrete shape each option produces, from today's date.
     var pickerLabel: String {
-        self == .system ? "System default" : shortWithYear(.now)
+        self == .system ? String(localized: "System default") : shortWithYear(.now)
     }
 
     /// Compact value shown on the Account row.
     var settingLabel: String {
-        self == .system ? "System" : shortWithYear(.now)
+        self == .system ? String(localized: "System") : shortWithYear(.now)
     }
 
     /// "5 June 2026" / "June 5, 2026" / "05.06.2026" — receipt detail header.

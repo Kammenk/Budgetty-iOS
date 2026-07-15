@@ -82,7 +82,7 @@ struct ProgressBarView: View {
 struct GlassSegmentedControl<Option: Identifiable & Equatable>: View {
     let options: [Option]
     @Binding var selection: Option
-    let title: (Option) -> String
+    let title: (Option) -> LocalizedStringKey
     @Namespace private var pillNS
 
     var body: some View {
