@@ -183,6 +183,66 @@ Low priority; decide which two remaining types are worth WidgetKit equivalents.
   `UserDatabaseManager`), fixing cross-account data bleed on shared devices. Same branch.
   When it merges: check whether the iOS local store has the same bleed (receipt data was
   account-agnostic on Android; iOS likely mirrors that).
+- **Account trim + full paywall benefit list + no AI wording** — Android branch
+  `account-paywall-cleanup` (`6547e73` code, `af23d0f` onboarding AI, `6df1ef9` paywall
+  compact-height; emulator-verified en+de on Pixel_6 + Pixel_Tablet, **not merged**).
+  ⚠️ **Do not mirror mechanically — the iOS side of every point below differs.** iOS findings
+  spot-checked 2026-07-16 against this repo.
+
+  **a. Inert toggles — applies, except Face ID.** Android deleted Push notifications /
+  Biometric / Analytics because each wrote a boolean nothing ever read.
+  - `Notifications` (`Scenes/Account/AccountView.swift:148`) — **inert here too**: no
+    `UNUserNotificationCenter` / `requestAuthorization` anywhere → remove.
+  - `Analytics` (`AccountView.swift:230`) — **inert here too**: no analytics SDK → remove.
+  - `Face ID` (`AccountView.swift:226`) — ⚠️ **REAL on iOS. Keep it.** `LAContext` +
+    `evaluatePolicy` in `Scenes/Lock/BiometricLockView.swift`, wired via `LockGate { RootView() }`
+    (`BudgettyApp.swift:81`). Android had no biometric dependency at all — this is a genuine
+    platform divergence, not drift. So iOS **keeps a Privacy & Security section** (Face ID only)
+    where Android deleted it, and `iOS Biometric Lock.dc.html` stays live where the Android
+    `BiometricLockScreen.dc.html` is being retired.
+  - Currency already sits under Preferences on iOS (`AccountView.swift:152`) → no move needed.
+  - `Contact support` → **"Contact us"** + second line "Report an issue, suggest a feature, or
+    just say hello", and the mail subject goes neutral ("Budgetty feedback"). ⚠️ On iOS a key IS
+    its English text, so this **renames a key** — migrate all 16 locale entries in
+    `Localizable.xcstrings`, don't strand the old one (see §6 mechanics).
+
+  **b. Paywall — iOS is in worse shape than Android was.** `Scenes/Paywall/PaywallView.swift:36-40`
+  already uses the title+subtitle `Feature` shape Android just adopted, but **3 of its 5 claims
+  are wrong**:
+  - "Cloud backup & sync / Your data safe and on all devices" — **does not exist** (same phantom
+    Android had). Product decision was to **keep it, demoted to a muted "Coming soon" row** with
+    a clock instead of a check — not to delete it.
+  - "Home screen widgets / Spending at a glance" — **not premium-gated** on iOS (no premium check
+    near the widget code) and free on Android. This advertises a free feature as paid → drop it.
+  - "10 custom categories / vs. 3 on the free plan" — **factually wrong**:
+    `Categories.maxCustomLimit = Int.max` (`Category/Categories.swift:29`) = unlimited. It both
+    undersells the product and quotes a number that doesn't exist.
+  - "Unlimited scans" ✅ real (`ScanQuota.freeLimit = 10`, `App/Settings.swift:31`) and "Accent
+    color themes" ✅ real — but iOS has **8 tints** vs Android's 3 (Sage/Ocean/Plum), so Android's
+    `paywall_benefit_themes_detail` does **not** transfer verbatim.
+  - **Recurring bills**: Android's 4th unlock is unlimited recurring bills (free cap 3,
+    `RecurringRepository.FREE_RECURRING_LIMIT`). No equivalent cap found on iOS — **confirm the
+    gate exists** before listing it, or the same "advertise what you don't enforce" bug appears.
+  - The principle worth copying, not the strings: **one shared benefit list** feeding every
+    layout, each row = title + the free-tier limit, every number **interpolated from the constant
+    that enforces it** so a retuned cap can't leave stale copy.
+
+  **c. Onboarding AI wording — applies as-is.** iOS names AI twice,
+  `Scenes/Onboarding/OnboardingView.swift:20` ("AI reads every item & category") and `:22` ("AI
+  pulls every line item and assigns a category — you just review."). Android reworded so Budgetty
+  itself is the sentence's subject. ⚠️ The **privacy policy's AI limited-use disclosure naming
+  Anthropic must stay** — required store disclosure, product copy only.
+
+  **d. Login brand panel.** Android's dropped "Snap a receipt — AI reads it" and "Budget tracking
+  & alerts" (alerts were as unimplemented as the notifications toggle — the same phantom sold in
+  a second place) and gained a closing "Premium unlocks unlimited scans, categories & bills" line.
+  It stays a **pre-auth app pitch, deliberately not a paywall**. Check the iPad login for the same
+  AI + alerts wording.
+
+  **Design:** Android's `ACCOUNT_PAYWALL_DESIGN_REQUEST.md` deliberately leaves every `iOS
+  *.dc.html` untouched so the mockups keep matching iOS code until this ports. An iOS port needs
+  its own request (`IOS_DESIGN_REQUEST_*` precedent) covering `iOS Account`, `iOS Paywall`,
+  `iOS Login`, `iOS Support & About` — and, unlike Android, **not** `iOS Biometric Lock`.
 
 ## iOS → Android (pending)
 
@@ -219,4 +279,9 @@ NB: Android's 4 options (DAY_MONTH_YEAR / DMY_SLASH / MDY_SLASH / ISO) differ fr
 
 ---
 
-*Last synced: 2026-07-15 (parity batch `9f08eef` ports §§1-5 and 7-9; REMAINING: §6 localization, §10 widgets-optional, and the Android-side date-format port) — Android `main`/`eb9a1b7` (+ unmerged `insights-questionnaire`) · iOS `android-parity`/`9f08eef`.*
+*Last synced: 2026-07-16 — added the in-flight **Account trim + paywall benefits + no-AI** brief
+(Android `account-paywall-cleanup`, unmerged; NB Face ID is real on iOS and must survive that
+port, and the iOS paywall independently carries 3 false claims worth fixing whenever it lands).
+Previously 2026-07-15: parity batch `9f08eef` ports §§1-5 and 7-9; REMAINING: §6 localization,
+§10 widgets-optional, and the Android-side date-format port — Android `main`/`eb9a1b7`
+(+ unmerged `insights-questionnaire`) · iOS `android-parity`/`9f08eef`.*
