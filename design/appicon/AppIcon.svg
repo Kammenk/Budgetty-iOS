@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1024" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#7A63CB"/>
+      <stop offset="1" stop-color="#4C3891"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="1024" height="1024" fill="url(#bg)"/>
+
+  <!-- receipt: rounded top, straight sides, 4-tooth torn bottom edge -->
+  <path fill="#FFFFFF" d="
+    M 390 238
+    L 634 238
+    A 52 52 0 0 1 686 290
+    L 686 734
+    L 642.5 782
+    L 599 734
+    L 555.5 782
+    L 512 734
+    L 468.5 782
+    L 425 734
+    L 381.5 782
+    L 338 734
+    L 338 290
+    A 52 52 0 0 1 390 238
+    Z"/>
+
+  <rect x="384" y="350" width="254" height="36" rx="18" fill="#4F378B"/>
+  <rect x="384" y="422" width="188" height="36" rx="18" fill="#4F378B"/>
+
+  <path d="M 412 571 L 484 642 L 632 500"
+        fill="none" stroke="#4F378B" stroke-width="40"
+        stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
