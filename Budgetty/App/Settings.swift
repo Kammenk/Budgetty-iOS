@@ -19,6 +19,7 @@ enum SettingsKey {
     static let premium = "pref.premium"           // effective Premium flag (subscription OR tester)
     static let testerPremium = "pref.testerPremium" // hidden 11-tap tester unlock, kept separate
     static let onboarded = "pref.onboarded"
+    static let quizPending = "pref.quizPending"   // armed at sign-up; gates the one-time Insights setup quiz
     static let scanQuotaUsed = "quota.scansUsed"  // lifetime finalized AI scans (see ScanQuota)
 }
 

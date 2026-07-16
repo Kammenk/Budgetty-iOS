@@ -42,6 +42,8 @@ final class AuthModel {
 
     func signUp(email: String, password: String) async throws {
         _ = try await Auth.auth().createUser(withEmail: email, password: password)
+        // Arm the one-time post-signup Insights setup quiz (skipped for returning sign-ins).
+        UserDefaults.standard.set(true, forKey: SettingsKey.quizPending)
     }
 
     func signOut() throws {
