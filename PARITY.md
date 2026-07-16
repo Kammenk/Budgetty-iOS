@@ -176,8 +176,9 @@ Low priority; decide which two remaining types are worth WidgetKit equivalents.
   iOS `InsightSection`) and `InsightsQuizView.swift` (Liquid Glass v2 UI, from mockup
   `iOS Insights Setup.dc.html`). Finish applies hidden/order + seeds currency/income/monthly
   budget; skip just clears the flag. Sim-verified iPhone (goal/currency/income-reveal/done).
-  **Follow-up: localization** — copy is English `LocalizedStringKey` literals; not yet in
-  `Localizable.xcstrings` for the 16 locales.
+  **Localized 2026-07-16** — 55 new keys × 15 target locales added to `Localizable.xcstrings`
+  (413 keys total), terminology matched to the existing glossary; sim-verified in German
+  (`Frage %lld von 7`) and Swedish (`Inkomst inställd — 2 400,00 €/månad`).
 - **Per-user local data isolation** — one local DB file per Firebase uid (Android
   `UserDatabaseManager`), fixing cross-account data bleed on shared devices. Same branch.
   When it merges: check whether the iOS local store has the same bleed (receipt data was
