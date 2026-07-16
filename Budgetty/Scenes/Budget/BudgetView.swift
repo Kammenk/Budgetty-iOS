@@ -29,7 +29,6 @@ struct BudgetView: View {
     @Query(sort: \Recurring.createdAt) private var recurring: [Recurring]
 
     @State private var period: BudgetPeriod = .monthly
-    @State private var wide = false
 
     // Sheet routing
     private struct RecurringEditor: Identifiable { let id = UUID(); let isIncome: Bool; let existing: Recurring? }
@@ -45,18 +44,14 @@ struct BudgetView: View {
                 VStack(spacing: 0) {
                     budgetHeader
                         .padding(.bottom, 10)
-                    Group {
-                        if hSize == .regular {
-                            if wide { wideStack } else { regularStack }
-                        } else {
-                            compactStack
-                        }
-                    }
+                    compactStack
                 }
                 .padding(.horizontal, 20).padding(.top, 6).padding(.bottom, 24)
+                // Single centered column on iPad (like Account): cap the whole column — title row
+                // included — to a readable width rather than stretching edge-to-edge.
+                .adaptiveReadableWidth(Dimens.contentMaxWidth)
             }
             .reportsDockScroll()
-            .trackWideLandscape($wide)
             .screenCanvas()
             // The mockup puts the title at the very top of the scroll content (no nav-bar row above
             // it), so draw our own header and hide the bar — the Home pattern.
@@ -88,7 +83,7 @@ struct BudgetView: View {
         }
     }
 
-    /// iPhone: one column.
+    /// One column on every size class. Capped/centered on iPad by the caller.
     private var compactStack: some View {
         VStack(spacing: 16) {
             periodPicker
@@ -98,31 +93,6 @@ struct BudgetView: View {
             activeSubBudgetsSection
             categorySection
         }
-    }
-
-    /// iPad portrait: income | recurring side by side, 4-column category grid, capped and centered.
-    private var regularStack: some View {
-        budgetStack(maxWidth: Dimens.wideContentMaxWidth)
-    }
-
-    /// iPad landscape: same, but a wider cap and a 6-column category grid.
-    private var wideStack: some View {
-        budgetStack(maxWidth: Dimens.landscapeContentMaxWidth)
-    }
-
-    private func budgetStack(maxWidth: CGFloat) -> some View {
-        VStack(spacing: 16) {
-            periodPicker
-            overallCard
-            RegularColumns {
-                incomeSection
-            } right: {
-                recurringSection
-            }
-            activeSubBudgetsSection
-            categorySection
-        }
-        .adaptiveReadableWidth(maxWidth)
     }
 
     // MARK: - Derived data
@@ -355,7 +325,8 @@ struct BudgetView: View {
     private var categorySection: some View {
         VStack(spacing: 0) {
             sectionHeader("Category Budgets")
-            LazyVGrid(columns: adaptiveGridColumns(compact: 2, regular: wide ? 6 : 4,
+            // 2 columns on iPhone; 3 within the readable single column on iPad.
+            LazyVGrid(columns: adaptiveGridColumns(compact: 2, regular: 3,
                                                    isRegular: hSize == .regular, spacing: 10),
                       spacing: 10) {
                 ForEach(Categories.groups.filter { $0.name != Categories.other }, id: \.name) { g in

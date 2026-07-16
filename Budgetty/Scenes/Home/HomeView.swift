@@ -12,9 +12,7 @@ import SwiftData
 
 struct HomeView: View {
     @Environment(AuthModel.self) private var auth
-    @Environment(\.horizontalSizeClass) private var hSize
     @Environment(\.selectTab) private var selectTab
-    @State private var wide = false
     @Query(sort: \Receipt.createdAt, order: .reverse) private var receipts: [Receipt]
     @Query private var budgets: [Budget]
     @Query private var recurrings: [Recurring]
@@ -56,20 +54,16 @@ struct HomeView: View {
                 VStack(spacing: 0) {
                     homeHeader
                         .padding(.bottom, 14)
-                    Group {
-                        if hSize == .regular {
-                            if wide { wideStack } else { regularStack }
-                        } else {
-                            compactStack
-                        }
-                    }
+                    compactStack
                 }
                 .padding(.horizontal, 20)
                 .padding(.top, 6)
                 .padding(.bottom, 24)
+                // Single centered column on iPad (like Account): cap the whole column — title row
+                // included — to a readable width rather than stretching edge-to-edge.
+                .adaptiveReadableWidth(Dimens.contentMaxWidth)
             }
             .reportsDockScroll()
-            .trackWideLandscape($wide)
             .screenCanvas()
             .sheet(isPresented: $showCustomize) {
                 HomeCustomizeSheet(orderRaw: $orderRaw, hiddenRaw: $hiddenRaw)
@@ -110,7 +104,8 @@ struct HomeView: View {
 
     // MARK: - Layout
 
-    /// iPhone: one column, in the user's customized section order (hidden sections skipped).
+    /// One column on every size class, in the user's customized section order (hidden sections
+    /// skipped). Capped/centered on iPad by the caller.
     private var compactStack: some View {
         VStack(spacing: 14) {
             ForEach(visibleSections) { section in
@@ -122,29 +117,6 @@ struct HomeView: View {
                 }
             }
         }
-    }
-
-    /// iPad portrait: hero full-width, then budgets | recent receipts side by side, capped/centered.
-    private var regularStack: some View { homeStack(maxWidth: Dimens.wideContentMaxWidth) }
-
-    /// iPad landscape: same arrangement (keeps the receipts list in a half-width column so its rows
-    /// don't stretch), with a wider cap.
-    private var wideStack: some View { homeStack(maxWidth: Dimens.landscapeContentMaxWidth) }
-
-    private func homeStack(maxWidth: CGFloat) -> some View {
-        VStack(spacing: Dimens.regularColumnSpacing) {
-            heroCard
-            if hasBudget {
-                RegularColumns {
-                    budgetsCard
-                } right: {
-                    recentReceiptsSection
-                }
-            } else {
-                recentReceiptsSection
-            }
-        }
-        .adaptiveReadableWidth(maxWidth)
     }
 
     // MARK: - Hero

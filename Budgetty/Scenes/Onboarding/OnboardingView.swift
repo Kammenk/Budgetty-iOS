@@ -54,6 +54,10 @@ struct OnboardingView: View {
             }
             .padding(.horizontal, 28).padding(.bottom, 20)
         }
+        // Keep the flow a centered readable column on iPad (no-op on iPhone, which is narrower)
+        // so the CTA and pages don't stretch edge-to-edge.
+        .frame(maxWidth: 480)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Palette.groupedBackground.ignoresSafeArea())
     }
 
