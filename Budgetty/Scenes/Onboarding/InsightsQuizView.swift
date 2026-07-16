@@ -132,7 +132,7 @@ struct InsightsQuizView: View {
                     .padding(.horizontal, isExpanded ? 0 : 20)
                     .padding(.top, isExpanded ? 20 : 16)
                     .padding(.bottom, 44)
-                    .frame(minHeight: proxy.size.height, alignment: centerVertically ? .center : .top)
+                    .frame(minHeight: proxy.size.height, alignment: .top)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
             .scrollDismissesKeyboard(.interactively)
@@ -140,9 +140,6 @@ struct InsightsQuizView: View {
             .transition(.opacity)
         }
     }
-
-    /// iPad centers a short question block; the currency list (and iPhone) stay top-aligned.
-    private var centerVertically: Bool { isExpanded && !isCurrency }
 
     @ViewBuilder
     private var stepBody: some View {
