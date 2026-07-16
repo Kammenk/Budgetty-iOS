@@ -20,6 +20,7 @@ struct BudgettyApp: App {
     @Environment(\.scenePhase) private var scenePhase
     @AppStorage(SettingsKey.appearance) private var appearanceRaw = AppearancePref.system.rawValue
     @AppStorage(SettingsKey.onboarded) private var onboarded = false
+    @AppStorage(SettingsKey.quizPending) private var quizPending = false
 
     /// First-run gate: show Onboarding until completed. DEBUG env can force either way for previews.
     private var showOnboarding: Bool {
@@ -55,6 +56,18 @@ struct BudgettyApp: App {
         return auth.isSignedIn
     }
 
+    /// Show the one-time Insights setup quiz (armed at sign-up). DEBUG env can force it for previews.
+    private var showQuiz: Bool {
+        #if DEBUG
+        switch ProcessInfo.processInfo.environment["QUIZ"] {
+        case "force": return true
+        case "skip": return false
+        default: break
+        }
+        #endif
+        return quizPending
+    }
+
     var body: some Scene {
         WindowGroup {
             Group {
@@ -62,6 +75,8 @@ struct BudgettyApp: App {
                     OnboardingView()
                 } else if !isAuthed {
                     LoginView()
+                } else if showQuiz {
+                    InsightsQuizView(onComplete: { quizPending = false })
                 } else {
                     LockGate { RootView() }
                 }

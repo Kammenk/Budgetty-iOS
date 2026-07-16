@@ -169,8 +169,15 @@ Low priority; decide which two remaining types are worth WidgetKit equivalents.
 
 ## Android → iOS (in flight on Android — do NOT port yet)
 
-- **Insights setup questionnaire** — post-signup 6-question quiz that pre-fills hidden
-  sections/order on Insights. Branch `insights-questionnaire`, unmerged/not device-tested.
+- **Insights setup questionnaire** — ✅ **PORTED to iOS 2026-07-16** (branch `insights-setup-quiz`).
+  Post-signup one-time setup quiz: 6 questions + a currency step + closing summary (8 screens),
+  armed at sign-up (`SettingsKey.quizPending`), gated in `BudgettyApp` between Login and RootView.
+  `Scenes/Onboarding/InsightsQuiz.swift` (model + answer→section mapping, adapted to the coarser
+  iOS `InsightSection`) and `InsightsQuizView.swift` (Liquid Glass v2 UI, from mockup
+  `iOS Insights Setup.dc.html`). Finish applies hidden/order + seeds currency/income/monthly
+  budget; skip just clears the flag. Sim-verified iPhone (goal/currency/income-reveal/done).
+  **Follow-up: localization** — copy is English `LocalizedStringKey` literals; not yet in
+  `Localizable.xcstrings` for the 16 locales.
 - **Per-user local data isolation** — one local DB file per Firebase uid (Android
   `UserDatabaseManager`), fixing cross-account data bleed on shared devices. Same branch.
   When it merges: check whether the iOS local store has the same bleed (receipt data was
