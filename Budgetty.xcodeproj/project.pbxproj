@@ -121,6 +121,7 @@
 			);
 			dependencies = (
 				AA100000000000000000000C /* PBXTargetDependency */,
+				5D0000000000000000000003 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				69BE82602FFB885100006F98 /* Budgetty */,
@@ -200,6 +201,7 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				FB1000000000000000000001 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */,
+				5D0000000000000000000001 /* XCRemoteSwiftPackageReference "SwiftLintPlugins" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 69BE825F2FFB885100006F98 /* Products */;
@@ -251,6 +253,10 @@
 			isa = PBXTargetDependency;
 			target = AA1000000000000000000001 /* BudgettyWidgetExtension */;
 			targetProxy = AA100000000000000000000D /* PBXContainerItemProxy */;
+		};
+		5D0000000000000000000003 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			productRef = 5D0000000000000000000002 /* SwiftLintBuildToolPlugin */;
 		};
 /* End PBXTargetDependency section */
 
@@ -548,6 +554,14 @@
 				minimumVersion = 11.0.0;
 			};
 		};
+		5D0000000000000000000001 /* XCRemoteSwiftPackageReference "SwiftLintPlugins" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/SimplyDanny/SwiftLintPlugins.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 0.59.0;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -560,6 +574,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = FB1000000000000000000001 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
 			productName = FirebaseAuth;
+		};
+		5D0000000000000000000002 /* SwiftLintBuildToolPlugin */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 5D0000000000000000000001 /* XCRemoteSwiftPackageReference "SwiftLintPlugins" */;
+			productName = "plugin:SwiftLintBuildToolPlugin";
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

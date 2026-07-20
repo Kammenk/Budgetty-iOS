@@ -13,7 +13,7 @@ import SwiftUI
 extension EnvironmentValues {
     /// Callback the iPhone shell injects so tab-root scroll views can drive the dock's hide.
     /// nil wherever there is no dock to drive (iPad shell, sheets, previews) — reporting is a no-op.
-    @Entry var dockScrollReporter: ((CGFloat) -> Void)? = nil
+    @Entry var dockScrollReporter: ((CGFloat) -> Void)?
 }
 
 extension View {

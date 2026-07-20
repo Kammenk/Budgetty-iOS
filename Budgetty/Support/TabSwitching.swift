@@ -12,5 +12,5 @@ import SwiftUI
 
 extension EnvironmentValues {
     /// Switch the app's selected bottom-tab. nil wherever there is no tab shell to drive.
-    @Entry var selectTab: ((AppTab) -> Void)? = nil
+    @Entry var selectTab: ((AppTab) -> Void)?
 }

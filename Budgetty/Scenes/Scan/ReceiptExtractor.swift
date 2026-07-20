@@ -31,7 +31,7 @@ struct ExtractionResult {
     var readable: Bool
     /// The receipt's printed subtotal lifted by the materialized charge rows — the clean anchor the
     /// review screen's dropped-line check compares the item sum against. nil when nothing was printed.
-    var printedSubtotal: Decimal? = nil
+    var printedSubtotal: Decimal?
 }
 
 enum ExtractError: LocalizedError {

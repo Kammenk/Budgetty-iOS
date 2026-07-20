@@ -126,7 +126,7 @@ struct RecurringSheet: View {
 
     static func weekdayName(_ n: Int) -> String {
         // 1 = Monday … 7 = Sunday
-        let symbols = DateFormatter().weekdaySymbols ?? ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"]
+        let symbols = DateFormatter().weekdaySymbols ?? ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
         let idx = n % 7 // 7→0 (Sunday), 1→1 (Monday)…
         return symbols[idx]
     }
