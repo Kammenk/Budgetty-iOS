@@ -10,10 +10,12 @@
 import SwiftUI
 import SwiftData
 import PhotosUI
+import StoreKit
 
 struct ScanFlowView: View {
     @Environment(\.modelContext) private var context
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.requestReview) private var requestReview
 
     private enum Phase: Equatable { case capture, reading, review, failed(String) }
     @State private var phase: Phase = .capture
@@ -288,9 +290,22 @@ struct ScanFlowView: View {
     private func save() {
         draft.persist(into: context, isManual: isManual)
         // Only a successful, finalized scan counts against the free quota — failed reads and
-        // abandoned reviews never got here, and manual entry is always free.
+        // abandoned reviews never got here, and manual entry is always free. The rating gate rides
+        // the exact same guard: a finalized scan is both what burns a free scan and what can earn a
+        // review prompt; manual entry and edit re-saves are neither.
+        let earnedReview = !isManual && ReviewGate.recordSuccessfulScan()
         if !isManual { scansUsed += 1 }
         dismiss()
+        if earnedReview {
+            ReviewGate.onPromptRequested()
+            // Fire *after* the sheet has finished dismissing — asking mid-transition lets the system
+            // alert fight the sheet animation. The action captures the active scene, so it still
+            // presents once this view is gone.
+            Task { @MainActor in
+                try? await Task.sleep(for: .milliseconds(600))
+                requestReview()
+            }
+        }
     }
 
     private func maybeAutostart() {
