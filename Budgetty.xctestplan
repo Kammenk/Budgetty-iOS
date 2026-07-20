@@ -1,0 +1,28 @@
+{
+  "configurations" : [
+    {
+      "id" : "7E7E0000-0000-0000-0000-0000000000A2",
+      "name" : "Configuration 1",
+      "options" : {
+
+      }
+    }
+  ],
+  "defaultOptions" : {
+    "targetForVariableExpansion" : {
+      "containerPath" : "container:Budgetty.xcodeproj",
+      "identifier" : "69BE825D2FFB885100006F98",
+      "name" : "Budgetty"
+    }
+  },
+  "testTargets" : [
+    {
+      "target" : {
+        "containerPath" : "container:Budgetty.xcodeproj",
+        "identifier" : "7E7E000000000000000000A1",
+        "name" : "BudgettyTests"
+      }
+    }
+  ],
+  "version" : 1
+}
