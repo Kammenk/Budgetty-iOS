@@ -75,10 +75,13 @@ struct ScanFlowView: View {
             VStack(spacing: 0) {
                 HStack {
                     circleButton("xmark") { dismiss() }
+                        .accessibilityLabel("Close")
+                        .accessibilityIdentifier(A11y.Scan.close)
                     Spacer()
                     Text("Scan Receipt").font(.headline).foregroundStyle(.white)
                     Spacer()
                     circleButton("bolt.fill") {}
+                        .accessibilityLabel("Flash")
                 }
                 .padding(.horizontal, 20).padding(.top, 8)
 
@@ -100,6 +103,7 @@ struct ScanFlowView: View {
 
                 Button("Enter manually") { startManual() }
                     .font(.subheadline).foregroundStyle(.white)
+                    .accessibilityIdentifier(A11y.Scan.manual)
                     .padding(.top, 10)
 
                 Spacer()
@@ -114,6 +118,8 @@ struct ScanFlowView: View {
                             .frame(width: 52, height: 52)
                             .background(.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
                     }
+                    .accessibilityLabel("Choose from library")
+                    .accessibilityIdentifier(A11y.Scan.gallery)
                     .disabled(quotaExhausted).opacity(quotaExhausted ? 0.35 : 1)
                     Spacer()
                     // Shutter — the capture primary; solid white so it reads as the hero control.
@@ -127,6 +133,8 @@ struct ScanFlowView: View {
                         Circle().strokeBorder(.white, lineWidth: 4).frame(width: 72, height: 72)
                             .overlay(Circle().fill(.white).frame(width: 56, height: 56))
                     }
+                    .accessibilityLabel("Capture receipt")
+                    .accessibilityIdentifier(A11y.Scan.shutter)
                     .disabled(quotaExhausted).opacity(quotaExhausted ? 0.35 : 1)
                     Spacer()
                     // Flash
@@ -136,6 +144,7 @@ struct ScanFlowView: View {
                             .frame(width: 52, height: 52)
                             .background(.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
                     }
+                    .accessibilityLabel("Flash")
                 }
                 .padding(.horizontal, 24).padding(.vertical, 18)
                 // Dark-tinted glass so the slab reads like the mockup's smoked bar, not bright chrome.
@@ -279,6 +288,7 @@ struct ScanFlowView: View {
                 Text("Go Premium").font(.headline)
                     .ctaPill(height: 50)
             }
+            .accessibilityIdentifier(A11y.Scan.goPremium)
         }
         .padding(22)
         .background(.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 20, style: .continuous))

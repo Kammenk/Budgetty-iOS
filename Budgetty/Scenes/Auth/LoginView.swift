@@ -59,6 +59,7 @@ struct LoginView: View {
                     .opacity(canSubmit ? 1 : 0.5)
                 }
                 .disabled(!canSubmit)
+                .accessibilityIdentifier(A11y.Login.signIn)
                 .padding(.top, 20)
 
                 HStack(spacing: 4) {
@@ -97,6 +98,7 @@ struct LoginView: View {
             selection: Binding(get: { Mode(signUp: isSignUp) },
                                set: { isSignUp = $0.signUp })
         ) { $0.signUp ? "Sign Up" : "Sign in" }
+        .accessibilityIdentifier(A11y.Login.modeToggle)
     }
 
     private var header: some View {
@@ -120,6 +122,7 @@ struct LoginView: View {
                 TextField("you@example.com", text: $email)
                     .textInputAutocapitalization(.never).keyboardType(.emailAddress)
                     .textContentType(.emailAddress).autocorrectionDisabled()
+                    .accessibilityIdentifier(A11y.Login.email)
             }
             .padding(.horizontal, 16).frame(height: 46)
             Divider().padding(.leading, 16)
@@ -127,6 +130,7 @@ struct LoginView: View {
                 Text("Password").foregroundStyle(Palette.secondaryLabel).frame(width: 90, alignment: .leading)
                 SecureField("••••••••", text: $password)
                     .textContentType(isSignUp ? .newPassword : .password)
+                    .accessibilityIdentifier(A11y.Login.password)
             }
             .padding(.horizontal, 16).frame(height: 46)
         }

@@ -99,6 +99,7 @@ struct InsightsView: View {
                         .background(Palette.fill, in: Circle())
                 }
                 .accessibilityLabel("Customize sections")
+                .accessibilityIdentifier(A11y.Insights.customize)
             }
         }
     }
@@ -241,8 +242,12 @@ struct InsightsView: View {
         let steppable = !period.isCustom
         return HStack(spacing: 12) {
             stepButton("chevron.left", disabled: !steppable || !canStepBackward) { step(-1) }
+                .accessibilityLabel("Previous period")
+                .accessibilityIdentifier(A11y.Insights.periodPrev)
             periodMenu
             stepButton("chevron.right", disabled: !steppable || !canStepForward) { step(1) }
+                .accessibilityLabel("Next period")
+                .accessibilityIdentifier(A11y.Insights.periodNext)
         }
         .frame(maxWidth: .infinity)
         .padding(.top, 8).padding(.bottom, 6)

@@ -32,6 +32,16 @@ enum AppTab: Hashable, CaseIterable {
         case .budget: "dollarsign.circle.fill"
         }
     }
+
+    /// Stable UI-automation id (matches Android's tab test tags — see A11y.Tab).
+    var a11yIdentifier: String {
+        switch self {
+        case .home: A11y.Tab.home
+        case .history: A11y.Tab.history
+        case .insights: A11y.Tab.insights
+        case .budget: A11y.Tab.budget
+        }
+    }
 }
 
 struct RootView: View {
@@ -168,6 +178,7 @@ struct RootView: View {
             .overlay(alignment: .top) {
                 Button { showScan = true } label: { scanPill }
                     .buttonStyle(.plain)
+                    .accessibilityIdentifier(A11y.Tab.scan)
                     .alignmentGuide(.top) { $0[.bottom] + 10 }
                     .offset(y: dockHidden ? 66 : 0) // down by dock height + the 10pt gap
             }
@@ -223,6 +234,7 @@ struct RootView: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel(t.title)
+        .accessibilityIdentifier(t.a11yIdentifier)
         .accessibilityAddTraits(selected ? [.isSelected] : [])
     }
 
@@ -230,6 +242,7 @@ struct RootView: View {
     private var scanAccessory: some View {
         Button { showScan = true } label: { scanPill }
             .buttonStyle(.plain)
+            .accessibilityIdentifier(A11y.Tab.scan)
     }
 
     private var scanPill: some View {

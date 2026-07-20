@@ -108,8 +108,10 @@ struct ReviewView: View {
             Spacer()
             Button("Cancel", role: .cancel, action: onCancel)
                 .font(.system(size: 15, weight: .medium)).foregroundStyle(Palette.bad)
+                .accessibilityIdentifier(A11y.Review.cancel)
             Button("Save", action: attemptSave)
                 .font(.system(size: 15, weight: .semibold)).foregroundStyle(Palette.tint)
+                .accessibilityIdentifier(A11y.Review.saveHeader)
         }
         .padding(.horizontal, 20).padding(.top, 14).padding(.bottom, 12)
         .overlay(alignment: .bottom) {
@@ -146,6 +148,7 @@ struct ReviewView: View {
                     fieldLabel("Store", color: Palette.tint)
                     TextField("Store", text: $draft.store)
                         .font(.system(size: 14)).textInputAutocapitalization(.words)
+                        .accessibilityIdentifier(A11y.Review.store)
                 }
                 Image(systemName: "square.and.pencil")
                     .font(.system(size: 13, weight: .medium))
@@ -213,6 +216,7 @@ struct ReviewView: View {
                     .foregroundStyle(Palette.separatorStrong)
             )
         }
+        .accessibilityIdentifier(A11y.Review.addItem)
     }
 
     // MARK: - Footer
@@ -228,6 +232,7 @@ struct ReviewView: View {
                     .font(.headline)
                     .ctaPill()
             }
+            .accessibilityIdentifier(A11y.Scan.save)
             .padding(.top, 4)
         }
         .padding(.horizontal, 20).padding(.top, 12).padding(.bottom, 8)
@@ -271,6 +276,7 @@ private struct ItemCard: View {
                         .frame(width: 32, height: 32)
                         .background(Palette.bad.opacity(0.12), in: RoundedRectangle(cornerRadius: 8))
                 }
+                .accessibilityLabel("Delete item")
             }
             HStack(spacing: 8) {
                 Button(action: onEditCategory) {
