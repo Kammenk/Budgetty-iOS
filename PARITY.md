@@ -195,11 +195,30 @@ signed out, containers cached per file, legacy `default.store` adopted by the fi
 **⚠️ Untested:** the actual two-account switch needs a second Firebase account — verified so far are
 the uid-named store on a fresh install and the legacy-store adoption + migration on upgrade.
 
-### 13. Google Sign-In — iOS has none
-**Status:** NOT PORTED (found 2026-07-21; was never tracked here)
-Android signs in with Google (`AuthRepository`, `AuthViewModel`, `LoginScreen`); an iOS-wide grep for
-`GoogleSignIn|GIDSignIn|GoogleAuthProvider` returns zero hits — `Auth/AuthModel.swift` is
-email/password only. Android's `e328102` ("show the setup quiz to Google sign-ups too") therefore has
+### 13. Third-party sign-in — Apple ✅, Google still missing
+**Status:** PARTIAL — **Sign in with Apple added 2026-07-21** (iOS-first, no Android counterpart);
+**Google still NOT PORTED** (found 2026-07-21; was never tracked here)
+
+**Apple (done).** Fully native — `AuthenticationServices` + `CryptoKit`, no new dependency:
+`Auth/AuthModel.swift` (`prepareAppleRequest`/`signInWithApple`, SHA-256 nonce,
+`OAuthProvider.appleCredential`) and a `SignInWithAppleButton` under an "or" divider in
+`Scenes/Auth/LoginView.swift`, plus the `com.apple.developer.applesignin` entitlement. New
+sign-ups arm the setup quiz via `additionalUserInfo?.isNewUser`, matching Android's `e328102`
+behaviour for third-party sign-ups. Apple returns name/email **only on the first authorisation**, so
+the display name is captured there or never.
+- ⚠️ **Two steps outside the repo, both still open:** the **Apple provider must be enabled in the
+  Firebase console** (without it the credential exchange fails `operation-not-allowed`), and the App
+  ID needs the Sign In with Apple capability (automatic signing usually registers it on the next
+  archive). Verified as far as a simulator allows: the system flow engages and the no-Apple-Account
+  path shows friendly copy; the actual round trip needs a real Apple Account.
+- ⚠️ Once Google lands, Apple becomes **mandatory** under App Review 4.8 — that direction is now safe.
+
+**Google (open).**
+Android signs in with Google (`AuthRepository`, `AuthViewModel`, `LoginScreen`); iOS has no Google
+path. `GoogleService-Info.plist` already carries the iOS `CLIENT_ID`/`REVERSED_CLIENT_ID`, so the
+OAuth client exists — what's undecided is whether to add the `GoogleSignIn-iOS` SPM package or do the
+flow natively with `ASWebAuthenticationSession` + PKCE (the latter matches this project's
+prefer-native, no-external-libs convention). Android's `e328102` ("show the setup quiz to Google sign-ups too") therefore has
 no iOS counterpart to fix; whenever Google sign-in lands, it needs the same `isNewUser`-based arming
 of `SettingsKey.quizPending`.
 
@@ -294,6 +313,64 @@ of `SettingsKey.quizPending`.
   *.dc.html` untouched so the mockups keep matching iOS code until this ports. An iOS port needs
   its own request (`IOS_DESIGN_REQUEST_*` precedent) covering `iOS Account`, `iOS Paywall`,
   `iOS Login`, `iOS Support & About` — and, unlike Android, **not** `iOS Biometric Lock`.
+
+- **Free-tier widget cap: 2 placed widgets** — 🚧 **IN FLIGHT on Android**, branch
+  `widget-free-cap` (2026-07-21, build + detekt green, **not yet device-verified, not merged**).
+  Widgets were 100% free on both platforms; this makes them the **5th premium gate**.
+  **Do not port until the Android branch merges** — but read the API note below first, because
+  the enforcement mechanism does **not** port and iOS needs its own design decision.
+
+  **The rule (product):** a free user may have **2 widget instances placed at once**, counted
+  per *placed instance* across every type and size — two Budget widgets on two home screens use
+  both slots. The cap is **live, not a high-water mark**: remove one from the home screen and the
+  slot frees immediately. Existing free users over the cap when this ships get their extras
+  locked (the 2 oldest keep working) — user chose this over grandfathering.
+
+  **Android's mechanism (`WidgetQuota.kt`):** nothing is persisted. `AppWidgetManager
+  .getAppWidgetIds()` across all 10 providers *is* the state; ids are sorted ascending (the
+  system allocates them from an incrementing counter, so ascending == placement order) and the
+  first 2 are allowed. Over-cap instances render a locked card deep-linking to the paywall. This
+  is what makes removal self-healing with zero migration.
+
+  ⚠️ **The critical bit: Android cannot refuse a placement.** The system widget picker
+  (long-press home screen) bypasses the app entirely, so the in-app picker's button gate is a
+  courtesy only — the cap is really enforced **at render time**, by the widget drawing a locked
+  card instead of its data. iOS has the same property (a user always adds widgets from the home
+  screen; there is no `requestPinAppWidget` equivalent at all), so **iOS must also enforce in the
+  timeline provider, not in `WidgetsView.swift`.**
+
+  ⚠️ **`WidgetKit` has no per-instance identity — the Android approach does not port.**
+  `WidgetCenter.shared.getCurrentConfigurations` gives `[WidgetInfo]`, and `WidgetInfo` exposes
+  only `kind`, `family`, and `configuration`. There is **no unique id per placed widget**, so two
+  medium Budget Ring widgets are indistinguishable and "lock the 3rd one" is not directly
+  expressible. Options, in preference order:
+  1. **Cap distinct `(kind, family)` pairs instead of instances** — sort the pairs by a fixed
+     order, allow the first 2; duplicates of the same pair share a fate. Closest workable
+     analogue, and it keeps removal self-healing. Cost: a user can place three copies of one
+     allowed pair for free.
+  2. Count-only: if `getCurrentConfigurations().count > 2`, lock *all* of them with a "remove
+     some" message. Honest but heavy-handed; avoid.
+
+  Whichever is picked, iOS **diverges from Android's per-instance rule** — record the decision
+  here, because the paywall copy must not promise a cap the platform doesn't enforce.
+
+  **Also required on iOS:** the premium flag must be readable from the widget extension (check
+  `Budgetty/Widget/WidgetSharing.swift` — the App Group store is the natural home) and timelines
+  must be reloaded when the entitlement changes, or a purchase won't unlock anything until the
+  next refresh.
+
+  **Scope note:** §10 above says "1 type on iOS vs 3 on Android" and is **stale twice over** —
+  iOS now has 3 (`SpendingWidget`, `BudgetRingWidget`, `RecentReceiptsWidget`) and Android has
+  **5** (Budget, Summary, This Week, Scan, Top Categories). Fix §10 when this ports.
+
+  **Strings:** 8 new keys on Android × 16 locales (`widgets_slots_used`, `widgets_slots_full`,
+  `widgets_slots_unlimited`, `widgets_unlock`, `widget_locked_title`, `widget_locked_body`,
+  `paywall_benefit_widgets`, `paywall_benefit_widgets_detail`). The paywall detail line
+  **interpolates the enforcing constant** (`WidgetQuota.FREE_LIMIT`) rather than hardcoding "2" —
+  keep that on iOS so retuning the cap can't leave the copy stale.
+
+  **Paywall:** this makes **5 real unlocks + 1 "Coming soon"** on Android's shared benefits list.
+  iOS's paywall benefit list needs the same new row.
 
 ## iOS → Android (pending)
 
