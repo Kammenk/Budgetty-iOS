@@ -315,8 +315,8 @@ struct AccountView: View {
     }
 
     private func row<Trailing: View>(_ title: LocalizedStringKey, _ symbol: String, _ tint: Color,
-                                      icon: Color = .white,
-                                      @ViewBuilder trailing: () -> Trailing) -> some View {
+                                     icon: Color = .white,
+                                     @ViewBuilder trailing: () -> Trailing) -> some View {
         HStack(spacing: 12) {
             SettingsIcon(symbol: symbol, background: tint, foreground: icon)
             Text(title).foregroundStyle(Palette.label)

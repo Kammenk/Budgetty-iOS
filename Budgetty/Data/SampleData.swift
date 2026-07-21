@@ -29,6 +29,8 @@ enum SampleData {
         func day(_ offset: Int) -> Date { cal.date(byAdding: .day, value: -offset, to: .now) ?? .now }
 
         // (store, dayOffset, discount, [ (name, qty, unitPrice, category) ])
+        // Intentionally compact tuple shape for terse fixture rows; not worth named structs here.
+        // swiftlint:disable:next large_tuple
         let demo: [(String, Int, Decimal, [(String, Int, Decimal, String)])] = [
             ("Kaufland", 1, 3.20, [
                 ("Milk 1L", 2, 1.19, "Dairy"),

@@ -13,7 +13,7 @@ import SwiftData
 struct CategoryPickerSheet: View {
     @Binding var selection: String
     /// Called with the chosen category name (in addition to updating the binding).
-    var onPicked: ((String) -> Void)? = nil
+    var onPicked: ((String) -> Void)?
     @Environment(\.dismiss) private var dismiss
 
     @Query(filter: #Predicate<Category> { $0.isCustom }, sort: \Category.createdAt)

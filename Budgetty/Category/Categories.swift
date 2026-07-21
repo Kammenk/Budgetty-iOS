@@ -199,7 +199,6 @@ enum Categories {
         return predefined.map(\.emoji).filter { seen.insert($0).inserted }
     }()
 
-
     // MARK: - Localized display names
 
     /// Android `CategoryNames.kt` equivalent: category identity strings stay English in the DB,
