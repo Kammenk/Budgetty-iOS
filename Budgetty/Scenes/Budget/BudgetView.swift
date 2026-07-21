@@ -81,6 +81,7 @@ struct BudgetView: View {
         GlassSegmentedControl(options: Array(BudgetPeriod.allCases), selection: $period) {
             LocalizedStringKey($0.rawValue)
         }
+        .accessibilityIdentifier(A11y.Budget.periodToggle)
     }
 
     /// One column on every size class. Capped/centered on iPad by the caller.
@@ -167,6 +168,7 @@ struct BudgetView: View {
             .contentCard(cornerRadius: 16)
         }
         .buttonStyle(.plain)
+        .accessibilityIdentifier(A11y.Budget.overall)
     }
 
     // MARK: - Income
