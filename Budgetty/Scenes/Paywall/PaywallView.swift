@@ -188,6 +188,8 @@ struct PaywallView: View {
         }
         .padding(.horizontal, 24).padding(.top, 12).padding(.bottom, 8)
         .background(.bar)
+        // Pushed from Account the dock stays on screen; lift the CTA clear of it.
+        .aboveFloatingDock()
     }
 
     /// Real StoreKit 2 purchase of the selected plan. Entitlement changes flow back through

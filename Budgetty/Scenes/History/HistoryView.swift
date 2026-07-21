@@ -69,7 +69,7 @@ struct HistoryView: View {
                     tabContent(selecting: false)
                         .adaptiveReadableWidth()
                 }
-                .reportsDockScroll()
+                .underFloatingDock()
             }
             .screenCanvas()
             .navigationTitle("History")

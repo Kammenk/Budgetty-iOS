@@ -86,6 +86,7 @@ struct AccountView: View {
             .padding(.horizontal, 20).padding(.top, 6).padding(.bottom, 40)
             .adaptiveReadableWidth()
         }
+        .underFloatingDock(reportingScroll: false)
         .screenCanvas()
         .navigationTitle("Account")
         .confirmationDialog("Sign out of Budgetty?", isPresented: $confirmSignOut, titleVisibility: .visible) {
@@ -345,6 +346,7 @@ struct AccountView: View {
                 }
             }
         }
+        .underFloatingDock(reportingScroll: false)
         .navigationTitle("Appearance")
         .navigationBarTitleDisplayMode(.inline)
     }
@@ -369,6 +371,7 @@ struct AccountView: View {
                 Text("How dates appear on receipts and lists.")
             }
         }
+        .underFloatingDock(reportingScroll: false)
         .navigationTitle("Date format")
         .navigationBarTitleDisplayMode(.inline)
     }
@@ -414,6 +417,7 @@ struct LanguagePickerView: View {
                 Text("Your preferred language for Budgetty.")
             }
         }
+        .underFloatingDock(reportingScroll: false)
         .navigationTitle("Language")
         .navigationBarTitleDisplayMode(.inline)
     }
@@ -444,6 +448,7 @@ struct CurrencyPickerView: View {
                 }
             }
         }
+        .underFloatingDock(reportingScroll: false)
         .navigationTitle("Currency")
         .navigationBarTitleDisplayMode(.inline)
     }

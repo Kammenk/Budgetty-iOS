@@ -51,7 +51,7 @@ struct BudgetView: View {
                 // included — to a readable width rather than stretching edge-to-edge.
                 .adaptiveReadableWidth(Dimens.contentMaxWidth)
             }
-            .reportsDockScroll()
+            .underFloatingDock()
             .screenCanvas()
             // The mockup puts the title at the very top of the scroll content (no nav-bar row above
             // it), so draw our own header and hide the bar — the Home pattern.

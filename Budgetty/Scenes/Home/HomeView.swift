@@ -63,7 +63,7 @@ struct HomeView: View {
                 // included — to a readable width rather than stretching edge-to-edge.
                 .adaptiveReadableWidth(Dimens.contentMaxWidth)
             }
-            .reportsDockScroll()
+            .underFloatingDock()
             .screenCanvas()
             .sheet(isPresented: $showCustomize) {
                 HomeCustomizeSheet(orderRaw: $orderRaw, hiddenRaw: $hiddenRaw)

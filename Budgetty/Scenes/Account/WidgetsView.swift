@@ -35,6 +35,7 @@ struct WidgetsView: View {
             .padding(20)
             .adaptiveReadableWidth()
         }
+        .underFloatingDock(reportingScroll: false)
         .screenCanvas()
         .navigationTitle("Widgets")
     }

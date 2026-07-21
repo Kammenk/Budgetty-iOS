@@ -32,6 +32,7 @@ struct ReceiptDetailView: View {
             .padding(.horizontal, 20).padding(.top, 16).padding(.bottom, 40)
             .adaptiveReadableWidth()
         }
+        .underFloatingDock(reportingScroll: false)
         .background(Palette.groupedBackground)
         .navigationTitle(receipt.store)
         .navigationBarTitleDisplayMode(.inline)
