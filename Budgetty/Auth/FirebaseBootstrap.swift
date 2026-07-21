@@ -39,7 +39,7 @@ enum FirebaseBootstrap {
 
         // Use the real extractor unless a DEBUG run forces the stub (for offline UI checks).
         #if DEBUG
-        let forceStub = ProcessInfo.processInfo.environment["USE_STUB_EXTRACTOR"] == "1"
+        let forceStub = LaunchFlags.isOn("USE_STUB_EXTRACTOR")
         #else
         let forceStub = false
         #endif

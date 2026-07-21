@@ -305,7 +305,7 @@ struct ScanFlowView: View {
 
     private func maybeAutostart() {
         #if DEBUG
-        if phase == .capture, ProcessInfo.processInfo.environment["SCAN_PHASE"] == "review" {
+        if phase == .capture, LaunchFlags.value("SCAN_PHASE") == "review" {
             handle(UIImage())
         }
         #endif
