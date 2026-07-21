@@ -1,0 +1,77 @@
+name: iOS CI
+
+# Build-and-test-only CI: no code signing, no archive. Signing is blocked on the team having at
+# least one registered device (see QUALITY_TOOLING_TODO.md #9), but a lint + build + test gate
+# already catches compile breaks and failing tests, which is the bulk of the value.
+
+on: [push, pull_request]
+
+# A newer push to the same ref makes the in-flight run pointless — cancel it.
+concurrency:
+  group: ios-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-test:
+    name: Lint · Build · Test
+    runs-on: macos-latest
+    timeout-minutes: 45
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # The app targets iOS 26 (IPHONEOS_DEPLOYMENT_TARGET = 26.0) and uses Liquid Glass APIs, so it
+      # needs an Xcode 26+ SDK. Pick the newest Xcode on the image rather than pinning a path that
+      # rots when the runner image updates.
+      - name: Select newest Xcode
+        run: |
+          ls -d /Applications/Xcode*.app
+          sudo xcode-select -s "$(ls -d /Applications/Xcode*.app | sort -V | tail -1)"
+          xcodebuild -version
+
+      # Printed so that if the destination below stops matching, the log immediately shows what IS
+      # available on the image instead of just "device not found".
+      - name: List available simulators
+        run: xcrun simctl list devices available | grep -i iphone || true
+
+      # The Firebase graph is ~14 packages and slow to resolve; cache it on Package.resolved.
+      - name: Cache SwiftPM packages
+        uses: actions/cache@v4
+        with:
+          path: .spm
+          key: ${{ runner.os }}-spm-${{ hashFiles('**/Package.resolved') }}
+          restore-keys: ${{ runner.os }}-spm-
+
+      # Pinned to the version the .swiftlint.yml baseline was tuned against, so CI can't go red (or
+      # green) purely because the runner image shipped a different SwiftLint.
+      - name: Install SwiftLint 0.65.0
+        run: |
+          curl -fsSL -o "$RUNNER_TEMP/swiftlint.zip" \
+            https://github.com/realm/SwiftLint/releases/download/0.65.0/portable_swiftlint.zip
+          unzip -oq "$RUNNER_TEMP/swiftlint.zip" -d "$RUNNER_TEMP/swiftlint"
+
+      - name: SwiftLint
+        run: |
+          "$RUNNER_TEMP/swiftlint/swiftlint" lint --strict
+
+      # One invocation covers build + test. CODE_SIGNING_ALLOWED=NO keeps this firmly on the
+      # no-signing path even if a target later grows a signing requirement.
+      - name: Build & test
+        run: |
+          set -o pipefail
+          xcodebuild test \
+            -project Budgetty.xcodeproj \
+            -scheme Budgetty \
+            -configuration Debug \
+            -destination 'platform=iOS Simulator,name=iPhone 17,OS=latest' \
+            -clonedSourcePackagesDirPath .spm \
+            -resultBundlePath TestResults.xcresult \
+            CODE_SIGNING_ALLOWED=NO
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: TestResults
+          path: TestResults.xcresult
+          if-no-files-found: ignore
