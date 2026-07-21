@@ -11,8 +11,9 @@ import SwiftData
 
 @main
 struct BudgettyApp: App {
-    /// One container for the whole app, holding every persisted model.
-    let container: ModelContainer
+    /// The signed-in account's store. Swapped when the account changes so two users sharing a
+    /// device never see each other's data — see `UserStore`.
+    @State private var container: ModelContainer
 
     @State private var auth: AuthModel
     @State private var store: StoreManager
@@ -36,16 +37,12 @@ struct BudgettyApp: App {
 
     init() {
         FirebaseBootstrap.configure()
-        _auth = State(initialValue: AuthModel())
+        // Firebase restores the previous session synchronously, so the very first container is
+        // already the right account's — no empty frame, no scratch-store flash.
+        let auth = AuthModel()
+        _auth = State(initialValue: auth)
         _store = State(initialValue: StoreManager())
-        do {
-            container = try ModelContainer(
-                for: LineItem.self, Receipt.self, Category.self,
-                Budget.self, Recurring.self, CategoryRule.self
-            )
-        } catch {
-            fatalError("Failed to create ModelContainer: \(error)")
-        }
+        _container = State(initialValue: UserStore.container(for: auth.uid))
     }
 
     /// Signed in? DEBUG builds can bypass the login gate for screenshots.
@@ -68,6 +65,20 @@ struct BudgettyApp: App {
         return quizPending
     }
 
+    /// Brings a freshly-opened store up to date: data migrations, then the predefined categories.
+    @MainActor
+    private func prepare(_ container: ModelContainer) {
+        // Before seeding: the split repoints rows off the old category name, and seeding would
+        // otherwise insert the new one first, forcing the collision branch and discarding the
+        // existing row's colour.
+        Migrations.splitSubscriptionsAndServices(container.mainContext)
+        Seed.categoriesIfNeeded(container.mainContext)
+        #if DEBUG
+        SampleData.populateIfEmpty(container.mainContext)
+        #endif
+        WidgetSharing.update(from: container.mainContext)
+    }
+
     var body: some Scene {
         WindowGroup {
             Group {
@@ -85,12 +96,12 @@ struct BudgettyApp: App {
             .environment(store)
             .tint(Palette.tint)
             .preferredColorScheme((AppearancePref(rawValue: appearanceRaw) ?? .system).colorScheme)
-            .task { @MainActor in
-                Seed.categoriesIfNeeded(container.mainContext)
-                #if DEBUG
-                SampleData.populateIfEmpty(container.mainContext)
-                #endif
-                WidgetSharing.update(from: container.mainContext)
+            .task { @MainActor in prepare(container) }
+            .onChange(of: auth.uid) { _, uid in
+                // A fresh account opens a store that has never been seeded, so prepare it too.
+                let next = UserStore.container(for: uid)
+                container = next
+                prepare(next)
             }
             .onChange(of: scenePhase) { _, phase in
                 if phase == .active {

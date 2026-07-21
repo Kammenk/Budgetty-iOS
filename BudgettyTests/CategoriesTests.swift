@@ -12,9 +12,25 @@ import Testing
 
 struct CategoriesTests {
     @Test func canonicalCountAndGroups() {
-        // 50 selectable categories (7 groups + subs + Other) across 8 top-level groups.
-        #expect(Categories.predefined.count == 50)
+        // 51 selectable categories (7 groups + subs + Other) across 8 top-level groups.
+        #expect(Categories.predefined.count == 51)
         #expect(Categories.groups.count == 8)
+    }
+
+    /// The 2026-07-21 split (Android `581302f`): the old "Subscriptions & Services" sub-category was
+    /// near-indistinguishable from the group holding it, so it became "Subscriptions" + "Services".
+    /// Both halves must exist under the unchanged group, and the retired name must be gone — the
+    /// Cloud Function's category list emits the new names to both apps.
+    @Test func subscriptionsAndServicesAreSplit() {
+        let names = Set(Categories.predefined.map(\.name))
+        #expect(names.contains("Subscriptions"))
+        #expect(names.contains("Services"))
+        #expect(!names.contains("Subscriptions & Services"))
+        #expect(Categories.groupOf("Subscriptions") == "Services & Subscriptions")
+        #expect(Categories.groupOf("Services") == "Services & Subscriptions")
+        // "Subscriptions" reuses the retired category's slot in `defs` so it keeps that colour —
+        // sub-hues are assigned by walking the list in order.
+        #expect(Categories.color(for: "Subscriptions") == 0xFFBF9559)
     }
 
     @Test func namesAreUnique() {

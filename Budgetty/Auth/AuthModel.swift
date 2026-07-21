@@ -24,6 +24,10 @@ final class AuthModel {
     }
 
     var isSignedIn: Bool { user != nil }
+
+    /// Firebase uid of the signed-in account; nil when signed out. Keys the per-account
+    /// local store (see `UserStore`) so callers don't need FirebaseAuth themselves.
+    var uid: String? { user?.uid }
     var email: String { user?.email ?? "" }
 
     /// Up to two initials from the email local part (e.g. "alex.rivera@…" → "AR").
@@ -55,11 +59,16 @@ final class AuthModel {
     }
 
     func deleteAccount() async throws {
+        // Captured first: once the Firebase user is gone there is no uid left to find its store by.
+        let uid = user?.uid
         try await user?.delete()
         // The lifetime free-scan counter and the rating-prompt history clear only on account
         // deletion (Android parity).
         ScanQuota.reset()
         ReviewGate.reset()
+        // Wipe this account's local receipts too — the store outlives the Firebase user otherwise,
+        // and a later account could adopt the file (Android `deleteDataFor`).
+        if let uid { UserStore.deleteData(for: uid) }
     }
 }
 
