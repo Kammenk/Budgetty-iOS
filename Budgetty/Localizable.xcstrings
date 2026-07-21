@@ -10452,6 +10452,107 @@
         }
       }
     },
+    "cat_services" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "bg" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Услуги"
+          }
+        },
+        "cs" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Služby"
+          }
+        },
+        "da" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tjenester"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dienstleistungen"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Services"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Servicios"
+          }
+        },
+        "fi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Palvelut"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Services"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Servizi"
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tjenester"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Diensten"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Usługi"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Serviços"
+          }
+        },
+        "ro" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Servicii"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Услуги"
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tjänster"
+          }
+        }
+      }
+    },
     "cat_services_subscriptions" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -10856,103 +10957,103 @@
         }
       }
     },
-    "cat_subscriptions_services" : {
+    "cat_subscriptions" : {
       "extractionState" : "stale",
       "localizations" : {
         "bg" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Абонаменти и услуги"
+            "value" : "Абонаменти"
           }
         },
         "cs" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Předplatná & služby"
+            "value" : "Předplatné"
           }
         },
         "da" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Abonnementer & tjenester"
+            "value" : "Abonnementer"
           }
         },
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Abos und Dienste"
+            "value" : "Abonnements"
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Subscriptions & Services"
+            "value" : "Subscriptions"
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Suscripciones y servicios"
+            "value" : "Suscripciones"
           }
         },
         "fi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Tilaukset & palvelut"
+            "value" : "Tilaukset"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Abonnements et services"
+            "value" : "Abonnements"
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Abbonamenti e servizi"
+            "value" : "Abbonamenti"
           }
         },
         "nb" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Abonnementer & tjenester"
+            "value" : "Abonnementer"
           }
         },
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Abonnementen en diensten"
+            "value" : "Abonnementen"
           }
         },
         "pl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Subskrypcje i usługi"
+            "value" : "Subskrypcje"
           }
         },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Assinaturas e serviços"
+            "value" : "Subscrições"
           }
         },
         "ro" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Abonamente & servicii"
+            "value" : "Abonamente"
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Подписки и услуги"
+            "value" : "Подписки"
           }
         },
         "sv" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Prenumerationer & tjänster"
+            "value" : "Prenumerationer"
           }
         }
       }

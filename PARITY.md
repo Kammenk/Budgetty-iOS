@@ -167,6 +167,55 @@ Low priority; decide which two remaining types are worth WidgetKit equivalents.
 
 ---
 
+### 11. Category split — "Subscriptions & Services" → "Subscriptions" + "Services"
+**Status:** PORTED (2026-07-21, sim-verified iPhone 17 Pro incl. the upgrade path)
+**Android:** `581302f` (2026-07-21). The sub-category was near-indistinguishable from the group
+holding it ("Services & Subscriptions"), so it became two: `Subscriptions` 🔁 (reusing the old slot
+in `defs`, which keeps its colour — sub-hues walk the list in order) and `Services` 🧰 (appended, for
+the same reason). Group name unchanged.
+**⚠️ Why this was urgent:** `functions/receiptPrompt.js` is the SHARED prompt and already lists both
+new names, so a deployed function emits categories iOS didn't know — they'd fall back to Other.
+**iOS:** `Category/Categories.swift` (defs + `cat_*` key map), `Localizable.xcstrings`
+(`cat_subscriptions`/`cat_services` added from Android's finished translations, `cat_subscriptions_services`
+retired — 16 locales, no re-translation), and `Data/Migrations.swift` +
+`BudgettyApp.prepare(_:)`. The name IS the stored reference, so the migration repoints `Category`,
+`LineItem`, `Recurring`, `CategoryRule` and the `CAT:<name>` budget key — the iOS counterpart of
+Android's `MIGRATION_17_18`. Everything lands on `Subscriptions`, matching Android. Covered by
+`BudgettyTests/MigrationsTests.swift` (4 cases incl. the collision and idempotence).
+
+### 12. Per-user local data isolation
+**Status:** PORTED (2026-07-21) — was a live data-bleed bug on iOS
+**Android:** `UserDatabaseManager` (on main, v10.5.0) — one Room file per Firebase uid.
+**iOS was worse than "not ported":** a single `ModelContainer` was built once in `BudgettyApp.init()`
+with no uid at all, so two accounts on one device shared receipts, budgets and categories outright.
+**iOS:** `Data/UserStore.swift` — `budgetty-u-<uid>.store` per account, `budgetty-anon.store` when
+signed out, containers cached per file, legacy `default.store` adopted by the first signed-in account
+(sidecars moved too), and `deleteData(for:)` wired into `AuthModel.deleteAccount()`. The container is
+`@State` and swapped in `.onChange(of: auth.uid)`, which also seeds/migrates the newly opened store.
+**⚠️ Untested:** the actual two-account switch needs a second Firebase account — verified so far are
+the uid-named store on a fresh install and the legacy-store adoption + migration on upgrade.
+
+### 13. Google Sign-In — iOS has none
+**Status:** NOT PORTED (found 2026-07-21; was never tracked here)
+Android signs in with Google (`AuthRepository`, `AuthViewModel`, `LoginScreen`); an iOS-wide grep for
+`GoogleSignIn|GIDSignIn|GoogleAuthProvider` returns zero hits — `Auth/AuthModel.swift` is
+email/password only. Android's `e328102` ("show the setup quiz to Google sign-ups too") therefore has
+no iOS counterpart to fix; whenever Google sign-in lands, it needs the same `isNewUser`-based arming
+of `SettingsKey.quizPending`.
+
+### 14. Scan guards — two Android checks missing on iOS
+**Status:** NOT PORTED (found 2026-07-21)
+- **Article-count guard.** Android cross-checks the receipt's printed item count against the parsed
+  lines/units (`HaikuReceiptExtractor.validateExtraction`; `1d12a44` fixed it over-rejecting multi-buy
+  receipts). iOS decodes the field (`Data/Remote/ReceiptAPI.swift:40` `printedItemCount`) and never
+  reads it — that is its only reference in the repo. A genuine under-read is silently accepted.
+- **Inflated-total warning.** Android `651b638` warns on Review when the total runs far past the item
+  sum *with no printed subtotal* — the dual-currency backstop. iOS's two reconciliation checks in
+  `Scenes/Scan/ReviewView.swift` are both gated on `printedSubtotal` being present, so this case shows
+  nothing and the gap is absorbed into `extraCharges`.
+- NB the dual-currency fix itself (`21a1213`) is **server-side** in the shared prompt — iOS gets it
+  free, no action.
+
 ## Android → iOS (in flight on Android — do NOT port yet)
 
 - **Insights setup questionnaire** — ✅ **PORTED to iOS 2026-07-16** (branch `insights-setup-quiz`).
@@ -179,13 +228,12 @@ Low priority; decide which two remaining types are worth WidgetKit equivalents.
   **Localized 2026-07-16** — 55 new keys × 15 target locales added to `Localizable.xcstrings`
   (413 keys total), terminology matched to the existing glossary; sim-verified in German
   (`Frage %lld von 7`) and Swedish (`Inkomst inställd — 2 400,00 €/månad`).
-- **Per-user local data isolation** — one local DB file per Firebase uid (Android
-  `UserDatabaseManager`), fixing cross-account data bleed on shared devices. Same branch.
-  When it merges: check whether the iOS local store has the same bleed (receipt data was
-  account-agnostic on Android; iOS likely mirrors that).
-- **Account trim + full paywall benefit list + no AI wording** — Android branch
-  `account-paywall-cleanup` (`6547e73` code, `af23d0f` onboarding AI, `6df1ef9` paywall
-  compact-height; emulator-verified en+de on Pixel_6 + Pixel_Tablet, **not merged**).
+- **Per-user local data isolation** — ✅ **PORTED to iOS 2026-07-21**, see §12 above. iOS did have
+  the same bleed, and worse (one container, no uid at all).
+- **Account trim + full paywall benefit list + no AI wording** — ⚠️ **NO LONGER IN FLIGHT: merged on
+  Android as `a8ef389`** (`6547e73` code, `af23d0f` onboarding AI, `6df1ef9` paywall compact-height;
+  emulator-verified en+de on Pixel_6 + Pixel_Tablet). **This is now portable — treat it as pending,
+  not blocked.** Everything below still applies.
   ⚠️ **Do not mirror mechanically — the iOS side of every point below differs.** iOS findings
   spot-checked 2026-07-16 against this repo.
 
@@ -227,10 +275,13 @@ Low priority; decide which two remaining types are worth WidgetKit equivalents.
     layout, each row = title + the free-tier limit, every number **interpolated from the constant
     that enforces it** so a retuned cap can't leave stale copy.
 
-  **c. Onboarding AI wording — applies as-is.** iOS names AI twice,
-  `Scenes/Onboarding/OnboardingView.swift:20` ("AI reads every item & category") and `:22` ("AI
-  pulls every line item and assigns a category — you just review."). Android reworded so Budgetty
-  itself is the sentence's subject. ⚠️ The **privacy policy's AI limited-use disclosure naming
+  **c. Onboarding AI wording — ✅ DONE on iOS 2026-07-21.** Both mentions on onboarding page 2
+  (`Scenes/Onboarding/OnboardingView.swift:20` and `:22`) now read "Budgetty" instead of "AI",
+  matching Android's reword (`af23d0f`) where Budgetty itself is the sentence's subject. Verified on
+  the simulator via `SIMCTL_CHILD_ONBOARDING=force`. No translation work: this copy is still a Swift
+  literal, not in `Localizable.xcstrings` (one of the ~69 English-only iOS literals). The only
+  whole-word `AI` left in the iOS bundle is two code comments (`ScanFlowView.swift:34`,
+  `Settings.swift:23`); iOS's login panel never carried the AI line Android dropped in §d. ⚠️ The **privacy policy's AI limited-use disclosure naming
   Anthropic must stay** — required store disclosure, product copy only.
 
   **d. Login brand panel.** Android's dropped "Snap a receipt — AI reads it" and "Budget tracking
@@ -279,9 +330,10 @@ NB: Android's 4 options (DAY_MONTH_YEAR / DMY_SLASH / MDY_SLASH / ISO) differ fr
 
 ---
 
-*Last synced: 2026-07-16 — added the in-flight **Account trim + paywall benefits + no-AI** brief
-(Android `account-paywall-cleanup`, unmerged; NB Face ID is real on iOS and must survive that
-port, and the iOS paywall independently carries 3 false claims worth fixing whenever it lands).
-Previously 2026-07-15: parity batch `9f08eef` ports §§1-5 and 7-9; REMAINING: §6 localization,
-§10 widgets-optional, and the Android-side date-format port — Android `main`/`eb9a1b7`
-(+ unmerged `insights-questionnaire`) · iOS `android-parity`/`9f08eef`.*
+*Last synced: 2026-07-21 — full audit against both codebases (PARITY.md was 5 days stale and wrong in
+one place: the Account/paywall work had already merged on Android). Ported this pass: §11 category
+split and §12 per-user data isolation, both on iOS branch `android-parity-cats-user-isolation`. Newly
+found and still open: §13 Google Sign-In, §14 the two scan guards, plus §4's Account/paywall port and
+the 69 English-only iOS literals in LOCALIZATION_TODO.md. Confirmed NOT gaps: the dual-currency fix
+(server-side), Crashlytics (deliberately unmerged on iOS for the App Privacy label), and the
+platform-specific tooling. Android `main`/`d0db412` · iOS `main`/`90b3d0d`.*

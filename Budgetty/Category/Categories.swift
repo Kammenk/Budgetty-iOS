@@ -78,7 +78,10 @@ enum Categories {
         Def(name: "Car Maintenance", emoji: "🔧", parent: "Transportation"),
         // 📋 Services & Subscriptions
         Def(name: "Services & Subscriptions", emoji: "📋", parent: nil),
-        Def(name: "Subscriptions & Services", emoji: "🔁", parent: "Services & Subscriptions"),
+        // Replaces the old "Subscriptions & Services", which was near-indistinguishable from its own
+        // parent group. Kept at the same index on purpose: sub-hues walk `defs` in order, so reusing
+        // the slot keeps this category's existing colour (its sibling "Services" is appended below).
+        Def(name: "Subscriptions", emoji: "🔁", parent: "Services & Subscriptions"),
         Def(name: "Education", emoji: "🎓", parent: "Services & Subscriptions"),
         Def(name: "Travel & Accommodation", emoji: "🧳", parent: "Services & Subscriptions"),
         Def(name: "Insurance & Utilities", emoji: "🛡️", parent: "Services & Subscriptions"),
@@ -91,6 +94,10 @@ enum Categories {
         // `children()` filters by parent, so they still render inside their own group.
         Def(name: "Video Games", emoji: "🎮", parent: "Dining & Entertainment"),
         Def(name: "Investments", emoji: "📈", parent: "Services & Subscriptions"),
+        // The non-subscription half of the old "Subscriptions & Services" (repairs, haircuts,
+        // cleaning — one-off paid-for work). Appended for the same reason as the two above: a
+        // mid-list insert would recolour every sub-category after it.
+        Def(name: "Services", emoji: "🧰", parent: "Services & Subscriptions"),
         // 🪙 Gratuity on a delivery/restaurant order — its own line, kept apart from the food.
         Def(name: "Tips", emoji: "🪙", parent: "Dining & Entertainment"),
         // 🛵 Combined delivery + service + bag/booking fees on a delivery-app order.
@@ -245,7 +252,8 @@ enum Categories {
         "Fuel": "cat_fuel",
         "Car Maintenance": "cat_car_maintenance",
         "Services & Subscriptions": "cat_services_subscriptions",
-        "Subscriptions & Services": "cat_subscriptions_services",
+        "Subscriptions": "cat_subscriptions",
+        "Services": "cat_services",
         "Investments": "cat_investments",
         "Education": "cat_education",
         "Travel & Accommodation": "cat_travel_accommodation",
