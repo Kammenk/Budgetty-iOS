@@ -16,6 +16,8 @@ enum SettingsKey {
     static let notifications = "pref.notifications"
     static let faceID = "pref.faceID"
     static let analytics = "pref.analytics"
+    /// Crashlytics collection — default-ON with an opt-out toggle (see `CrashReporting`).
+    static let crashReporting = "pref.crashReporting"
     static let premium = "pref.premium"           // effective Premium flag (subscription OR tester)
     static let testerPremium = "pref.testerPremium" // hidden 11-tap tester unlock, kept separate
     static let onboarded = "pref.onboarded"

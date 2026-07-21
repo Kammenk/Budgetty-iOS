@@ -21,6 +21,7 @@ struct AccountView: View {
     @AppStorage(SettingsKey.notifications) private var notifications = true
     @AppStorage(SettingsKey.faceID) private var faceID = false
     @AppStorage(SettingsKey.analytics) private var analytics = true
+    @AppStorage(SettingsKey.crashReporting) private var crashReporting = true
     @AppStorage(SettingsKey.premium) private var premium = false
 
     @State private var confirmSignOut = false
@@ -230,6 +231,15 @@ struct AccountView: View {
             Toggle(isOn: $analytics) { label("Analytics", "chart.bar.fill", Color(argb: 0xFF5AC8FA)) }
                 .tint(Palette.good)
                 .padding(.vertical, 8).padding(.horizontal, 16)
+            divider
+            // Default-on with a real opt-out (Android parity). The stored preference is the source of
+            // truth — push every change straight to the SDK so it can't drift from the toggle.
+            Toggle(isOn: $crashReporting) {
+                label("Crash reporting", "exclamationmark.triangle.fill", Color(argb: 0xFFFF9500))
+            }
+            .tint(Palette.good)
+            .padding(.vertical, 8).padding(.horizontal, 16)
+            .onChange(of: crashReporting) { _, enabled in CrashReporting.setEnabled(enabled) }
         }
         .contentCard(cornerRadius: 14)
     }
