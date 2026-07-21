@@ -297,15 +297,28 @@ of `SettingsKey.quizPending`.
   - "10 custom categories / vs. 3 on the free plan" — **factually wrong**:
     `Categories.maxCustomLimit = Int.max` (`Category/Categories.swift:29`) = unlimited. It both
     undersells the product and quotes a number that doesn't exist.
-  - "Unlimited scans" ✅ real (`ScanQuota.freeLimit = 10`, `App/Settings.swift:31`) and "Accent
-    color themes" ✅ real — but iOS has **8 tints** vs Android's 3 (Sage/Ocean/Plum), so Android's
-    `paywall_benefit_themes_detail` does **not** transfer verbatim.
+  - "Unlimited scans" ✅ real (`ScanQuota.freeLimit = 10`, `App/Settings.swift:31`).
+  - ⚠️ **CORRECTION (2026-07-21): "Accent color themes" is NOT real either** — this tracker had it
+    wrong. There is no accent preference on iOS at all: no key in `SettingsKey`, `Palette.tint` is a
+    single hard-coded colour, and Account shows Premium users a static row reading "Violet" with no
+    picker. So four of the five original rows were false, not three.
   - **Recurring bills**: Android's 4th unlock is unlimited recurring bills (free cap 3,
     `RecurringRepository.FREE_RECURRING_LIMIT`). No equivalent cap found on iOS — **confirm the
     gate exists** before listing it, or the same "advertise what you don't enforce" bug appears.
   - The principle worth copying, not the strings: **one shared benefit list** feeding every
     layout, each row = title + the free-tier limit, every number **interpolated from the constant
     that enforces it** so a retuned cap can't leave stale copy.
+  - ✅ **DONE 2026-07-21 — `Store/PremiumBenefits.swift`.** Widgets row deleted (free, ungated);
+    categories row now "Unlimited custom categories / vs `Categories.freeCustomLimit` on the free
+    plan"; cloud and accent themes demoted to muted `soon` rows with a clock. Numbers interpolate
+    from `ScanQuota.freeLimit` and `Categories.freeCustomLimit`; `BudgettyTests/
+    PremiumBenefitsTests.swift` fails if a row claims a number the code doesn't enforce.
+  - ⚠️ **Product gap this exposes:** iOS Premium now honestly unlocks **2** things; Android unlocks
+    **4** (it also caps recurring bills at `FREE_RECURRING_LIMIT` and ships 3 real accent tints).
+    Closing that is a product decision — build the features, or accept a thinner iOS offer.
+  - ⚠️ **Still dishonest elsewhere:** Account's "Accent color" row wears a **Premium** badge and
+    pushes the paywall for a feature that doesn't exist (`AccountView.swift:189-203`). Fix with the
+    rest of the Account trim.
 
   **c. Onboarding AI wording — ✅ DONE on iOS 2026-07-21.** Both mentions on onboarding page 2
   (`Scenes/Onboarding/OnboardingView.swift:20` and `:22`) now read "Budgetty" instead of "AI",
