@@ -5,9 +5,8 @@
 //  Observable wrapper around Firebase auth — email/password plus Sign in with Apple. No anonymous
 //  sessions, matching Android. Drives the login gate and the Account profile / sign-out.
 //
-//  Apple is the only third-party provider here; Android's Google sign-in has no iOS counterpart yet
-//  (PARITY §13). Note that adding Google later makes Apple mandatory under App Review 4.8 — which it
-//  already is here, so that direction is safe.
+//  Third-party providers: Apple (native AuthenticationServices) and Google (native OAuth + PKCE,
+//  see GoogleOAuth — no SDK). App Review 4.8 requires Apple wherever Google is offered.
 //
 
 import AuthenticationServices
@@ -99,6 +98,18 @@ final class AuthModel {
                 try? await change.commitChanges()
             }
         }
+    }
+
+    // MARK: - Sign in with Google
+
+    /// Runs the Google consent flow and exchanges the resulting ID token for a Firebase session.
+    /// Mirrors Android, which also passes the ID token alone
+    /// (`GoogleAuthProvider.getCredential(idToken, null)`) and arms the quiz off `isNewUser`.
+    func signInWithGoogle(presentingFrom anchor: ASPresentationAnchor?) async throws {
+        let idToken = try await GoogleOAuth.idToken(presentingFrom: anchor)
+        let credential = GoogleAuthProvider.credential(withIDToken: idToken, accessToken: "")
+        let result = try await Auth.auth().signIn(with: credential)
+        if result.additionalUserInfo?.isNewUser == true { armSetupQuiz() }
     }
 
     /// Arms the one-time post-signup Insights setup quiz (skipped for returning sign-ins).

@@ -195,9 +195,9 @@ signed out, containers cached per file, legacy `default.store` adopted by the fi
 **⚠️ Untested:** the actual two-account switch needs a second Firebase account — verified so far are
 the uid-named store on a fresh install and the legacy-store adoption + migration on upgrade.
 
-### 13. Third-party sign-in — Apple ✅, Google still missing
-**Status:** PARTIAL — **Sign in with Apple added 2026-07-21** (iOS-first, no Android counterpart);
-**Google still NOT PORTED** (found 2026-07-21; was never tracked here)
+### 13. Third-party sign-in — Apple ✅, Google ✅
+**Status:** DONE 2026-07-21. Apple is iOS-first (no Android counterpart); Google reaches parity with
+Android's `AuthRepository` Google flow.
 
 **Apple (done).** Fully native — `AuthenticationServices` + `CryptoKit`, no new dependency:
 `Auth/AuthModel.swift` (`prepareAppleRequest`/`signInWithApple`, SHA-256 nonce,
@@ -213,12 +213,25 @@ the display name is captured there or never.
   path shows friendly copy; the actual round trip needs a real Apple Account.
 - ⚠️ Once Google lands, Apple becomes **mandatory** under App Review 4.8 — that direction is now safe.
 
-**Google (open).**
-Android signs in with Google (`AuthRepository`, `AuthViewModel`, `LoginScreen`); iOS has no Google
-path. `GoogleService-Info.plist` already carries the iOS `CLIENT_ID`/`REVERSED_CLIENT_ID`, so the
-OAuth client exists — what's undecided is whether to add the `GoogleSignIn-iOS` SPM package or do the
-flow natively with `ASWebAuthenticationSession` + PKCE (the latter matches this project's
-prefer-native, no-external-libs convention). Android's `e328102` ("show the setup quiz to Google sign-ups too") therefore has
+**Google (done).** Native OAuth 2.0 + PKCE via `ASWebAuthenticationSession` — **no GoogleSignIn
+SDK**, keeping the prefer-native convention. `Auth/GoogleOAuth.swift` builds the consent URL from the
+`CLIENT_ID`/`REVERSED_CLIENT_ID` already in `GoogleService-Info.plist`, verifies `state`, and
+exchanges the code for an ID token; `AuthModel.signInWithGoogle` hands that to
+`GoogleAuthProvider.credential`. Only the ID token is used — same as Android's
+`GoogleAuthProvider.getCredential(idToken, null)` — and `isNewUser` arms the setup quiz.
+- Why not the SDK: it needs `CFBundleURLTypes`, and this app target has **no physical Info.plist**
+  (`GENERATE_INFOPLIST_FILE = YES`). `ASWebAuthenticationSession` intercepts its own
+  `callbackURLScheme`, so nothing has to be registered and no pbxproj surgery was needed.
+- Verified on the simulator up to Google's real sign-in page (client id, redirect URI and PKCE all
+  accepted; the page names the project, see below) and the cancel path. The signed-in round trip
+  needs a real Google account.
+- ⚠️ **Follow-up, Google Cloud console:** the OAuth consent screen has no app name set, so the page
+  reads "to continue to **project-773376958569**" instead of "Budgetty". Cosmetic but it looks
+  untrustworthy at exactly the wrong moment. Set App name + logo under APIs & Services → OAuth
+  consent screen.
+- ⚠️ **Follow-up, branding:** Google's mark isn't bundled, so the button is a neutral capsule with an
+  SF Symbol rather than Google's branded button. Add the official asset to comply with their
+  identity guidelines before public release. Android's `e328102` ("show the setup quiz to Google sign-ups too") therefore has
 no iOS counterpart to fix; whenever Google sign-in lands, it needs the same `isNewUser`-based arming
 of `SettingsKey.quizPending`.
 

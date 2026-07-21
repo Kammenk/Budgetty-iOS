@@ -18,6 +18,7 @@
 enum A11y {
     enum Login {
         static let apple = "login_apple"
+        static let google = "login_google"
         static let email = "login_email"          // == Android LoginTagEmail
         static let password = "login_password"     // == Android LoginTagPassword
         static let signIn = "login_sign_in"        // == Android LoginTagSignIn

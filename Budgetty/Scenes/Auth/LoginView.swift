@@ -30,6 +30,31 @@ struct LoginView: View {
         }
     }
 
+    private func signInWithGoogle() {
+        errorMessage = nil
+        busy = true
+        Task {
+            defer { busy = false }
+            do {
+                try await auth.signInWithGoogle(presentingFrom: presentationAnchor())
+            } catch let error as GoogleSignInError {
+                // GoogleOAuth normalises everything it can fail on into this type; `.cancelled`
+                // deliberately has no description, so backing out stays silent.
+                errorMessage = error.errorDescription
+            } catch {
+                errorMessage = error.localizedDescription // Firebase's own wording
+            }
+        }
+    }
+
+    /// The window ASWebAuthenticationSession should present over.
+    private func presentationAnchor() -> ASPresentationAnchor? {
+        UIApplication.shared.connectedScenes
+            .compactMap { $0 as? UIWindowScene }
+            .flatMap(\.windows)
+            .first { $0.isKeyWindow }
+    }
+
     /// Human copy for an Apple authorisation failure, or nil when there is nothing worth saying.
     ///
     /// `ASAuthorizationError` surfaces as a bare NSError whose `localizedDescription` is the useless
@@ -130,6 +155,24 @@ struct LoginView: View {
                 .disabled(busy)
                 .accessibilityIdentifier(A11y.Login.apple)
                 .padding(.top, 12)
+
+                Button(action: signInWithGoogle) {
+                    HStack(spacing: 8) {
+                        // Google's own mark isn't bundled, so this stays a neutral capsule rather
+                        // than a half-right imitation of their branded button.
+                        Image(systemName: "globe")
+                        Text("Continue with Google").fontWeight(.semibold)
+                    }
+                    .font(.body)
+                    .foregroundStyle(Palette.label)
+                    .frame(maxWidth: .infinity, minHeight: 52)
+                    .background(Palette.fill, in: Capsule())
+                    .overlay(Capsule().strokeBorder(Palette.separator, lineWidth: 0.5))
+                }
+                .buttonStyle(.plain)
+                .disabled(busy)
+                .accessibilityIdentifier(A11y.Login.google)
+                .padding(.top, 10)
 
                 HStack(spacing: 4) {
                     Text(isSignUp ? "Have an account?" : "Don't have an account?")
