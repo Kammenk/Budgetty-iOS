@@ -10,10 +10,12 @@
 import SwiftUI
 import SwiftData
 import PhotosUI
+import StoreKit
 
 struct ScanFlowView: View {
     @Environment(\.modelContext) private var context
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.requestReview) private var requestReview
 
     private enum Phase: Equatable { case capture, reading, review, failed(String) }
     @State private var phase: Phase = .capture
@@ -75,10 +77,13 @@ struct ScanFlowView: View {
             VStack(spacing: 0) {
                 HStack {
                     circleButton("xmark") { dismiss() }
+                        .accessibilityLabel("Close")
+                        .accessibilityIdentifier(A11y.Scan.close)
                     Spacer()
                     Text("Scan Receipt").font(.headline).foregroundStyle(.white)
                     Spacer()
                     circleButton("bolt.fill") {}
+                        .accessibilityLabel("Flash")
                 }
                 .padding(.horizontal, 20).padding(.top, 8)
 
@@ -100,6 +105,7 @@ struct ScanFlowView: View {
 
                 Button("Enter manually") { startManual() }
                     .font(.subheadline).foregroundStyle(.white)
+                    .accessibilityIdentifier(A11y.Scan.manual)
                     .padding(.top, 10)
 
                 Spacer()
@@ -114,6 +120,8 @@ struct ScanFlowView: View {
                             .frame(width: 52, height: 52)
                             .background(.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
                     }
+                    .accessibilityLabel("Choose from library")
+                    .accessibilityIdentifier(A11y.Scan.gallery)
                     .disabled(quotaExhausted).opacity(quotaExhausted ? 0.35 : 1)
                     Spacer()
                     // Shutter — the capture primary; solid white so it reads as the hero control.
@@ -127,6 +135,8 @@ struct ScanFlowView: View {
                         Circle().strokeBorder(.white, lineWidth: 4).frame(width: 72, height: 72)
                             .overlay(Circle().fill(.white).frame(width: 56, height: 56))
                     }
+                    .accessibilityLabel("Capture receipt")
+                    .accessibilityIdentifier(A11y.Scan.shutter)
                     .disabled(quotaExhausted).opacity(quotaExhausted ? 0.35 : 1)
                     Spacer()
                     // Flash
@@ -136,6 +146,7 @@ struct ScanFlowView: View {
                             .frame(width: 52, height: 52)
                             .background(.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
                     }
+                    .accessibilityLabel("Flash")
                 }
                 .padding(.horizontal, 24).padding(.vertical, 18)
                 // Dark-tinted glass so the slab reads like the mockup's smoked bar, not bright chrome.
@@ -279,6 +290,7 @@ struct ScanFlowView: View {
                 Text("Go Premium").font(.headline)
                     .ctaPill(height: 50)
             }
+            .accessibilityIdentifier(A11y.Scan.goPremium)
         }
         .padding(22)
         .background(.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
@@ -288,14 +300,27 @@ struct ScanFlowView: View {
     private func save() {
         draft.persist(into: context, isManual: isManual)
         // Only a successful, finalized scan counts against the free quota — failed reads and
-        // abandoned reviews never got here, and manual entry is always free.
+        // abandoned reviews never got here, and manual entry is always free. The rating gate rides
+        // the exact same guard: a finalized scan is both what burns a free scan and what can earn a
+        // review prompt; manual entry and edit re-saves are neither.
+        let earnedReview = !isManual && ReviewGate.recordSuccessfulScan()
         if !isManual { scansUsed += 1 }
         dismiss()
+        if earnedReview {
+            ReviewGate.onPromptRequested()
+            // Fire *after* the sheet has finished dismissing — asking mid-transition lets the system
+            // alert fight the sheet animation. The action captures the active scene, so it still
+            // presents once this view is gone.
+            Task { @MainActor in
+                try? await Task.sleep(for: .milliseconds(600))
+                requestReview()
+            }
+        }
     }
 
     private func maybeAutostart() {
         #if DEBUG
-        if phase == .capture, ProcessInfo.processInfo.environment["SCAN_PHASE"] == "review" {
+        if phase == .capture, LaunchFlags.value("SCAN_PHASE") == "review" {
             handle(UIImage())
         }
         #endif

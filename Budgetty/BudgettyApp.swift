@@ -25,7 +25,7 @@ struct BudgettyApp: App {
     /// First-run gate: show Onboarding until completed. DEBUG env can force either way for previews.
     private var showOnboarding: Bool {
         #if DEBUG
-        switch ProcessInfo.processInfo.environment["ONBOARDING"] {
+        switch LaunchFlags.value("ONBOARDING") {
         case "force": return true
         case "skip": return false
         default: break
@@ -51,7 +51,7 @@ struct BudgettyApp: App {
     /// Signed in? DEBUG builds can bypass the login gate for screenshots.
     private var isAuthed: Bool {
         #if DEBUG
-        if ProcessInfo.processInfo.environment["SKIP_AUTH"] == "1" { return true }
+        if LaunchFlags.isOn("SKIP_AUTH") { return true }
         #endif
         return auth.isSignedIn
     }
@@ -59,7 +59,7 @@ struct BudgettyApp: App {
     /// Show the one-time Insights setup quiz (armed at sign-up). DEBUG env can force it for previews.
     private var showQuiz: Bool {
         #if DEBUG
-        switch ProcessInfo.processInfo.environment["QUIZ"] {
+        switch LaunchFlags.value("QUIZ") {
         case "force": return true
         case "skip": return false
         default: break

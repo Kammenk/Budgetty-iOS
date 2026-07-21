@@ -68,6 +68,7 @@ struct SupportAboutView: View {
             .padding(.horizontal, 20).padding(.top, 6).padding(.bottom, 40)
             .adaptiveReadableWidth()
         }
+        .underFloatingDock(reportingScroll: false)
         .screenCanvas()
         .navigationTitle("Support & About")
     }

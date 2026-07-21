@@ -32,6 +32,16 @@ enum AppTab: Hashable, CaseIterable {
         case .budget: "dollarsign.circle.fill"
         }
     }
+
+    /// Stable UI-automation id (matches Android's tab test tags — see A11y.Tab).
+    var a11yIdentifier: String {
+        switch self {
+        case .home: A11y.Tab.home
+        case .history: A11y.Tab.history
+        case .insights: A11y.Tab.insights
+        case .budget: A11y.Tab.budget
+        }
+    }
 }
 
 struct RootView: View {
@@ -49,6 +59,8 @@ struct RootView: View {
     @State private var showScan = false
     @State private var dockHidden = false
     @State private var lastScrollY: CGFloat?
+    /// Measured height of `bottomChrome`, handed to the tab roots so their scroll content clears it.
+    @State private var chromeHeight: CGFloat = 0
     @Environment(\.horizontalSizeClass) private var hSize
     @Namespace private var dockNS
 
@@ -64,7 +76,7 @@ struct RootView: View {
             mainTabs
             #endif
         }
-        .fullScreenCover(isPresented: $showScan) { ScanFlowView() }
+        .fullScreenCover(isPresented: $showScan) { ScanFlowView().coversFloatingDock() }
         .onAppear {
             #if DEBUG
             if ProcessInfo.processInfo.environment["SHOW_SCAN"] == "1" { showScan = true }
@@ -122,6 +134,7 @@ struct RootView: View {
         }
         .safeAreaInset(edge: .bottom, spacing: 0) { bottomChrome }
         .environment(\.dockScrollReporter, handleDockScroll)
+        .environment(\.dockChromeHeight, chromeHeight)
         .onChange(of: tab) {
             lastScrollY = nil // the new tab's offset is unrelated — don't read it as a scroll
             setDock(hidden: false)
@@ -157,21 +170,24 @@ struct RootView: View {
             .accessibilityHidden(tab != t)
     }
 
-    /// The dock, with the Scan pill drawn 10pt above it (mockup spacing). The pill lives in an
-    /// overlay so only the dock's height insets the content — the page scrolls under the pill.
+    /// The dock, with the Scan pill stacked 10pt above it (mockup spacing). Both sit in the layout
+    /// so the bottom safe-area inset covers the *whole* chrome: scrolled to the end, a page's last
+    /// row clears the pill as well as the dock instead of resting under them.
     /// While scrolling down the dock slides off the bottom edge and the pill drops into its slot
     /// (the primary action stays reachable, like the system accessory during tab-bar minimize);
     /// `offset` doesn't reflow layout, so the safe-area inset — and the content under it — hold still.
     private var bottomChrome: some View {
-        glassDock
-            .offset(y: dockHidden ? 100 : 0) // 56pt dock + 34pt home area → fully off-screen
-            .overlay(alignment: .top) {
-                Button { showScan = true } label: { scanPill }
-                    .buttonStyle(.plain)
-                    .alignmentGuide(.top) { $0[.bottom] + 10 }
-                    .offset(y: dockHidden ? 66 : 0) // down by dock height + the 10pt gap
-            }
-            .padding(.horizontal, 14)
+        VStack(spacing: 10) {
+            Button { showScan = true } label: { scanPill }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier(A11y.Tab.scan)
+                .offset(y: dockHidden ? 66 : 0) // down by dock height + the 10pt gap
+            glassDock
+                .offset(y: dockHidden ? 100 : 0) // 56pt dock + 34pt home area → fully off-screen
+        }
+        // Unoffset height (offsets don't reflow), so this is the space a tab root must reserve.
+        .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { chromeHeight = $0 }
+        .padding(.horizontal, 14)
     }
 
     /// The mockup's floating tab dock: a 56pt glass capsule (chrome wash over blur, white-alpha
@@ -223,6 +239,7 @@ struct RootView: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel(t.title)
+        .accessibilityIdentifier(t.a11yIdentifier)
         .accessibilityAddTraits(selected ? [.isSelected] : [])
     }
 
@@ -230,6 +247,7 @@ struct RootView: View {
     private var scanAccessory: some View {
         Button { showScan = true } label: { scanPill }
             .buttonStyle(.plain)
+            .accessibilityIdentifier(A11y.Tab.scan)
     }
 
     private var scanPill: some View {

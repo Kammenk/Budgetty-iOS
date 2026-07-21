@@ -63,7 +63,7 @@ struct HomeView: View {
                 // included — to a readable width rather than stretching edge-to-edge.
                 .adaptiveReadableWidth(Dimens.contentMaxWidth)
             }
-            .reportsDockScroll()
+            .underFloatingDock()
             .screenCanvas()
             .sheet(isPresented: $showCustomize) {
                 HomeCustomizeSheet(orderRaw: $orderRaw, hiddenRaw: $hiddenRaw)
@@ -95,10 +95,13 @@ struct HomeView: View {
             }
             .buttonStyle(.plain)
             .accessibilityLabel("Customize sections")
+            .accessibilityIdentifier(A11y.Home.customize)
             NavigationLink { AccountView() } label: {
                 AvatarView(initials: auth.initials, size: 36, fontSize: 14)
             }
             .buttonStyle(.plain)
+            .accessibilityLabel("Account")
+            .accessibilityIdentifier(A11y.Home.account)
         }
     }
 
@@ -286,6 +289,7 @@ struct HomeView: View {
                     Text("See All").font(.subheadline).foregroundStyle(Palette.tint)
                 }
                 .buttonStyle(.plain)
+                .accessibilityIdentifier(A11y.Home.seeAllBudgets)
             }
             if showMonthly, let m = monthly {
                 budgetRow(title: "Monthly", spent: monthSpent, limit: m)
@@ -367,6 +371,7 @@ struct HomeView: View {
                     Text("See All").font(.subheadline).foregroundStyle(Palette.tint)
                 }
                 .buttonStyle(.plain)
+                .accessibilityIdentifier(A11y.Home.seeAllReceipts)
             }
             .padding(.horizontal, 16)
             .padding(.top, 4)
@@ -387,6 +392,7 @@ struct HomeView: View {
                 .contentCard(cornerRadius: 14)
             }
         }
+        .accessibilityIdentifier(A11y.Home.recentReceipts)
     }
 
     private var emptyReceipts: some View {
@@ -461,6 +467,8 @@ struct ReceiptRowView: View {
                 .foregroundStyle(Palette.tertiaryLabel)
         }
         .padding(.horizontal, 16).padding(.vertical, 12)
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier(A11y.receiptRow)
     }
 
     private func dateLabel(_ date: Date) -> String {

@@ -1,0 +1,53 @@
+# Budgetty end-to-end smoke flow — ONE YAML drives BOTH platforms.
+#
+# The strategic point (see QUALITY_TOOLING_TODO.md #6 / PARITY.md): the selectors are the shared
+# accessibility identifiers from AccessibilityID.swift == Android's Compose test tags, and the launch
+# `arguments` reach the app's DEBUG hooks on both platforms (iOS: launch args → LaunchFlags; Android:
+# intent extras). So feature parity becomes something CI checks, not a markdown promise.
+#
+# appId is set for iOS; the Android sibling swaps it to com.budgetty.app (the only line that differs).
+#
+# Hooks used (all test-only, DEBUG-gated):
+#   SKIP_AUTH=1            bypass the Firebase login gate (no network, no flaky sign-in)
+#   ONBOARDING=skip        skip the first-run onboarding
+#   QUIZ=skip              skip the post-signup Insights setup quiz
+#   USE_STUB_EXTRACTOR=1   canned offline extraction — deterministic, no API cost
+#   SCAN_PHASE=review      auto-run the stub extraction on scan open (no camera/photo-picker needed)
+
+appId: com.budgetty.Budgetty
+name: Receipt scan → save → appears in History
+---
+- launchApp:
+    clearState: true
+    arguments:
+      SKIP_AUTH: "1"
+      ONBOARDING: "skip"
+      QUIZ: "skip"
+      USE_STUB_EXTRACTOR: "1"
+      SCAN_PHASE: "review"
+
+# 1. Home renders (auth skipped, onboarding skipped) — the dock is up.
+- assertVisible:
+    id: "tab_home"
+- takeScreenshot: 01_home
+
+# 2. Open the scan flow via the floating Scan pill.
+- tapOn:
+    id: "tab_scan"
+- takeScreenshot: 02_after_scan_tap
+
+# 3. SCAN_PHASE=review auto-runs the stub extractor → the editable Review screen.
+- assertVisible:
+    id: "scan_save"
+- takeScreenshot: 03_review
+- tapOn:
+    id: "scan_save"
+
+# 4. The sheet dismisses back to Home. Switch to History…
+- tapOn:
+    id: "tab_history"
+
+# 5. …and confirm the just-saved receipt is now listed.
+- assertVisible:
+    id: "receipt_row"
+- takeScreenshot: 04_history

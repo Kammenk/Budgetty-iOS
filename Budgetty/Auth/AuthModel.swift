@@ -56,8 +56,10 @@ final class AuthModel {
 
     func deleteAccount() async throws {
         try await user?.delete()
-        // The lifetime free-scan counter clears only on account deletion (Android parity).
+        // The lifetime free-scan counter and the rating-prompt history clear only on account
+        // deletion (Android parity).
         ScanQuota.reset()
+        ReviewGate.reset()
     }
 }
 

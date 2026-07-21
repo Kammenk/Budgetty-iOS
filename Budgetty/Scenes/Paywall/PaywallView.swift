@@ -83,6 +83,8 @@ struct PaywallView: View {
                 .background(.white.opacity(0.18), in: Circle())
                 .overlay(Circle().strokeBorder(.white.opacity(0.25), lineWidth: 0.5))
         }
+        .accessibilityLabel("Close")
+        .accessibilityIdentifier(A11y.Paywall.close)
         .padding(.trailing, 16)
         .safeAreaPadding(.top, 8)
     }
@@ -164,6 +166,7 @@ struct PaywallView: View {
             }
         }
         .buttonStyle(.plain)
+        .accessibilityIdentifier(p == .yearly ? A11y.Paywall.planYearly : A11y.Paywall.planMonthly)
     }
 
     private var footer: some View {
@@ -176,13 +179,17 @@ struct PaywallView: View {
                 .ctaPill()
             }
             .disabled(premium || busy || selectedProduct == nil)
+            .accessibilityIdentifier(A11y.Paywall.subscribe)
             Button("Restore purchases") { Task { await store.restore() } }
                 .font(.subheadline).foregroundStyle(Palette.tint)
+                .accessibilityIdentifier(A11y.Paywall.restore)
             Text("No free trial · cancel anytime")
                 .font(.caption2).foregroundStyle(Palette.secondaryLabel)
         }
         .padding(.horizontal, 24).padding(.top, 12).padding(.bottom, 8)
         .background(.bar)
+        // Pushed from Account the dock stays on screen; lift the CTA clear of it.
+        .aboveFloatingDock()
     }
 
     /// Real StoreKit 2 purchase of the selected plan. Entitlement changes flow back through

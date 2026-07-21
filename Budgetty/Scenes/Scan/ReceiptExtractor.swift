@@ -31,7 +31,7 @@ struct ExtractionResult {
     var readable: Bool
     /// The receipt's printed subtotal lifted by the materialized charge rows — the clean anchor the
     /// review screen's dropped-line check compares the item sum against. nil when nothing was printed.
-    var printedSubtotal: Decimal? = nil
+    var printedSubtotal: Decimal?
 }
 
 enum ExtractError: LocalizedError {
@@ -85,19 +85,10 @@ struct APIReceiptExtractor: ReceiptExtractor {
         }
         let chargesTotal = chargeItems.reduce(Decimal.zero) { $0 + $1.price }
 
-        // Anchor on the printed grand total: any gap the items+discount+on-top-tax don't explain
-        // becomes extraCharges, so paid-total == printed total. The itemized charges come OUT of that
-        // gap — only a still-unexplained residual (an uncaptured deposit/fee) stays as the invisible
-        // add-on, so the delivery/tip rows aren't double-counted. Sub-5-cent gaps are cent-rounding.
-        var extraCharges = Decimal.zero
         let printedTotal = Decimal.fromDouble(resp.total)
-        if printedTotal > 0 {
-            let reconciled = itemsSum - discount + (taxOnTop ? tax : .zero)
-            let gap = printedTotal - reconciled
-            if gap >= Self.extraChargesMin {
-                extraCharges = max(.zero, gap - chargesTotal)
-            }
-        }
+        let extraCharges = Self.resolveExtraCharges(printedTotal: printedTotal, itemsSum: itemsSum,
+                                                    discount: discount, tax: tax, taxOnTop: taxOnTop,
+                                                    chargesTotal: chargesTotal)
 
         // The printed subtotal describes the PRODUCT rows; the review screen sums all rows (products
         // + charges), so lift the anchor by the charges to keep the dropped-line check aligned.
@@ -122,12 +113,26 @@ struct APIReceiptExtractor: ReceiptExtractor {
     /// Ignore a sub-5-cent gap between the printed total and the reconciled items as rounding.
     private static let extraChargesMin = Decimal(string: "0.05")!
 
-    private static func normalizedCategory(_ raw: String?) -> String {
+    /// Anchor the paid total on the printed grand total: whatever gap the items+discount+on-top-tax
+    /// don't explain becomes `extraCharges`, minus the already-materialized charge rows (so the
+    /// delivery/tip lines aren't double-counted). A sub-5-cent gap is cent-rounding and yields zero.
+    /// Pure (no I/O) so it can be unit-tested — mirrors Android's total-anchor logic.
+    static func resolveExtraCharges(printedTotal: Decimal, itemsSum: Decimal, discount: Decimal,
+                                    tax: Decimal, taxOnTop: Bool, chargesTotal: Decimal) -> Decimal {
+        guard printedTotal > 0 else { return .zero }
+        let reconciled = itemsSum - discount + (taxOnTop ? tax : .zero)
+        let gap = printedTotal - reconciled
+        guard gap >= extraChargesMin else { return .zero }
+        return max(.zero, gap - chargesTotal)
+    }
+
+    /// An extracted category string, falling back to the default when missing or not a built-in.
+    static func normalizedCategory(_ raw: String?) -> String {
         guard let raw, !raw.isEmpty else { return Categories.defaultName }
         return Categories.isPredefined(raw) ? raw : Categories.defaultName
     }
 
-    private static func parseDate(_ raw: String?) -> Date {
+    static func parseDate(_ raw: String?) -> Date {
         guard let raw, !raw.isEmpty else { return .now }
         let iso = ISO8601DateFormatter()
         if let d = iso.date(from: raw) { return d }

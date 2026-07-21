@@ -69,7 +69,7 @@ struct HistoryView: View {
                     tabContent(selecting: false)
                         .adaptiveReadableWidth()
                 }
-                .reportsDockScroll()
+                .underFloatingDock()
             }
             .screenCanvas()
             .navigationTitle("History")
@@ -158,6 +158,7 @@ struct HistoryView: View {
                 HStack(spacing: 8) {
                     Image(systemName: "magnifyingglass").foregroundStyle(Palette.secondaryLabel)
                     TextField("Search", text: $search).font(.subheadline)
+                        .accessibilityIdentifier(A11y.History.search)
                     if !search.isEmpty {
                         Button { search = "" } label: {
                             Image(systemName: "xmark.circle.fill").foregroundStyle(Palette.tertiaryLabel)
@@ -175,6 +176,7 @@ struct HistoryView: View {
             GlassSegmentedControl(options: Array(HistoryMode.allCases), selection: $mode) {
                 LocalizedStringKey($0.rawValue)
             }
+            .accessibilityIdentifier(A11y.History.modeToggle)
 
             if mode != .budgets {
                 ScrollView(.horizontal, showsIndicators: false) {
@@ -306,6 +308,7 @@ struct HistoryView: View {
                         }
                     }
                 }
+                .accessibilityIdentifier(A11y.History.receiptsList)
                 .padding(.bottom, 24)
             }
         }

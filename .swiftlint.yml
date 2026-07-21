@@ -1,0 +1,51 @@
+# SwiftLint configuration for Budgetty (iOS)
+#
+# Philosophy: land a config that passes clean today, then tighten rule-by-rule. A linter that is red
+# on day one gets ignored forever, so the baseline here is deliberately green — see the disabled_rules
+# block for what was switched off to get there, each with a note so it can be re-enabled intentionally.
+
+# Only our own code. Everything else (SPM checkouts, the design mockups, generated build output) is
+# out of scope.
+included:
+  - Budgetty
+  - BudgettyWidget
+
+excluded:
+  - build            # gitignored but present on disk — the entire Firebase SPM checkout graph lives
+                     # here; linting it is both wrong and enormously slow. Non-negotiable.
+  - .build
+  - design           # HTML/CSS design mockups, not Swift
+  - "**/*.xcstrings" # localization catalogs, not source
+
+disabled_rules:
+  # Off for the initial green baseline. Re-enable one at a time as the code is cleaned up.
+  - line_length          # many mockup-derived view bodies run long; cosmetic, high count
+  - todo                 # TODO/FIXME markers are tracked work, not lint failures
+  - trailing_comma       # collection trailing-comma style not yet normalized
+  - type_body_length     # some View files are large by SwiftUI nature
+  - file_length          # ditto
+  - function_body_length # ditto
+  # Deliberate house style, not drift — leave off rather than reformat the codebase:
+  - switch_case_alignment # compact two-cases-per-line enum switches (e.g. RootView tab titles)
+  - statement_position    # SwiftUI ViewBuilder `if { } else { }` with else on its own line
+  # Unsafe to autocorrect in a SwiftUI codebase: `--fix` rewrites `let _ = x` to `_ = x`, which is a
+  # `()` expression a ViewBuilder rejects ("type '()' cannot conform to 'View'"). Keep it off so a
+  # future `swiftlint --fix` can't silently break a build (see HomeView budget-card else branch).
+  - redundant_discardable_let
+
+# Thresholds tuned to the codebase so the enabled rules pass. Tighten downward over time.
+identifier_name:
+  min_length: 1          # single-letter locals (b, r, c, d) are idiomatic in the DTO initializers
+  max_length: 60
+type_name:
+  max_length: 60
+cyclomatic_complexity:
+  warning: 20
+nesting:
+  type_level: 2
+large_tuple:
+  warning: 3             # 3-member tuples are idiomatic here (currency/language option lists, chart layout)
+function_parameter_count:
+  warning: 8             # a couple of DTO/persist initializers legitimately take many fields
+
+reporter: "xcode"       # Xcode-parseable output so build-phase warnings show inline

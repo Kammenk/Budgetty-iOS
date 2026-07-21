@@ -41,6 +41,7 @@ struct NotificationsView: View {
             .padding(.horizontal, 20).padding(.top, 6).padding(.bottom, 40)
             .adaptiveReadableWidth()
         }
+        .underFloatingDock(reportingScroll: false)
         .screenCanvas()
         .navigationTitle("Notifications")
     }

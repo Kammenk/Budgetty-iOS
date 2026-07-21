@@ -51,7 +51,7 @@ struct BudgetView: View {
                 // included — to a readable width rather than stretching edge-to-edge.
                 .adaptiveReadableWidth(Dimens.contentMaxWidth)
             }
-            .reportsDockScroll()
+            .underFloatingDock()
             .screenCanvas()
             // The mockup puts the title at the very top of the scroll content (no nav-bar row above
             // it), so draw our own header and hide the bar — the Home pattern.
@@ -81,6 +81,7 @@ struct BudgetView: View {
         GlassSegmentedControl(options: Array(BudgetPeriod.allCases), selection: $period) {
             LocalizedStringKey($0.rawValue)
         }
+        .accessibilityIdentifier(A11y.Budget.periodToggle)
     }
 
     /// One column on every size class. Capped/centered on iPad by the caller.
@@ -167,6 +168,7 @@ struct BudgetView: View {
             .contentCard(cornerRadius: 16)
         }
         .buttonStyle(.plain)
+        .accessibilityIdentifier(A11y.Budget.overall)
     }
 
     // MARK: - Income
