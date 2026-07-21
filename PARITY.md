@@ -275,10 +275,13 @@ of `SettingsKey.quizPending`.
     layout, each row = title + the free-tier limit, every number **interpolated from the constant
     that enforces it** so a retuned cap can't leave stale copy.
 
-  **c. Onboarding AI wording — applies as-is.** iOS names AI twice,
-  `Scenes/Onboarding/OnboardingView.swift:20` ("AI reads every item & category") and `:22` ("AI
-  pulls every line item and assigns a category — you just review."). Android reworded so Budgetty
-  itself is the sentence's subject. ⚠️ The **privacy policy's AI limited-use disclosure naming
+  **c. Onboarding AI wording — ✅ DONE on iOS 2026-07-21.** Both mentions on onboarding page 2
+  (`Scenes/Onboarding/OnboardingView.swift:20` and `:22`) now read "Budgetty" instead of "AI",
+  matching Android's reword (`af23d0f`) where Budgetty itself is the sentence's subject. Verified on
+  the simulator via `SIMCTL_CHILD_ONBOARDING=force`. No translation work: this copy is still a Swift
+  literal, not in `Localizable.xcstrings` (one of the ~69 English-only iOS literals). The only
+  whole-word `AI` left in the iOS bundle is two code comments (`ScanFlowView.swift:34`,
+  `Settings.swift:23`); iOS's login panel never carried the AI line Android dropped in §d. ⚠️ The **privacy policy's AI limited-use disclosure naming
   Anthropic must stay** — required store disclosure, product copy only.
 
   **d. Login brand panel.** Android's dropped "Snap a receipt — AI reads it" and "Budget tracking
