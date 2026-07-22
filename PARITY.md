@@ -236,7 +236,11 @@ no iOS counterpart to fix; whenever Google sign-in lands, it needs the same `isN
 of `SettingsKey.quizPending`.
 
 ### 14. Scan guards — two Android checks missing on iOS
-**Status:** NOT PORTED (found 2026-07-21)
+**Status:** PORTED 2026-07-22 — `Scenes/Scan/ReceiptExtractor.swift` (`validate`) and
+`Scenes/Scan/ReviewView.swift` (`inflatedTotal`). All seven thresholds copied verbatim from Android
+so a receipt is judged identically on both platforms; `BudgettyTests/ExtractionGuardTests.swift`
+pins them, leaning on the cases that must NOT be rejected. Note iOS was missing a **third** guard the
+audit hadn't spotted: the money-sanity overshoot check. Ported alongside.
 - **Article-count guard.** Android cross-checks the receipt's printed item count against the parsed
   lines/units (`HaikuReceiptExtractor.validateExtraction`; `1d12a44` fixed it over-rejecting multi-buy
   receipts). iOS decodes the field (`Data/Remote/ReceiptAPI.swift:40` `printedItemCount`) and never
