@@ -15,22 +15,19 @@ struct SupportAboutView: View {
     @State private var versionTaps = 0
     @Environment(\.openURL) private var openURL
 
-    /// The hosted policy, same document the Android app links to (`URL_PRIVACY` in AccountScreen.kt)
-    /// and the one the App Store listing points at. Section 1(f) is what discloses crash reporting,
-    /// so this link is part of the Crashlytics shipping gate — an app that collects crash data has
-    /// to give the user a way to read what that means.
-    private static let privacyPolicy = URL(string: "https://budgetty-96a3d.web.app/")!
-
     var body: some View {
         ScrollView {
             VStack(spacing: 0) {
+                // One row, because one inbox. "FAQ" pointed at a page that has no FAQ on it — the
+                // hosted document is a privacy policy and nothing else — and "Suggest a feature" was
+                // a second mail row with a different subject. Android already settled this: a single
+                // "Contact us" whose subtitle names all three reasons to write (PARITY.md §4a), which
+                // is also why the subject line is neutral.
                 sectionHeader("Help")
                 VStack(spacing: 0) {
-                    link("FAQ", "questionmark.circle.fill", Palette.tint)
-                    divider
-                    link("Contact us", "envelope.fill", Color(argb: 0xFF007AFF))
-                    divider
-                    link("Suggest a feature", "lightbulb.fill", Color(argb: 0xFFFF9500))
+                    link("Contact us", "envelope.fill", Color(argb: 0xFF007AFF),
+                         subtitle: "Report an issue, suggest a feature, or just say hello",
+                         url: Legal.supportMail)
                 }
                 .contentCard(cornerRadius: 14)
                 .padding(.bottom, 24)
@@ -38,16 +35,19 @@ struct SupportAboutView: View {
                 sectionHeader("Legal")
                 VStack(spacing: 0) {
                     link("Privacy Policy", "hand.raised.fill", Color(argb: 0xFF34C759),
-                         url: Self.privacyPolicy)
+                         url: Legal.privacyPolicy)
                     divider
-                    // ⚠️ Still inert, and not fixable by picking a URL: no terms document exists on
-                    // either platform. Apple's standard EULA covers subscriptions by default, but
-                    // which document this row points at is the owner's call.
-                    link("Terms of Service", "doc.text.fill", Color(argb: 0xFF8E8E93))
+                    link("Terms of Service", "doc.text.fill", Color(argb: 0xFF8E8E93),
+                         url: Legal.terms)
                 }
                 .contentCard(cornerRadius: 14)
                 .padding(.bottom, 24)
 
+                // ⚠️ BOTH STILL INERT, and not for want of a string: each needs the App Store id,
+                // which doesn't exist in this repo and can't until there's a public listing (Rate
+                // wants the write-review URL, Share wants the listing URL). Wire them from
+                // App Store Connect › App Information › General › Apple ID once the app is live —
+                // pointing them anywhere before that just sends people to a 404.
                 sectionHeader("About")
                 VStack(spacing: 0) {
                     link("Rate Budgetty", "star.fill", Color(argb: 0xFFFFD700))
@@ -102,18 +102,27 @@ struct SupportAboutView: View {
         Rectangle().fill(Palette.separator).frame(height: 0.5)
     }
 
-    /// ⚠️ `url` is optional only because most of this screen's rows have never been wired to
-    /// anything — FAQ, Contact us, Suggest a feature, Rate and Share are all still no-ops that draw
-    /// an outward arrow. Passing a URL is the fix; see the note on the Terms row for why that one
-    /// isn't just a missing string.
+    /// ⚠️ `url` stays optional only for Rate and Share, the two rows still blocked on an App Store
+    /// id. Every other row on this screen is wired; a row without a URL draws the same outward arrow
+    /// and does nothing, so don't add one without a destination.
     private func link(_ title: LocalizedStringKey, _ symbol: String, _ tint: Color,
-                      url: URL? = nil) -> some View {
+                      subtitle: LocalizedStringKey? = nil, url: URL? = nil) -> some View {
         Button { if let url { openURL(url) } } label: {
             HStack(spacing: 12) {
                 SettingsIcon(symbol: symbol, background: tint)
-                Text(title).foregroundStyle(Palette.label)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(title).foregroundStyle(Palette.label)
+                    if let subtitle {
+                        Text(subtitle).font(.caption).foregroundStyle(Palette.secondaryLabel)
+                    }
+                }
                 Spacer()
-                Image(systemName: "arrow.up.right").font(.caption).foregroundStyle(Palette.tertiaryLabel)
+                // Only where there's something to open. The arrow is the affordance that promises a
+                // destination, and Rate/Share have none yet — drawing it anyway is what made this
+                // screen feel broken rather than unfinished.
+                if url != nil {
+                    Image(systemName: "arrow.up.right").font(.caption).foregroundStyle(Palette.tertiaryLabel)
+                }
             }
             .padding(.vertical, 13).padding(.horizontal, 16)
             .contentShape(Rectangle())

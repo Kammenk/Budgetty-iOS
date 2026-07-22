@@ -768,6 +768,100 @@
         }
       }
     },
+    "Report an issue, suggest a feature, or just say hello" : {
+      "localizations" : {
+        "bg" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Съобщи за проблем, предложи функция или просто кажи здравей"
+          }
+        },
+        "cs" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nahlaste problém, navrhněte funkci nebo jen pozdravte"
+          }
+        },
+        "da" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rapportér et problem, foreslå en funktion, eller sig bare hej"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Melde ein Problem, schlage eine Funktion vor oder sag einfach Hallo"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Informa de un problema, sugiere una función o solo saluda"
+          }
+        },
+        "fi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ilmoita ongelmasta, ehdota ominaisuutta tai sano vain moi"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Signalez un problème, proposez une fonctionnalité ou dites simplement bonjour"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Segnala un problema, proponi una funzione o mandaci due righe"
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Meld en feil, foreslå en funksjon, eller bare si hei"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Meld een probleem, stel een functie voor of zeg gewoon hallo"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zgłoś problem, zaproponuj funkcję lub po prostu się przywitaj"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Relate um problema, sugira um recurso ou apenas diga oi"
+          }
+        },
+        "ro" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Raportează o problemă, propune o funcție sau spune-ne salut"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Сообщите о проблеме, предложите функцию или просто напишите нам"
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rapportera ett problem, föreslå en funktion eller säg bara hej"
+          }
+        }
+      }
+    },
     "Sage, Ocean and Plum" : {
       "localizations" : {
         "bg" : {

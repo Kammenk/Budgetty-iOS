@@ -91,6 +91,16 @@ These are now proper catalog keys (they were bare Swift literals before), still 
 Everything else this pass added came from Android's finished translations (the paywall benefit rows,
 `BEST VALUE`, `Upgrade to add more`, `%@ / mo`) and is complete in all 15 target locales.
 
+## Support & About rewire, 2026-07-22
+
+Nothing new to translate. The rows that went away (`FAQ`, `Suggest a feature`) take their keys with
+them, and the one row that gained a subtitle reuses Android's finished
+`account_contact_subtitle` — "Report an issue, suggest a feature, or just say hello", 15 locales.
+
+The support email's subject line ("Budgetty feedback") is **deliberately English on both platforms**:
+it's a triage token in an inbox, not user-facing copy, and localizing it would only make filtering
+harder. Android hardcodes it the same way.
+
 ## The widget extension is entirely English (pre-existing)
 
 `BudgettyWidget/` has no string catalog of its own — `Localizable.xcstrings` belongs to the app
