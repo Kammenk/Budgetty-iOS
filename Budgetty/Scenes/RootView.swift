@@ -281,7 +281,6 @@ struct RootView: View {
         case "receipt": NavigationStack { DebugFirstReceiptDetail() }
         case "category": DebugCategoryPicker()
         case "review": DebugReviewScreen()
-        case "notifications": NavigationStack { NotificationsView() }
         case "support": NavigationStack { SupportAboutView() }
         case "widgets": NavigationStack { WidgetsView() }
         case "lock": BiometricLockView(onUnlock: {})

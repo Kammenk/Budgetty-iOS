@@ -23,10 +23,30 @@ struct PaywallView: View {
     private var selectedProduct: Product? {
         store.product(plan == .yearly ? StoreManager.yearlyID : StoreManager.monthlyID)
     }
-    /// Real localized price when products loaded; static fallback otherwise (e.g. Simulator with no
-    /// StoreKit configuration).
-    private func price(_ id: String, fallback: String) -> String {
-        store.product(id)?.displayPrice ?? fallback
+    /// Real localized price from StoreKit. Until the product loads there is no honest price to
+    /// show — and the CTA is disabled in exactly that case — so it renders as a dash rather than a
+    /// number we made up. (Happens on a Simulator with no StoreKit configuration selected.)
+    private func price(_ id: String) -> String {
+        store.product(id)?.displayPrice ?? "—"
+    }
+
+    /// The yearly plan's cost per month, in the product's own currency and locale.
+    ///
+    /// Derived, never typed. This line used to read a hardcoded "€2.50 / month" — arithmetic on a
+    /// €29.99 that App Store Connect is free to change, which would have made the paywall quietly
+    /// lie. Same defect `PremiumBenefits` exists to prevent, one screen over.
+    private var yearlyPerMonth: String? {
+        guard let yearly = store.product(StoreManager.yearlyID) else { return nil }
+        return PlanPricing.perMonth(yearly: yearly.price).formatted(yearly.priceFormatStyle)
+    }
+
+    /// What the yearly plan saves against paying monthly for a year, rounded down. Nil unless both
+    /// products are loaded *and* yearly is genuinely cheaper — if the pricing ever stops being a
+    /// saving, the badge drops the claim instead of inventing one.
+    private var yearlySavingsPercent: Int? {
+        guard let yearly = store.product(StoreManager.yearlyID),
+              let monthly = store.product(StoreManager.monthlyID) else { return nil }
+        return PlanPricing.savingsPercent(yearly: yearly.price, monthly: monthly.price)
     }
 
     // What Premium unlocks lives in `PremiumBenefits` so every surface agrees and each number comes
@@ -87,12 +107,23 @@ struct PaywallView: View {
 
     private var plansColumn: some View {
         VStack(spacing: 10) {
-            planCard(.yearly, title: "Yearly", detail: "€2.50 / month",
-                     price: price(StoreManager.yearlyID, fallback: "€29.99"),
-                     sub: "billed annually", badge: "BEST VALUE · SAVE 37%")
-            planCard(.monthly, title: "Monthly", detail: "Billed each month",
-                     price: price(StoreManager.monthlyID, fallback: "€3.99"), sub: nil, badge: nil)
+            planCard(.yearly, title: "Yearly",
+                     detail: yearlyPerMonth.map { String(localized: "\($0) / mo") },
+                     price: price(StoreManager.yearlyID),
+                     sub: String(localized: "billed annually"),
+                     badge: bestValueBadge)
+            planCard(.monthly, title: "Monthly", detail: String(localized: "Billed each month"),
+                     price: price(StoreManager.monthlyID), sub: nil, badge: nil)
         }
+    }
+
+    /// Quantifies the saving only when it can be computed from the loaded products. The number is
+    /// appended as a bare "· −37%" rather than a "SAVE 37%" sentence so the badge stays correct in
+    /// all 16 languages off one already-translated phrase.
+    private var bestValueBadge: String {
+        let base = String(localized: "BEST VALUE")
+        guard let percent = yearlySavingsPercent else { return base }
+        return "\(base) · −\(percent)%"
     }
 
     private var hero: some View {
@@ -133,7 +164,7 @@ struct PaywallView: View {
         .opacity(f.soon ? 0.65 : 1)
     }
 
-    private func planCard(_ p: Plan, title: LocalizedStringKey, detail: String, price: String, sub: String?, badge: String?) -> some View {
+    private func planCard(_ p: Plan, title: LocalizedStringKey, detail: String?, price: String, sub: String?, badge: String?) -> some View {
         let selected = plan == p
         return Button {
             plan = p
@@ -141,7 +172,9 @@ struct PaywallView: View {
             HStack {
                 VStack(alignment: .leading, spacing: 3) {
                     Text(title).font(.headline).foregroundStyle(Palette.label)
-                    Text(detail).font(.caption).foregroundStyle(Palette.secondaryLabel)
+                    // Nil while StoreKit hasn't loaded the product — the per-month figure is derived
+                    // from its price, so there's nothing truthful to put here yet.
+                    if let detail { Text(detail).font(.caption).foregroundStyle(Palette.secondaryLabel) }
                 }
                 Spacer()
                 VStack(alignment: .trailing, spacing: 1) {
@@ -179,6 +212,9 @@ struct PaywallView: View {
                 }
                 .ctaPill()
             }
+            // The pill paints its own gradient, so `.disabled` alone leaves it looking tappable —
+            // which reads as broken next to a "—" price when StoreKit hasn't loaded the products.
+            .opacity(selectedProduct == nil && !premium ? 0.45 : 1)
             .disabled(premium || busy || selectedProduct == nil)
             .accessibilityIdentifier(A11y.Paywall.subscribe)
             Button("Restore purchases") { Task { await store.restore() } }

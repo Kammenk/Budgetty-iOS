@@ -28,28 +28,24 @@ enum Palette {
     /// Liquid Glass v2 material-system `--tint`. Use as the app tint and for selected/active states.
     /// Per the spec this is used *only* on the primary action, active tab, and links — never as a
     /// chrome fill (chrome stays system-adaptive glass and defers to content).
-    static let tint = Color(uiColor: UIColor { trait in
-        trait.userInterfaceStyle == .dark
-            ? UIColor(red: 0xC4/255, green: 0xAE/255, blue: 1.0, alpha: 1)
-            : UIColor(red: 0x6B/255, green: 0x50/255, blue: 0xA8/255, alpha: 1)
-    })
+    ///
+    /// Computed, not stored: Premium can swap the accent (see `AccentOption`), and reading through
+    /// `AppTheme` is what makes every view drawing with the tint re-render when it changes.
+    static var tint: Color { AppTheme.shared.accent.color }
 
     /// Faint brand wash behind selected sidebar rows / chips / secondary buttons (`--tint-bg`:
-    /// light rgba(107,80,168,.10) · dark rgba(196,174,255,.14)).
-    static let tintSoft = Color(uiColor: UIColor { trait in
-        trait.userInterfaceStyle == .dark
-            ? UIColor(red: 0xC4/255, green: 0xAE/255, blue: 1.0, alpha: 0.14)
-            : UIColor(red: 0x6B/255, green: 0x50/255, blue: 0xA8/255, alpha: 0.10)
-    })
+    /// light rgba(107,80,168,.10) · dark rgba(196,174,255,.14) at the default accent).
+    static var tintSoft: Color { AppTheme.shared.accent.soft }
 
-    /// Hero "Total spent" card gradient — CSS-exact from the v2 mockup:
+    /// Hero "Total spent" card gradient — CSS-exact from the v2 mockup at the default accent:
     /// `linear-gradient(140deg, #5E4CAB, #7B5AC8, #9A6FE0)` = deep violet entering at the top-left,
     /// brightening toward the bottom-right. The *bright top edge* the mockup shows is NOT the
     /// gradient — it's a separate `inset 0 1px 0 rgba(255,255,255,.18)` highlight (see `heroCard`).
-    static let heroGradient = LinearGradient(
-        colors: [Color(argb: 0xFF5E4CAB), Color(argb: 0xFF7B5AC8), Color(argb: 0xFF9A6FE0)],
-        startPoint: .topLeading, endPoint: .bottomTrailing
-    )
+    /// Other accents re-derive the same ramp at their own hue (`AccentOption.heroStops`).
+    static var heroGradient: LinearGradient {
+        LinearGradient(colors: AppTheme.shared.accent.heroStops,
+                       startPoint: .topLeading, endPoint: .bottomTrailing)
+    }
 
     /// Full-bleed page canvas: the grouped background plus the mockup's THREE ambient glows —
     /// CSS-exact from `iOS Home.dc.html`:
@@ -193,9 +189,10 @@ enum Palette {
 
     // MARK: - Signature glass CTA (Scan)
 
-    /// The prominent Scan button stays a rich violet in *both* themes (mockup `--lg-cta`), so it never
-    /// washes out to the pale dark-mode tint. White label on top.
-    static let scanCTA = dynamic(light: 0xFF6B50A8, dark: 0xFF7E60E0)
+    /// The prominent Scan button stays a rich colour in *both* themes (mockup `--lg-cta`), so it
+    /// never washes out to the pale dark-mode tint. White label on top — which is why the accent
+    /// swap re-derives it by luminance rather than by hue alone (see `AccentOption.cta`).
+    static var scanCTA: Color { AppTheme.shared.accent.cta }
 
     /// Build a dynamic (light/dark) Color from two packed 0xAARRGGBB integers.
     private static func dynamic(light: Int, dark: Int) -> Color {

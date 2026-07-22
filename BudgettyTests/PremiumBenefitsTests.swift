@@ -15,7 +15,7 @@ struct PremiumBenefitsTests {
     /// Every "real" benefit must be one something actually gates on. If a future row is added here,
     /// it needs an enforcing constant — or it belongs in `soon`.
     @Test func realBenefitsAreOnlyTheEnforcedOnes() {
-        #expect(PremiumBenefits.real.map(\.id) == ["scans", "categories"])
+        #expect(PremiumBenefits.real.map(\.id) == ["scans", "categories", "recurring", "themes"])
     }
 
     /// The numbers must come from the constants, not be retyped. Change a cap and this fails until
@@ -26,6 +26,21 @@ struct PremiumBenefitsTests {
 
         let categories = try #require(PremiumBenefits.real.first(where: { $0.id == "categories" }))
         #expect(categories.detail.contains("\(Categories.freeCustomLimit)"))
+
+        let recurring = try #require(PremiumBenefits.real.first(where: { $0.id == "recurring" }))
+        #expect(recurring.detail.contains("\(RecurringQuota.freeLimit)"))
+    }
+
+    /// The themes row names three accents; they have to exist, or it's the old "advertise what you
+    /// don't ship" bug wearing a new coat.
+    @Test func themesRowNamesAccentsThatExist() throws {
+        let themes = try #require(PremiumBenefits.real.first(where: { $0.id == "themes" }))
+        for accent in [AccentOption.sage, .ocean, .plum] {
+            #expect(themes.detail.localizedCaseInsensitiveContains(accent.rawValue))
+        }
+        // …and they must be distinct colours, not four aliases of the brand violet.
+        let hexes = Set(AccentOption.allCases.map { "\($0.hexes.light)-\($0.hexes.dark)" })
+        #expect(hexes.count == AccentOption.allCases.count)
     }
 
     /// Unbuilt features stay visible but flagged; nothing in `real` may claim to be coming.
@@ -35,7 +50,7 @@ struct PremiumBenefitsTests {
         let noRealRowFlagged = PremiumBenefits.real.allSatisfy { !$0.soon }
         #expect(everyRoadmapRowFlagged)
         #expect(noRealRowFlagged)
-        #expect(PremiumBenefits.soon.map(\.id) == ["cloud", "themes"])
+        #expect(PremiumBenefits.soon.map(\.id) == ["cloud"])
     }
 
     /// The two claims that got this audit started: widgets aren't gated anywhere, and the free
