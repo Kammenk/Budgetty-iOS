@@ -29,17 +29,9 @@ struct PaywallView: View {
         store.product(id)?.displayPrice ?? fallback
     }
 
-    private struct Feature: Identifiable {
-        let id = UUID(); let symbol: String; let title: String; let subtitle: String
-    }
-    // Outline symbols per the mockup — the tiles carry the tint, the glyphs stay light-line.
-    private let features = [
-        Feature(symbol: "camera", title: "Unlimited scans", subtitle: "Scan as many receipts as you want"),
-        Feature(symbol: "paintpalette", title: "Accent color themes", subtitle: "Personalise the look with 8 tints"),
-        Feature(symbol: "icloud", title: "Cloud backup & sync", subtitle: "Your data safe and on all devices"),
-        Feature(symbol: "square.grid.2x2", title: "Home screen widgets", subtitle: "Spending at a glance, on your home"),
-        Feature(symbol: "star", title: "10 custom categories", subtitle: "vs. 3 on the free plan"),
-    ]
+    // What Premium unlocks lives in `PremiumBenefits` so every surface agrees and each number comes
+    // from the constant enforcing it — see the audit note there for why this list shrank.
+    private let features = PremiumBenefits.all
 
     var body: some View {
         ScrollView {
@@ -119,17 +111,26 @@ struct PaywallView: View {
         .background(Palette.heroGradient)
     }
 
-    private func featureRow(_ f: Feature) -> some View {
+    private func featureRow(_ f: PremiumBenefit) -> some View {
         HStack(spacing: 14) {
-            RoundedRectangle(cornerRadius: 10, style: .continuous).fill(Palette.tintSoft)
+            // A roadmap row is muted and wears a clock, so it can't be mistaken for something the
+            // subscription buys today.
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .fill(f.soon ? Palette.fill : Palette.tintSoft)
                 .frame(width: 38, height: 38)
-                .overlay(Image(systemName: f.symbol).font(.system(size: 17)).foregroundStyle(Palette.tint))
+                .overlay(
+                    Image(systemName: f.soon ? "clock" : f.symbol)
+                        .font(.system(size: 17))
+                        .foregroundStyle(f.soon ? Palette.secondaryLabel : Palette.tint)
+                )
             VStack(alignment: .leading, spacing: 2) {
-                Text(f.title).font(.callout).fontWeight(.semibold).foregroundStyle(Palette.label)
-                Text(f.subtitle).font(.caption).foregroundStyle(Palette.secondaryLabel)
+                Text(f.title).font(.callout).fontWeight(.semibold)
+                    .foregroundStyle(f.soon ? Palette.secondaryLabel : Palette.label)
+                Text(f.detail).font(.caption).foregroundStyle(Palette.secondaryLabel)
             }
             Spacer()
         }
+        .opacity(f.soon ? 0.65 : 1)
     }
 
     private func planCard(_ p: Plan, title: LocalizedStringKey, detail: String, price: String, sub: String?, badge: String?) -> some View {
