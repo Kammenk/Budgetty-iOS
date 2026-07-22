@@ -33,6 +33,17 @@ extension View {
         modifier(ReadableWidth(maxWidth: maxWidth))
     }
 
+    /// Reports into `flag` whether the container is too short to show a tall screen's content
+    /// without scrolling past it (< 900pt).
+    ///
+    /// Size classes can't answer this: every iPhone in portrait is `regular` height, so an 852pt
+    /// iPhone 17 Pro and a 1210pt iPad Pro look identical to them. The threshold sits above the
+    /// tallest phone deliberately — the screens using this are ones where a phone genuinely runs
+    /// out of room and an iPad never does. Mirrors `trackWideLandscape`'s geometry approach.
+    func trackCompactHeight(_ flag: Binding<Bool>) -> some View {
+        onGeometryChange(for: Bool.self) { $0.size.height < 900 } action: { flag.wrappedValue = $0 }
+    }
+
     /// Reports into `flag` whether the container is landscape-wide (>= 1100pt) — approximates iPad
     /// landscape / wide Split View, which the size classes alone can't tell from iPad portrait.
     /// Dashboards use this to switch from a two-column to a three-column layout.

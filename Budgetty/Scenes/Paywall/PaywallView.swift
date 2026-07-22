@@ -15,6 +15,8 @@ struct PaywallView: View {
     @Environment(StoreManager.self) private var store
     @AppStorage(SettingsKey.premium) private var premium = false
     @State private var wide = false
+    /// Short screen — every iPhone in portrait. Drives the dense hero/spacing below.
+    @State private var shortScreen = false
     @State private var busy = false
 
     private enum Plan { case yearly, monthly }
@@ -65,18 +67,20 @@ struct PaywallView: View {
                             plansColumn.frame(maxWidth: .infinity)
                         }
                     } else {
-                        VStack(spacing: 20) {
+                        VStack(spacing: shortScreen ? 14 : 20) {
                             featuresColumn
                             plansColumn
                         }
                     }
                 }
-                .padding(20)
+                .padding(.horizontal, 20)
+                .padding(.vertical, shortScreen ? 14 : 20)
             }
             .adaptiveReadableWidth(wide ? 900 : Dimens.contentMaxWidth)
         }
         .ignoresSafeArea(edges: .top) // hero runs under the status bar (mockup)
         .trackWideLandscape($wide)
+        .trackCompactHeight($shortScreen)
         .background(Palette.groupedBackground)
         // Mockup chrome: no title bar — the violet hero runs to the very top with a glass close
         // button floating over it.
@@ -102,7 +106,7 @@ struct PaywallView: View {
     }
 
     private var featuresColumn: some View {
-        VStack(spacing: 14) { ForEach(features) { featureRow($0) } }
+        VStack(spacing: shortScreen ? 10 : 14) { ForEach(features) { featureRow($0) } }
     }
 
     private var plansColumn: some View {
@@ -126,19 +130,25 @@ struct PaywallView: View {
         return "\(base) · −\(percent)%"
     }
 
+    // On a phone the hero is what pushes the plan cards under the pinned footer: the offer is the
+    // point of this screen, so the ornament gives up the space rather than the thing being sold.
+    // Same call Android made on its short-window paywall (6df1ef9) — decoration yields to content.
+    // The badge stays large; only its padding and the glyph tile shrink, so the mockup still reads.
     private var hero: some View {
         VStack(spacing: 0) {
-            RoundedRectangle(cornerRadius: 22, style: .continuous)
+            RoundedRectangle(cornerRadius: shortScreen ? 18 : 22, style: .continuous)
                 .fill(.white.opacity(0.2))
-                .frame(width: 72, height: 72)
-                .overlay(Image(systemName: "dollarsign").font(.system(size: 34, weight: .bold)).foregroundStyle(.white))
-                .padding(.bottom, 16)
+                .frame(width: shortScreen ? 56 : 72, height: shortScreen ? 56 : 72)
+                .overlay(Image(systemName: "dollarsign")
+                    .font(.system(size: shortScreen ? 27 : 34, weight: .bold)).foregroundStyle(.white))
+                .padding(.bottom, shortScreen ? 10 : 16)
             Text("Budgetty Premium").font(.title2).fontWeight(.bold).foregroundStyle(.white)
             Text("Unlock everything · Cancel anytime")
                 .font(.subheadline).foregroundStyle(.white.opacity(0.85)).padding(.top, 6)
         }
         .frame(maxWidth: .infinity)
-        .padding(.top, 76).padding(.bottom, 28) // clears the status bar now that the hero runs to y=0
+        // Top padding still has to clear the status bar, since the hero runs to y=0.
+        .padding(.top, shortScreen ? 62 : 76).padding(.bottom, shortScreen ? 18 : 28)
         .background(Palette.heroGradient)
     }
 
