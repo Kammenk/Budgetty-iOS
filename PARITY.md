@@ -529,3 +529,17 @@ answering from inside the extension, and a real purchase reloading widget timeli
 gaps after this pass: Crashlytics (still deliberately unmerged, blocked on the App Privacy label),
 MetricKit + snapshot tests from QUALITY_TOOLING_TODO.md, and the English-only iOS literals.
 Android `main`/`fe136cd` · iOS `main`/`1165b6a`.*
+
+*Updated 2026-07-22 (later) — **Crashlytics merged**, closing the last item above. The code was ready
+since `089efa6`; what landed now is the disclosure it was waiting on: `PrivacyInfo.xcprivacy` declares
+`NSPrivacyCollectedDataTypeCrashData` (not linked — nothing calls `setUserID`; keep it that way or the
+manifest and the App Store label both go wrong), and Support & About actually links to the privacy
+policy, which required fixing the shared policy's billing sections — they told iOS readers Google Play
+handles their subscription (Android repo `23e996d`, **still needs deploying to Firebase Hosting**).
+⚠️ **Still gated, and not doable from a repo: the App Store Connect App Privacy label must declare
+Diagnostics › Crash Data (App Functionality, not linked, not tracking) before any build is uploaded.**
+Found while doing it, not fixed: **every row on Support & About is a no-op** — FAQ, Contact us,
+Suggest a feature, Terms of Service, Rate, Share all draw an outward arrow and do nothing; only
+Privacy Policy is now wired. Terms is the awkward one — no terms document exists on either platform,
+and Apple's guideline 3.1.2 wants Terms + Privacy links on the **subscription screen** too, which the
+paywall doesn't have. Android's own FAQ link is also broken (`#faq` is not an anchor on that page).*

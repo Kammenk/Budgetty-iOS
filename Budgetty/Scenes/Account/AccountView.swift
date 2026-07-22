@@ -19,6 +19,7 @@ struct AccountView: View {
     @AppStorage(SettingsKey.language) private var language = "system"
     @AppStorage(SettingsKey.dateFormat) private var dateFormatRaw = DateFormatOption.system.rawValue
     @AppStorage(SettingsKey.faceID) private var faceID = false
+    @AppStorage(SettingsKey.crashReporting) private var crashReporting = true
     @AppStorage(SettingsKey.premium) private var premium = false
     private let theme = AppTheme.shared
 
@@ -221,14 +222,24 @@ struct AccountView: View {
         .contentCard(cornerRadius: 14)
     }
 
-    /// Face ID only. Android deleted its whole Privacy section because every switch in it wrote a
-    /// boolean nothing read; this one is real (`LockGate` → `BiometricLockView`), so the section
-    /// stays here — a genuine platform difference, not drift.
+    /// Two real switches. Android deleted its whole Privacy section because every switch in it wrote
+    /// a boolean nothing read; both of these are wired to something — `faceID` to `LockGate` →
+    /// `BiometricLockView` (a platform difference, Android has no biometric lock), and
+    /// `crashReporting` to the Crashlytics SDK.
     private var privacyCard: some View {
         VStack(spacing: 0) {
             Toggle(isOn: $faceID) { label("Face ID", "lock.fill", Color(argb: 0xFF30B0C7)) }
                 .tint(Palette.good)
                 .padding(.vertical, 8).padding(.horizontal, 16)
+            divider
+            // Default-on with a real opt-out (Android parity). The stored preference is the source of
+            // truth — push every change straight to the SDK so it can't drift from the toggle.
+            Toggle(isOn: $crashReporting) {
+                label("Crash reporting", "exclamationmark.triangle.fill", Color(argb: 0xFFFF9500))
+            }
+            .tint(Palette.good)
+            .padding(.vertical, 8).padding(.horizontal, 16)
+            .onChange(of: crashReporting) { _, enabled in CrashReporting.setEnabled(enabled) }
         }
         .contentCard(cornerRadius: 14)
     }

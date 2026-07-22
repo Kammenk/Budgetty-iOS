@@ -15,6 +15,9 @@ enum SettingsKey {
     static let dateFormat = "pref.dateFormat"
     static let accent = "pref.accent"             // Premium accent theme (see AccentOption/AppTheme)
     static let faceID = "pref.faceID"
+    /// Crashlytics collection — default-ON with an opt-out toggle (see `CrashReporting`).
+    /// Unlike the `analytics` and `notifications` keys deleted alongside the trim, this one is read.
+    static let crashReporting = "pref.crashReporting"
     static let premium = "pref.premium"           // effective Premium flag (subscription OR tester)
     static let testerPremium = "pref.testerPremium" // hidden 11-tap tester unlock, kept separate
     static let onboarded = "pref.onboarded"

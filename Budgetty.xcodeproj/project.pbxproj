@@ -10,22 +10,23 @@
 		AA100000000000000000000B /* BudgettyWidgetExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = AA1000000000000000000002 /* BudgettyWidgetExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		FB1000000000000000000004 /* FirebaseCore in Frameworks */ = {isa = PBXBuildFile; productRef = FB1000000000000000000002 /* FirebaseCore */; };
 		FB1000000000000000000005 /* FirebaseAuth in Frameworks */ = {isa = PBXBuildFile; productRef = FB1000000000000000000003 /* FirebaseAuth */; };
+		FB1000000000000000000007 /* FirebaseCrashlytics in Frameworks */ = {isa = PBXBuildFile; productRef = FB1000000000000000000006 /* FirebaseCrashlytics */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
-		AA100000000000000000000D /* PBXContainerItemProxy */ = {
-			isa = PBXContainerItemProxy;
-			containerPortal = 69BE82562FFB885100006F98 /* Project object */;
-			proxyType = 1;
-			remoteGlobalIDString = AA1000000000000000000001;
-			remoteInfo = BudgettyWidgetExtension;
-		};
 		7E7E000000000000000000AA /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = 69BE82562FFB885100006F98 /* Project object */;
 			proxyType = 1;
 			remoteGlobalIDString = 69BE825D2FFB885100006F98;
 			remoteInfo = Budgetty;
+		};
+		AA100000000000000000000D /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 69BE82562FFB885100006F98 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = AA1000000000000000000001;
+			remoteInfo = BudgettyWidgetExtension;
 		};
 /* End PBXContainerItemProxy section */
 
@@ -45,8 +46,8 @@
 
 /* Begin PBXFileReference section */
 		69BE825E2FFB885100006F98 /* Budgetty.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Budgetty.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		AA1000000000000000000002 /* BudgettyWidgetExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = BudgettyWidgetExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		7E7E000000000000000000A8 /* BudgettyTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = BudgettyTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		AA1000000000000000000002 /* BudgettyWidgetExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = BudgettyWidgetExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -65,17 +66,17 @@
 			path = Budgetty;
 			sourceTree = "<group>";
 		};
+		7E7E000000000000000000AB /* BudgettyTests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = BudgettyTests;
+			sourceTree = "<group>";
+		};
 		AA1000000000000000000003 /* BudgettyWidget */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
 				AA100000000000000000000E /* Exceptions for "BudgettyWidget" folder in "BudgettyWidgetExtension" target */,
 			);
 			path = BudgettyWidget;
-			sourceTree = "<group>";
-		};
-		7E7E000000000000000000AB /* BudgettyTests */ = {
-			isa = PBXFileSystemSynchronizedRootGroup;
-			path = BudgettyTests;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -87,17 +88,18 @@
 			files = (
 				FB1000000000000000000004 /* FirebaseCore in Frameworks */,
 				FB1000000000000000000005 /* FirebaseAuth in Frameworks */,
+				FB1000000000000000000007 /* FirebaseCrashlytics in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		AA1000000000000000000005 /* Frameworks */ = {
+		7E7E000000000000000000A6 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		7E7E000000000000000000A6 /* Frameworks */ = {
+		AA1000000000000000000005 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -138,6 +140,7 @@
 				69BE825B2FFB885100006F98 /* Frameworks */,
 				69BE825C2FFB885100006F98 /* Resources */,
 				AA100000000000000000000A /* Embed Foundation Extensions */,
+				FB1000000000000000000008 /* Upload Crashlytics dSYMs */,
 			);
 			buildRules = (
 			);
@@ -151,32 +154,11 @@
 			packageProductDependencies = (
 				FB1000000000000000000002 /* FirebaseCore */,
 				FB1000000000000000000003 /* FirebaseAuth */,
+				FB1000000000000000000006 /* FirebaseCrashlytics */,
 			);
 			productName = Budgetty;
 			productReference = 69BE825E2FFB885100006F98 /* Budgetty.app */;
 			productType = "com.apple.product-type.application";
-		};
-		AA1000000000000000000001 /* BudgettyWidgetExtension */ = {
-			isa = PBXNativeTarget;
-			buildConfigurationList = AA1000000000000000000007 /* Build configuration list for PBXNativeTarget "BudgettyWidgetExtension" */;
-			buildPhases = (
-				AA1000000000000000000004 /* Sources */,
-				AA1000000000000000000005 /* Frameworks */,
-				AA1000000000000000000006 /* Resources */,
-			);
-			buildRules = (
-			);
-			dependencies = (
-			);
-			fileSystemSynchronizedGroups = (
-				AA1000000000000000000003 /* BudgettyWidget */,
-			);
-			name = BudgettyWidgetExtension;
-			packageProductDependencies = (
-			);
-			productName = BudgettyWidgetExtension;
-			productReference = AA1000000000000000000002 /* BudgettyWidgetExtension.appex */;
-			productType = "com.apple.product-type.app-extension";
 		};
 		7E7E000000000000000000A1 /* BudgettyTests */ = {
 			isa = PBXNativeTarget;
@@ -201,6 +183,28 @@
 			productReference = 7E7E000000000000000000A8 /* BudgettyTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
 		};
+		AA1000000000000000000001 /* BudgettyWidgetExtension */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = AA1000000000000000000007 /* Build configuration list for PBXNativeTarget "BudgettyWidgetExtension" */;
+			buildPhases = (
+				AA1000000000000000000004 /* Sources */,
+				AA1000000000000000000005 /* Frameworks */,
+				AA1000000000000000000006 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				AA1000000000000000000003 /* BudgettyWidget */,
+			);
+			name = BudgettyWidgetExtension;
+			packageProductDependencies = (
+			);
+			productName = BudgettyWidgetExtension;
+			productReference = AA1000000000000000000002 /* BudgettyWidgetExtension.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -214,12 +218,12 @@
 					69BE825D2FFB885100006F98 = {
 						CreatedOnToolsVersion = 26.6;
 					};
-					AA1000000000000000000001 = {
-						CreatedOnToolsVersion = 26.6;
-					};
 					7E7E000000000000000000A1 = {
 						CreatedOnToolsVersion = 26.6;
 						TestTargetID = 69BE825D2FFB885100006F98;
+					};
+					AA1000000000000000000001 = {
+						CreatedOnToolsVersion = 26.6;
 					};
 				};
 			};
@@ -270,14 +274,14 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		AA1000000000000000000006 /* Resources */ = {
+		7E7E000000000000000000A7 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		7E7E000000000000000000A7 /* Resources */ = {
+		AA1000000000000000000006 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -286,15 +290,28 @@
 		};
 /* End PBXResourcesBuildPhase section */
 
-/* Begin PBXSourcesBuildPhase section */
-		69BE825A2FFB885100006F98 /* Sources */ = {
-			isa = PBXSourcesBuildPhase;
+/* Begin PBXShellScriptBuildPhase section */
+		FB1000000000000000000008 /* Upload Crashlytics dSYMs */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
 			buildActionMask = 2147483647;
 			files = (
 			);
+			inputPaths = (
+				"${DWARF_DSYM_FOLDER_PATH}/${DWARF_DSYM_FILE_NAME}/Contents/Resources/DWARF/${TARGET_NAME}",
+				"$(SRCROOT)/$(BUILT_PRODUCTS_DIR)/$(INFOPLIST_PATH)",
+			);
+			name = "Upload Crashlytics dSYMs";
+			outputPaths = (
+			);
 			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "# Upload dSYMs so Crashlytics reports are symbolicated instead of raw hex.\n# Debug builds produce no dSYM and never ship, so skip them outright — this keeps the\n# day-to-day build doing zero work here.\nif [ \"${CONFIGURATION}\" != \"Release\" ]; then exit 0; fi\n\nRUNNER=\"${BUILD_DIR%/Build/*}/SourcePackages/checkouts/firebase-ios-sdk/Crashlytics/run\"\nif [ ! -f \"$RUNNER\" ]; then\n  echo \"warning: Crashlytics run script not found at $RUNNER — crash reports will be UNSYMBOLICATED.\"\n  exit 0\nfi\n\"$RUNNER\"\n";
 		};
-		AA1000000000000000000004 /* Sources */ = {
+/* End PBXShellScriptBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		69BE825A2FFB885100006F98 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -308,18 +325,25 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		AA1000000000000000000004 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
-		AA100000000000000000000C /* PBXTargetDependency */ = {
-			isa = PBXTargetDependency;
-			target = AA1000000000000000000001 /* BudgettyWidgetExtension */;
-			targetProxy = AA100000000000000000000D /* PBXContainerItemProxy */;
-		};
 		7E7E000000000000000000A9 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
 			target = 69BE825D2FFB885100006F98 /* Budgetty */;
 			targetProxy = 7E7E000000000000000000AA /* PBXContainerItemProxy */;
+		};
+		AA100000000000000000000C /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = AA1000000000000000000001 /* BudgettyWidgetExtension */;
+			targetProxy = AA100000000000000000000D /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -489,6 +513,10 @@
 				CURRENT_PROJECT_VERSION = 7;
 				DEVELOPMENT_TEAM = 6J95GYU5VQ;
 				ENABLE_PREVIEWS = YES;
+				/* Crashlytics' upload-symbols needs to read the dSYM and reach the network, which the
+				   script sandbox forbids. Scoped to Release only — Debug keeps sandboxing on, and the
+				   phase exits immediately there. */
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_NSCameraUsageDescription = "Budgetty uses the camera to scan your receipts.";
@@ -512,6 +540,48 @@
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		7E7E000000000000000000A3 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 7;
+				DEVELOPMENT_TEAM = 6J95GYU5VQ;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.budgetty.Budgetty.tests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Budgetty.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Budgetty";
+			};
+			name = Debug;
+		};
+		7E7E000000000000000000A4 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 7;
+				DEVELOPMENT_TEAM = 6J95GYU5VQ;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.budgetty.Budgetty.tests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Budgetty.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Budgetty";
 			};
 			name = Release;
 		};
@@ -576,48 +646,6 @@
 			};
 			name = Release;
 		};
-		7E7E000000000000000000A3 /* Debug */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				BUNDLE_LOADER = "$(TEST_HOST)";
-				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 7;
-				DEVELOPMENT_TEAM = 6J95GYU5VQ;
-				GENERATE_INFOPLIST_FILE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.budgetty.Budgetty.tests;
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				SWIFT_APPROACHABLE_CONCURRENCY = YES;
-				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
-				SWIFT_EMIT_LOC_STRINGS = NO;
-				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Budgetty.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Budgetty";
-			};
-			name = Debug;
-		};
-		7E7E000000000000000000A4 /* Release */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				BUNDLE_LOADER = "$(TEST_HOST)";
-				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 7;
-				DEVELOPMENT_TEAM = 6J95GYU5VQ;
-				GENERATE_INFOPLIST_FILE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.budgetty.Budgetty.tests;
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				SWIFT_APPROACHABLE_CONCURRENCY = YES;
-				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
-				SWIFT_EMIT_LOC_STRINGS = NO;
-				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Budgetty.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Budgetty";
-			};
-			name = Release;
-		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -639,20 +667,20 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		AA1000000000000000000007 /* Build configuration list for PBXNativeTarget "BudgettyWidgetExtension" */ = {
-			isa = XCConfigurationList;
-			buildConfigurations = (
-				AA1000000000000000000008 /* Debug */,
-				AA1000000000000000000009 /* Release */,
-			);
-			defaultConfigurationIsVisible = 0;
-			defaultConfigurationName = Release;
-		};
 		7E7E000000000000000000A2 /* Build configuration list for PBXNativeTarget "BudgettyTests" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				7E7E000000000000000000A3 /* Debug */,
 				7E7E000000000000000000A4 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		AA1000000000000000000007 /* Build configuration list for PBXNativeTarget "BudgettyWidgetExtension" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				AA1000000000000000000008 /* Debug */,
+				AA1000000000000000000009 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
@@ -680,6 +708,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = FB1000000000000000000001 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
 			productName = FirebaseAuth;
+		};
+		FB1000000000000000000006 /* FirebaseCrashlytics */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = FB1000000000000000000001 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseCrashlytics;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

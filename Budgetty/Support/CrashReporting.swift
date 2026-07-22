@@ -1,0 +1,48 @@
+//
+//  CrashReporting.swift
+//  Budgetty
+//
+//  The one place that touches the Crashlytics SDK, so the rest of the app depends on this small
+//  surface rather than Firebase directly (mirrors Android's `CrashReporting`).
+//
+//  Collection model — **default-on with an opt-out**, matching Android (confirmed with the user):
+//  `SettingsKey.crashReporting` defaults to true and the Account screen exposes a real toggle. A
+//  genuine toggle is what makes default-on defensible for a Europe-only (GDPR) user base. The stored
+//  preference is the source of truth: applied at startup in `FirebaseBootstrap.configure()` and again
+//  on every toggle change, so the SDK state always follows the user's choice.
+//
+//  `setCrashlyticsCollectionEnabled` persists inside Crashlytics and survives process death, so a
+//  user who opts out stays opted out even before startup re-applies the preference.
+//
+//  ⚠️ SHIPPING BLOCKER (not code). Two of the three disclosure pieces are now done:
+//   ✅ `PrivacyInfo.xcprivacy` declares `NSPrivacyCollectedDataTypeCrashData` — not linked, not
+//      tracking. "Not linked" is only true because nothing here calls `setUserID`; add that and the
+//      manifest and the App Store label both become wrong.
+//   ✅ The privacy policy discloses crash reporting in §1(f), and Support & About finally links to
+//      it — every row on that screen used to be a no-op.
+//   ❌ The **App Store Connect App Privacy label** must declare Diagnostics › Crash Data, purpose
+//      App Functionality, not linked to the user, not used for tracking. Apple compares the label
+//      against the manifest above. It's a console action — it cannot be done from the repo.
+//  Do not upload a build until that last one is set. Android's equivalent Play Data-safety change
+//  is still pending on its side.
+//
+
+import Foundation
+import FirebaseCrashlytics
+
+enum CrashReporting {
+    /// The user's persisted choice; default-on when never set.
+    static var isEnabled: Bool {
+        UserDefaults.standard.object(forKey: SettingsKey.crashReporting) as? Bool ?? true
+    }
+
+    /// Point the SDK at `enabled`. Called at startup and on every toggle change.
+    static func setEnabled(_ enabled: Bool) {
+        Crashlytics.crashlytics().setCrashlyticsCollectionEnabled(enabled)
+    }
+
+    /// Apply the stored preference. Runs during Firebase configuration, before anything can crash.
+    static func applyStoredPreference() {
+        setEnabled(isEnabled)
+    }
+}

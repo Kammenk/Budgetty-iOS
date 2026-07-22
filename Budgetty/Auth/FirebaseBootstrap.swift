@@ -30,6 +30,10 @@ enum FirebaseBootstrap {
         }
         if FirebaseApp.app() == nil { FirebaseApp.configure() }
 
+        // Point Crashlytics at the user's stored choice immediately after configure(), so collection
+        // reflects an opt-out before any code that could crash runs. Default-on — see CrashReporting.
+        CrashReporting.applyStoredPreference()
+
         // Migration: earlier builds used anonymous sessions, which are no longer supported. Sign out
         // any lingering anonymous user so they land on the login screen like Android.
         if Auth.auth().currentUser?.isAnonymous == true { try? Auth.auth().signOut() }
