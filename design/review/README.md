@@ -43,6 +43,24 @@ screen again — fix the layout rather than reaching for a taller device.
 add `SIMCTL_CHILD_PAYWALL_PLAN=monthly` to the launch for the monthly one (DEBUG-only hook, same
 family as `SHOW_SCREEN`). `simctl` cannot tap, which is why the hook exists.
 
+## Store listing screenshots
+
+Different artifact, same simulator workflow. **Sizes are exact and unforgiving** — Apple rejects
+anything else, and the iPhone 17 Pro (1206 × 2622) is *not* an accepted size:
+
+| Slot | Simulator | Native size |
+|---|---|---|
+| iPhone 6.9" | iPhone 17 Pro Max | 1320 × 2868 ✅ |
+| iPad 13" | iPad Pro 13-inch | 2064 × 2752 ✅ |
+
+Add **`SIMCTL_CHILD_DEMO_EMAIL=alex.rivera@example.com`**. Under `SKIP_AUTH` there is no Firebase
+user, so the avatar renders "?" — fine in a debug run, wrong in a store screenshot. The hook is DEBUG
+only and never overrides a real session. Use a *demo* address, not the owner's: the Account screen
+displays it verbatim, so a real one would publish a personal email.
+
+Keep the two sets in the same appearance — `xcrun simctl ui <device> appearance light` — or you get a
+light iPhone set next to a dark iPad set.
+
 Then re-upload it in App Store Connect — the file here is a record of what was submitted, not the
 submission itself. **Check the rendered prices against the console before uploading**; never against
 `Budgetty.storekit`, which is a Simulator fixture (see `APP_STORE_CONNECT_SETUP.md`).

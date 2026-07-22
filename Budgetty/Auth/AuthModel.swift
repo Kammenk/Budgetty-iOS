@@ -33,7 +33,18 @@ final class AuthModel {
     /// Firebase uid of the signed-in account; nil when signed out. Keys the per-account
     /// local store (see `UserStore`) so callers don't need FirebaseAuth themselves.
     var uid: String? { user?.uid }
-    var email: String { user?.email ?? "" }
+    /// The signed-in account's address.
+    ///
+    /// `DEMO_EMAIL` substitutes a stand-in when there is no Firebase user, which is the case under
+    /// `SKIP_AUTH`. Without it `email` is empty, `initials` falls back to "?", and the avatar renders
+    /// a question mark — invisible in a debug run, but wrong in an App Store screenshot. DEBUG only,
+    /// and it never overrides a real session, so it can't mask who is actually signed in.
+    var email: String {
+        #if DEBUG
+        if user == nil, let demo = LaunchFlags.value("DEMO_EMAIL") { return demo }
+        #endif
+        return user?.email ?? ""
+    }
 
     /// Up to two initials from the email local part (e.g. "alex.rivera@…" → "AR").
     var initials: String {
