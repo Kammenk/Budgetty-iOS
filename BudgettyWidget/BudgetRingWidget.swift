@@ -12,16 +12,23 @@ import SwiftUI
 struct BudgetRingEntry: TimelineEntry {
     let date: Date
     let snapshot: WidgetSnapshot
+    /// Past the free tier's widget cap — draw the locked card instead of the data.
+    var locked = false
 }
 
 struct BudgetRingProvider: TimelineProvider {
     func placeholder(in context: Context) -> BudgetRingEntry { BudgetRingEntry(date: .now, snapshot: .load()) }
+    /// Never locked: this is the widget gallery's preview.
     func getSnapshot(in context: Context, completion: @escaping (BudgetRingEntry) -> Void) {
         completion(BudgetRingEntry(date: .now, snapshot: .load()))
     }
     func getTimeline(in context: Context, completion: @escaping (Timeline<BudgetRingEntry>) -> Void) {
-        let next = Calendar.current.date(byAdding: .hour, value: 2, to: .now) ?? .now.addingTimeInterval(7200)
-        completion(Timeline(entries: [BudgetRingEntry(date: .now, snapshot: .load())], policy: .after(next)))
+        Task {
+            let locked = await WidgetQuota.isLocked(kind: BudgetRingWidget.kind, family: context.family)
+            let next = Calendar.current.date(byAdding: .hour, value: 2, to: .now) ?? .now.addingTimeInterval(7200)
+            let entry = BudgetRingEntry(date: .now, snapshot: .load(), locked: locked)
+            completion(Timeline(entries: [entry], policy: .after(next)))
+        }
     }
 }
 
@@ -54,7 +61,9 @@ struct BudgetRingWidgetView: View {
     private var snap: WidgetSnapshot { entry.snapshot }
 
     var body: some View {
-        if snap.monthlyBudget <= 0 {
+        if entry.locked {
+            LockedWidgetView()
+        } else if snap.monthlyBudget <= 0 {
             noBudget
         } else {
             switch family {
@@ -132,8 +141,11 @@ struct BudgetRingWidgetView: View {
 }
 
 struct BudgetRingWidget: Widget {
+    /// Also listed in `WidgetQuota.kindOrder` — the cap ranks faces by it.
+    static let kind = "BudgettyBudgetRing"
+
     var body: some WidgetConfiguration {
-        StaticConfiguration(kind: "BudgettyBudgetRing", provider: BudgetRingProvider()) { entry in
+        StaticConfiguration(kind: Self.kind, provider: BudgetRingProvider()) { entry in
             BudgetRingWidgetView(entry: entry)
         }
         .configurationDisplayName("Budget Ring")

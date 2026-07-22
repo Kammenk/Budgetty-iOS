@@ -16,6 +16,100 @@
         }
       }
     },
+    "%lld of %lld free widget slots used" : {
+      "localizations" : {
+        "bg" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Използвани %1$lld от %2$lld безплатни слота за джаджи"
+          }
+        },
+        "cs" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Využito %1$lld z %2$lld bezplatných slotů pro widgety"
+          }
+        },
+        "da" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$lld af %2$lld gratis widgetpladser brugt"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$lld von %2$lld kostenlosen Widget-Plätzen belegt"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$lld de %2$lld espacios de widget gratis usados"
+          }
+        },
+        "fi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$lld / %2$lld ilmaista widget-paikkaa käytössä"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$lld sur %2$lld emplacements de widget gratuits utilisés"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$lld di %2$lld slot widget gratuiti usati"
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$lld av %2$lld gratis widgetplasser brukt"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$lld van %2$lld gratis widgetplekken gebruikt"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wykorzystano %1$lld z %2$lld darmowych miejsc na widżety"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$lld de %2$lld espaços de widget gratuitos usados"
+          }
+        },
+        "ro" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$lld din %2$lld sloturi gratuite pentru widgeturi folosite"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Использовано %1$lld из %2$lld бесплатных слотов для виджетов"
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$lld av %2$lld gratis widgetplatser använda"
+          }
+        }
+      }
+    },
     "BEST VALUE" : {
       "localizations" : {
         "bg" : {
@@ -486,6 +580,194 @@
         }
       }
     },
+    "Free widget slots are full. Remove one from your home screen, or upgrade for unlimited widgets." : {
+      "localizations" : {
+        "bg" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Безплатните слотове за джаджи са запълнени. Премахни една от началния екран или надгради за неограничени джаджи."
+          }
+        },
+        "cs" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bezplatné sloty pro widgety jsou plné. Odeberte jeden z domovské obrazovky nebo upgradujte pro neomezené widgety."
+          }
+        },
+        "da" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "De gratis widgetpladser er fyldt. Fjern en fra startskærmen, eller opgrader for ubegrænsede widgets."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Die kostenlosen Widget-Plätze sind belegt. Entferne eines vom Startbildschirm oder mach ein Upgrade für unbegrenzte Widgets."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Los espacios de widget gratis están llenos. Quita uno de la pantalla de inicio o mejora para tener widgets ilimitados."
+          }
+        },
+        "fi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ilmaiset widget-paikat ovat täynnä. Poista yksi aloitusnäytöltä tai päivitä saadaksesi rajattomat widgetit."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les emplacements de widget gratuits sont pleins. Retirez-en un de l'écran d'accueil ou passez à Premium pour des widgets illimités."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gli slot widget gratuiti sono esauriti. Rimuovine uno dalla schermata Home o passa a Premium per widget illimitati."
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "De gratis widgetplassene er fulle. Fjern en fra startskjermen, eller oppgrader for ubegrensede widgets."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "De gratis widgetplekken zijn vol. Verwijder er een van het startscherm of upgrade voor onbeperkt widgets."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Darmowe miejsca na widżety są zajęte. Usuń jeden z ekranu głównego lub ulepsz plan, aby mieć nielimitowane widżety."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Os espaços de widget gratuitos estão cheios. Remova um da tela inicial ou faça upgrade para widgets ilimitados."
+          }
+        },
+        "ro" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sloturile gratuite pentru widgeturi sunt pline. Elimină unul de pe ecranul principal sau fă upgrade pentru widgeturi nelimitate."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Бесплатные слоты для виджетов заняты. Удалите один с главного экрана или оформите подписку для безлимитных виджетов."
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "De gratis widgetplatserna är fulla. Ta bort en från hemskärmen eller uppgradera för obegränsade widgetar."
+          }
+        }
+      }
+    },
+    "Premium · unlimited widgets" : {
+      "localizations" : {
+        "bg" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Премиум · неограничени джаджи"
+          }
+        },
+        "cs" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Premium · neomezené widgety"
+          }
+        },
+        "da" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Premium · ubegrænsede widgets"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Premium · unbegrenzte Widgets"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Premium · widgets ilimitados"
+          }
+        },
+        "fi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Premium · rajattomat widgetit"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Premium · widgets illimités"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Premium · widget illimitati"
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Premium · ubegrensede widgets"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Premium · onbeperkt widgets"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Premium · nielimitowane widżety"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Premium · widgets ilimitados"
+          }
+        },
+        "ro" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Premium · widgeturi nelimitate"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Премиум · безлимитные виджеты"
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Premium · obegränsade widgetar"
+          }
+        }
+      }
+    },
     "Sage, Ocean and Plum" : {
       "localizations" : {
         "bg" : {
@@ -674,6 +956,100 @@
         }
       }
     },
+    "Unlimited home-screen widgets" : {
+      "localizations" : {
+        "bg" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Неограничени джаджи на началния екран"
+          }
+        },
+        "cs" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Neomezené widgety na domovské obrazovce"
+          }
+        },
+        "da" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ubegrænsede widgets på startskærmen"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Unbegrenzte Startbildschirm-Widgets"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Widgets ilimitados en la pantalla de inicio"
+          }
+        },
+        "fi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rajattomat aloitusnäytön widgetit"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Widgets d'écran d'accueil illimités"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Widget illimitati nella schermata Home"
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ubegrensede widgets på startskjermen"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Onbeperkt widgets op het startscherm"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nielimitowane widżety na ekranie głównym"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Widgets ilimitados na tela inicial"
+          }
+        },
+        "ro" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Widgeturi nelimitate pe ecranul principal"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Безлимитные виджеты на главном экране"
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Obegränsade widgetar på hemskärmen"
+          }
+        }
+      }
+    },
     "Unlimited receipt scans" : {
       "localizations" : {
         "bg" : {
@@ -858,6 +1234,100 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Obegränsade återkommande räkningar"
+          }
+        }
+      }
+    },
+    "Unlock more widgets" : {
+      "localizations" : {
+        "bg" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Отключи още джаджи"
+          }
+        },
+        "cs" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Odemknout více widgetů"
+          }
+        },
+        "da" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lås op for flere widgets"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mehr Widgets freischalten"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Desbloquear más widgets"
+          }
+        },
+        "fi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Avaa lisää widgetejä"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Débloquer plus de widgets"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sblocca altri widget"
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lås opp flere widgets"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Meer widgets ontgrendelen"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Odblokuj więcej widżetów"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Desbloquear mais widgets"
+          }
+        },
+        "ro" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Deblochează mai multe widgeturi"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Разблокировать больше виджетов"
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lås upp fler widgetar"
           }
         }
       }

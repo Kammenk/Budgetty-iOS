@@ -18,19 +18,26 @@ private let brandGradient = LinearGradient(
 struct SpendingEntry: TimelineEntry {
     let date: Date
     let snapshot: WidgetSnapshot
+    /// Past the free tier's widget cap — draw the locked card instead of the data.
+    var locked = false
 }
 
 struct SpendingProvider: TimelineProvider {
     func placeholder(in context: Context) -> SpendingEntry { SpendingEntry(date: .now, snapshot: .load()) }
 
+    /// Never locked: this is what the widget *gallery* previews, and showing a lock there would
+    /// advertise the cap instead of the widget.
     func getSnapshot(in context: Context, completion: @escaping (SpendingEntry) -> Void) {
         completion(SpendingEntry(date: .now, snapshot: .load()))
     }
 
     func getTimeline(in context: Context, completion: @escaping (Timeline<SpendingEntry>) -> Void) {
-        let entry = SpendingEntry(date: .now, snapshot: .load())
-        let next = Calendar.current.date(byAdding: .hour, value: 2, to: .now) ?? .now.addingTimeInterval(7200)
-        completion(Timeline(entries: [entry], policy: .after(next)))
+        Task {
+            let locked = await WidgetQuota.isLocked(kind: SpendingWidget.kind, family: context.family)
+            let entry = SpendingEntry(date: .now, snapshot: .load(), locked: locked)
+            let next = Calendar.current.date(byAdding: .hour, value: 2, to: .now) ?? .now.addingTimeInterval(7200)
+            completion(Timeline(entries: [entry], policy: .after(next)))
+        }
     }
 }
 
@@ -40,9 +47,13 @@ struct SpendingWidgetView: View {
     private var snap: WidgetSnapshot { entry.snapshot }
 
     var body: some View {
-        switch family {
-        case .systemSmall: small
-        default: medium
+        if entry.locked {
+            LockedWidgetView()
+        } else {
+            switch family {
+            case .systemSmall: small
+            default: medium
+            }
         }
     }
 
@@ -119,8 +130,11 @@ struct SpendingWidgetView: View {
 }
 
 struct SpendingWidget: Widget {
+    /// Also listed in `WidgetQuota.kindOrder` — the cap ranks faces by it.
+    static let kind = "BudgettySpending"
+
     var body: some WidgetConfiguration {
-        StaticConfiguration(kind: "BudgettySpending", provider: SpendingProvider()) { entry in
+        StaticConfiguration(kind: Self.kind, provider: SpendingProvider()) { entry in
             SpendingWidgetView(entry: entry)
         }
         .configurationDisplayName("Spend Total")

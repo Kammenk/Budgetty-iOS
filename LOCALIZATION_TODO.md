@@ -90,3 +90,13 @@ These are now proper catalog keys (they were bare Swift literals before), still 
 
 Everything else this pass added came from Android's finished translations (the paywall benefit rows,
 `BEST VALUE`, `Upgrade to add more`, `%@ / mo`) and is complete in all 15 target locales.
+
+## The widget extension is entirely English (pre-existing)
+
+`BudgettyWidget/` has no string catalog of its own — `Localizable.xcstrings` belongs to the app
+target — so every string the extension draws ships in English: the widget titles and descriptions in
+the system picker, `of budget`, `Set a budget`, `No spending yet`, and now `Widget locked` /
+`Unlock more widgets` on the locked card. Fixing it means adding a catalog resource to the widget
+target, which needs project-file work rather than a code change. The app-side equivalents of the
+locked-card copy *are* translated (`WidgetsView`'s slots card), so the strings themselves already
+exist in 15 locales — they just can't be reached from the extension's bundle.

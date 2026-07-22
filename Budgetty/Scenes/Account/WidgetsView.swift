@@ -12,6 +12,12 @@ import SwiftData
 struct WidgetsView: View {
     @Query(sort: \Receipt.createdAt, order: .reverse) private var receipts: [Receipt]
     @Query private var budgets: [Budget]
+    @AppStorage(SettingsKey.premium) private var premium = false
+
+    /// Faces currently on a home screen, for the slots caption. Read on appear — iOS gives no
+    /// change notification for placements, and this screen is short-lived enough not to need one.
+    @State private var placed: [WidgetSlot] = []
+    @State private var showPaywall = false
 
     private var monthSpent: Decimal {
         let cal = Calendar.current
@@ -24,6 +30,7 @@ struct WidgetsView: View {
         ScrollView {
             VStack(spacing: 20) {
                 banner
+                slotsCard
                 section("Small") {
                     HStack(spacing: 16) {
                         spendWidget.frame(width: 150, height: 150)
@@ -38,6 +45,41 @@ struct WidgetsView: View {
         .underFloatingDock(reportingScroll: false)
         .screenCanvas()
         .navigationTitle("Widgets")
+        .task { placed = await WidgetQuota.placedSlots() }
+        .sheet(isPresented: $showPaywall) { NavigationStack { PaywallView() } }
+    }
+
+    /// How many free slots are left.
+    ///
+    /// Informational only — iOS has no way to refuse a placement (the home-screen picker never runs
+    /// our code), so the cap is enforced where it has to be: at render time, by the widget drawing
+    /// `LockedWidgetView` instead of its data. This is the courtesy heads-up before that happens.
+    @ViewBuilder
+    private var slotsCard: some View {
+        let remaining = WidgetQuota.remaining(placed: placed, isPremium: premium)
+        HStack(spacing: 10) {
+            Image(systemName: remaining == 0 ? "lock.fill" : "square.grid.2x2")
+                .foregroundStyle(remaining == 0 ? Palette.warn : Palette.tint)
+            if let remaining {
+                if remaining == 0 {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Free widget slots are full. Remove one from your home screen, or upgrade for unlimited widgets.")
+                            .font(.caption).foregroundStyle(Palette.secondaryLabel)
+                        Button("Unlock more widgets") { showPaywall = true }
+                            .font(.caption).fontWeight(.semibold).foregroundStyle(Palette.tint)
+                    }
+                } else {
+                    Text("\(Set(placed).count) of \(WidgetQuota.freeLimit) free widget slots used")
+                        .font(.caption).foregroundStyle(Palette.secondaryLabel)
+                }
+            } else {
+                Text("Premium · unlimited widgets")
+                    .font(.caption).foregroundStyle(Palette.secondaryLabel)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(14).frame(maxWidth: .infinity, alignment: .leading)
+        .contentCard(cornerRadius: 12)
     }
 
     private var banner: some View {

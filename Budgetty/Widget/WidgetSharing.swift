@@ -71,6 +71,26 @@ enum WidgetSharing {
         guard let data = try? JSONEncoder().encode(snapshot),
               let defaults = UserDefaults(suiteName: suite) else { return }
         defaults.set(data, forKey: key)
+        publishPremium()
+        WidgetCenter.shared.reloadAllTimelines()
+    }
+
+    /// Mirror the Premium flag into the App Group so the extension can enforce `WidgetQuota` on its
+    /// own — widgets render when the app isn't running, and the standard-suite `pref.premium` the
+    /// rest of the app reads isn't visible from another process.
+    ///
+    /// Its own key rather than a snapshot field, so entitlement changes can publish without a
+    /// ModelContext (see `StoreManager`) and so a snapshot written by a pre-cap build can't decode
+    /// into "not premium" and lock someone's widgets.
+    static func publishPremium() {
+        UserDefaults(suiteName: suite)?
+            .set(UserDefaults.standard.bool(forKey: SettingsKey.premium), forKey: WidgetQuota.premiumKey)
+    }
+
+    /// Entitlement changed: republish and re-render. Without this a purchase wouldn't unlock a
+    /// locked widget until its next scheduled refresh, hours later.
+    static func premiumDidChange() {
+        publishPremium()
         WidgetCenter.shared.reloadAllTimelines()
     }
 }
