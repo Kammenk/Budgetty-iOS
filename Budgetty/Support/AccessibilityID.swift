@@ -68,6 +68,7 @@ enum A11y {
     enum Budget {
         static let periodToggle = "budget_period_toggle"
         static let overall = "budget_overall"
+        static let recurringUpgrade = "budget_recurring_upgrade"
     }
 
     enum Insights {

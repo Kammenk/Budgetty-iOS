@@ -72,3 +72,21 @@ translation, so they render in English in all 21 locales until translated.
 - `of budget` — WidgetsView.swift:79
 - `you@example.com` — LoginView.swift:120
 - `−\(receipt.discount.formatMoney()) saved` — ReceiptDetailView.swift:70
+
+## Added 2026-07-22 (premium parity pass)
+
+The two `NotificationsView.swift` entries above are gone — that screen was deleted along with the
+inert Notifications toggle, so its strings went with it.
+
+These are now proper catalog keys (they were bare Swift literals before), still English-only:
+
+- `billed annually` — PaywallView.swift · plan card
+- `Billed each month` — PaywallView.swift · plan card
+- `Tints buttons, highlights and the spending card.` — AccountView.swift · accent picker footer
+- `Violet (default)` / `Sage` / `Ocean` / `Plum` — Accent.swift · accent names.
+  **Android ships these untranslated too** (`AccentTheme`'s labels are hardcoded English in
+  `AppSettings.kt`), and the colour names stay English inside Android's own translations of
+  "Sage, Ocean and Plum" — so this is parity, not drift. Only "(default)" really wants translating.
+
+Everything else this pass added came from Android's finished translations (the paywall benefit rows,
+`BEST VALUE`, `Upgrade to add more`, `%@ / mo`) and is complete in all 15 target locales.

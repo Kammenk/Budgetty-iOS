@@ -13,9 +13,8 @@ enum SettingsKey {
     static let currency = "pref.currency"
     static let language = "pref.language"
     static let dateFormat = "pref.dateFormat"
-    static let notifications = "pref.notifications"
+    static let accent = "pref.accent"             // Premium accent theme (see AccentOption/AppTheme)
     static let faceID = "pref.faceID"
-    static let analytics = "pref.analytics"
     static let premium = "pref.premium"           // effective Premium flag (subscription OR tester)
     static let testerPremium = "pref.testerPremium" // hidden 11-tap tester unlock, kept separate
     static let onboarded = "pref.onboarded"
@@ -32,6 +31,15 @@ enum ScanQuota {
     static var used: Int { UserDefaults.standard.integer(forKey: SettingsKey.scanQuotaUsed) }
     static var remaining: Int { max(0, freeLimit - used) }
     static func reset() { UserDefaults.standard.removeObject(forKey: SettingsKey.scanQuotaUsed) }
+}
+
+/// The free tier's recurring-bill allowance (Android parity: `RecurringRepository.FREE_RECURRING_LIMIT`).
+///
+/// Bills only — income sources are never capped, since the point is planning what you earn against
+/// what you owe, and capping income would just make the forecast wrong. Nothing is persisted: the
+/// count is the live number of bills, so deleting one frees its slot immediately.
+enum RecurringQuota {
+    static let freeLimit = 3
 }
 
 /// App appearance preference, applied at the root via `.preferredColorScheme`.

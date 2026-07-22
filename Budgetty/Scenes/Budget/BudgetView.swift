@@ -28,7 +28,10 @@ struct BudgetView: View {
     @Query private var budgets: [Budget]
     @Query(sort: \Recurring.createdAt) private var recurring: [Recurring]
 
+    @AppStorage(SettingsKey.premium) private var premium = false
+
     @State private var period: BudgetPeriod = .monthly
+    @State private var showPaywall = false
 
     // Sheet routing
     private struct RecurringEditor: Identifiable { let id = UUID(); let isIncome: Bool; let existing: Recurring? }
@@ -63,6 +66,7 @@ struct BudgetView: View {
                 BudgetAmountSheet(title: ed.title, budgetKey: ed.key, existing: ed.existing)
             }
             .sheet(item: $categoryRoute) { CategoryBudgetSheet(group: $0.id) }
+            .sheet(isPresented: $showPaywall) { NavigationStack { PaywallView() } }
         }
     }
 
@@ -189,20 +193,47 @@ struct BudgetView: View {
         }
     }
 
+    /// Free tier caps bills at `RecurringQuota.freeLimit`; income is never capped.
+    private var billLimitReached: Bool { !premium && bills.count >= RecurringQuota.freeLimit }
+
     private var recurringSection: some View {
         VStack(spacing: 0) {
-            sectionHeader("Recurring")
+            sectionHeader("Recurring", badge: billLimitReached ? "\(bills.count) / \(RecurringQuota.freeLimit)" : nil)
             VStack(spacing: 0) {
                 ForEach(bills) { r in
                     moneyRow(r)
                     Divider().padding(.leading, 60)
                 }
-                addRow("Add recurring payment") {
-                    recurringEditor = RecurringEditor(isIncome: false, existing: nil)
+                // At the cap the Add row becomes the upsell rather than a button that fails — the
+                // existing bills keep working, and deleting one frees the slot again.
+                if billLimitReached {
+                    upgradeRow
+                } else {
+                    addRow("Add recurring payment") {
+                        recurringEditor = RecurringEditor(isIncome: false, existing: nil)
+                    }
                 }
             }
             .contentCard(cornerRadius: 14)
         }
+    }
+
+    private var upgradeRow: some View {
+        Button { showPaywall = true } label: {
+            HStack(spacing: 12) {
+                RoundedRectangle(cornerRadius: 8, style: .continuous).fill(Palette.fill)
+                    .frame(width: 32, height: 32)
+                    .overlay(Image(systemName: "lock.fill").font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(Palette.secondaryLabel))
+                Text("Upgrade to add more").foregroundStyle(Palette.secondaryLabel)
+                Spacer()
+                Image(systemName: "chevron.right").font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(Palette.tertiaryLabel)
+            }
+            .padding(.horizontal, 16).padding(.vertical, 12)
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier(A11y.Budget.recurringUpgrade)
     }
 
     private func moneyRow(_ r: Recurring) -> some View {
@@ -374,11 +405,19 @@ struct BudgetView: View {
 
     // MARK: - Bits
 
-    private func sectionHeader(_ title: LocalizedStringKey) -> some View {
+    /// `badge` carries the free-tier counter ("3 / 3") when a section is at its cap.
+    private func sectionHeader(_ title: LocalizedStringKey, badge: String? = nil) -> some View {
         HStack {
             Text(title).font(.caption).fontWeight(.semibold).textCase(.uppercase)
                 .foregroundStyle(Palette.secondaryLabel).tracking(0.5)
             Spacer()
+            if let badge {
+                Text(badge)
+                    .font(.caption2).fontWeight(.bold)
+                    .foregroundStyle(Palette.secondaryLabel)
+                    .padding(.horizontal, 8).padding(.vertical, 2)
+                    .background(Palette.fill, in: Capsule())
+            }
         }
         .padding(.horizontal, 16).padding(.top, 4).padding(.bottom, 6)
     }
