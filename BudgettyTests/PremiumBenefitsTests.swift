@@ -15,7 +15,7 @@ struct PremiumBenefitsTests {
     /// Every "real" benefit must be one something actually gates on. If a future row is added here,
     /// it needs an enforcing constant — or it belongs in `soon`.
     @Test func realBenefitsAreOnlyTheEnforcedOnes() {
-        #expect(PremiumBenefits.real.map(\.id) == ["scans", "categories", "recurring", "themes"])
+        #expect(PremiumBenefits.real.map(\.id) == ["scans", "categories", "recurring", "widgets", "themes"])
     }
 
     /// The numbers must come from the constants, not be retyped. Change a cap and this fails until
@@ -29,6 +29,9 @@ struct PremiumBenefitsTests {
 
         let recurring = try #require(PremiumBenefits.real.first(where: { $0.id == "recurring" }))
         #expect(recurring.detail.contains("\(RecurringQuota.freeLimit)"))
+
+        let widgets = try #require(PremiumBenefits.real.first(where: { $0.id == "widgets" }))
+        #expect(widgets.detail.contains("\(WidgetQuota.freeLimit)"))
     }
 
     /// The themes row names three accents; they have to exist, or it's the old "advertise what you
@@ -53,11 +56,14 @@ struct PremiumBenefitsTests {
         #expect(PremiumBenefits.soon.map(\.id) == ["cloud"])
     }
 
-    /// The two claims that got this audit started: widgets aren't gated anywhere, and the free
-    /// custom-category cap is 3 — never the "10" the old copy invented.
+    /// The free custom-category cap is 3 — never the "10" the old copy invented.
+    ///
+    /// The widgets row used to be banned outright here, because nothing gated widgets. It's allowed
+    /// back only now that `WidgetQuota` enforces a cap, and only while it quotes that constant —
+    /// which `detailsQuoteTheEnforcingConstants` checks. Delete the enforcement and that test fails,
+    /// which is the guard that actually matters.
     @Test func retiredFalseClaimsStayGone() {
         let copy = PremiumBenefits.all.map { "\($0.title) \($0.detail)" }.joined(separator: " ")
-        #expect(!copy.lowercased().contains("widget"))
         #expect(!copy.contains("10 custom"))
         #expect(Categories.freeCustomLimit == 3)
         #expect(Categories.maxCustomLimit == Int.max) // "unlimited" is literal, not marketing

@@ -89,6 +89,8 @@ final class StoreManager {
     private func syncPremiumFlag() {
         let tester = UserDefaults.standard.bool(forKey: SettingsKey.testerPremium)
         UserDefaults.standard.set(isSubscribed || tester, forKey: SettingsKey.premium)
+        // Widgets live in another process and enforce their own cap, so they need telling.
+        WidgetSharing.premiumDidChange()
     }
 
     private func observeTransactionUpdates() -> Task<Void, Never> {

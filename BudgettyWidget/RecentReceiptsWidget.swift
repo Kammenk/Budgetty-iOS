@@ -17,16 +17,23 @@ private let brandGradient = LinearGradient(
 struct RecentReceiptsEntry: TimelineEntry {
     let date: Date
     let snapshot: WidgetSnapshot
+    /// Past the free tier's widget cap — draw the locked card instead of the data.
+    var locked = false
 }
 
 struct RecentReceiptsProvider: TimelineProvider {
     func placeholder(in context: Context) -> RecentReceiptsEntry { RecentReceiptsEntry(date: .now, snapshot: .load()) }
+    /// Never locked: this is the widget gallery's preview.
     func getSnapshot(in context: Context, completion: @escaping (RecentReceiptsEntry) -> Void) {
         completion(RecentReceiptsEntry(date: .now, snapshot: .load()))
     }
     func getTimeline(in context: Context, completion: @escaping (Timeline<RecentReceiptsEntry>) -> Void) {
-        let next = Calendar.current.date(byAdding: .hour, value: 2, to: .now) ?? .now.addingTimeInterval(7200)
-        completion(Timeline(entries: [RecentReceiptsEntry(date: .now, snapshot: .load())], policy: .after(next)))
+        Task {
+            let locked = await WidgetQuota.isLocked(kind: RecentReceiptsWidget.kind, family: context.family)
+            let next = Calendar.current.date(byAdding: .hour, value: 2, to: .now) ?? .now.addingTimeInterval(7200)
+            let entry = RecentReceiptsEntry(date: .now, snapshot: .load(), locked: locked)
+            completion(Timeline(entries: [entry], policy: .after(next)))
+        }
     }
 }
 
@@ -53,7 +60,9 @@ struct RecentReceiptsWidgetView: View {
     private var snap: WidgetSnapshot { entry.snapshot }
 
     var body: some View {
-        if snap.rows.isEmpty {
+        if entry.locked {
+            LockedWidgetView()
+        } else if snap.rows.isEmpty {
             empty
         } else {
             switch family {
@@ -132,8 +141,11 @@ struct RecentReceiptsWidgetView: View {
 }
 
 struct RecentReceiptsWidget: Widget {
+    /// Also listed in `WidgetQuota.kindOrder` — the cap ranks faces by it.
+    static let kind = "BudgettyRecentReceipts"
+
     var body: some WidgetConfiguration {
-        StaticConfiguration(kind: "BudgettyRecentReceipts", provider: RecentReceiptsProvider()) { entry in
+        StaticConfiguration(kind: Self.kind, provider: RecentReceiptsProvider()) { entry in
             RecentReceiptsWidgetView(entry: entry)
         }
         .configurationDisplayName("Recent Receipts")

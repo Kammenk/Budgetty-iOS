@@ -13,6 +13,7 @@
 //
 //  ⚠️ Audited 2026-07-21 against the enforcing code; four of the five original rows were wrong:
 //  - "Home screen widgets" — removed, widgets were free on both platforms and nothing gated them.
+//    (Back as of 2026-07-22, but only because `WidgetQuota` now genuinely caps them.)
 //  - "10 custom categories" — the number didn't exist; the real cap is `Categories.freeCustomLimit`
 //    free and `maxCustomLimit` (unlimited) paid, so the row both undersold and quoted fiction.
 //  - "Cloud backup & sync" — no such feature; demoted to `soon`, where it stays.
@@ -61,6 +62,12 @@ enum PremiumBenefits {
                 symbol: "arrow.triangle.2.circlepath",
                 title: String(localized: "Unlimited recurring bills"),
                 detail: String(localized: "Free plan includes \(RecurringQuota.freeLimit)")
+            ),
+            PremiumBenefit(
+                id: "widgets",
+                symbol: "square.grid.2x2",
+                title: String(localized: "Unlimited home-screen widgets"),
+                detail: String(localized: "Free plan includes \(WidgetQuota.freeLimit)")
             ),
             PremiumBenefit(
                 id: "themes",
