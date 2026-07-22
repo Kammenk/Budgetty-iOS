@@ -543,3 +543,21 @@ Suggest a feature, Terms of Service, Rate, Share all draw an outward arrow and d
 Privacy Policy is now wired. Terms is the awkward one — no terms document exists on either platform,
 and Apple's guideline 3.1.2 wants Terms + Privacy links on the **subscription screen** too, which the
 paywall doesn't have. Android's own FAQ link is also broken (`#faq` is not an anchor on that page).*
+
+*Updated 2026-07-22 (later still) — **Support & About rewired**, and the fix wasn't one-per-row.
+`FAQ` pointed at an anchor that has never existed on a page that is only a privacy policy, so it was
+**deleted on both platforms** (Android `3221972`) rather than repointed at something equally
+unhelpful. `Suggest a feature` was a second mail row with its own subject; Android had already
+settled that shape — one **Contact us** whose subtitle names all three reasons to write, which is
+also why the subject is neutral — so iOS folded into it (§4a). `Terms of Service` now points at
+**Apple's standard EULA** (owner's decision), the agreement that already governs these subscriptions
+by default; if a custom one is ever written, `Legal.swift` is the single place to change. The paywall
+gained the **3.1.2-required Terms + Privacy links**, which it had been missing entirely — a plausible
+rejection for an app monetised solely by auto-renewing subscriptions.
+⚠️ **`Rate` and `Share` are still inert on purpose**: both need the App Store id, which cannot exist
+until there's a public listing. They no longer draw an outward arrow, since promising a destination
+there was the actual defect. Wire them from App Store Connect › App Information › General › Apple ID
+once the app is live.
+Bonus verification this pass: with StoreKit products actually loading, the derived paywall pricing
+proved out end-to-end — $49.99/yr rendered "$4.17 / mo" and "BEST VALUE · −16%" against a $4.99
+monthly, both computed, neither typed.*

@@ -220,6 +220,16 @@ struct PaywallView: View {
             Button("Restore purchases") { Task { await store.restore() } }
                 .font(.subheadline).foregroundStyle(Palette.tint)
                 .accessibilityIdentifier(A11y.Paywall.restore)
+            // Required here, not just in Settings: App Review 3.1.2 wants Terms of Use and a privacy
+            // policy on the subscription screen itself. This screen is the app's entire monetisation,
+            // so their absence is a plausible rejection rather than a nicety.
+            HStack(spacing: 6) {
+                Link("Terms of Service", destination: Legal.terms)
+                Text("·")
+                Link("Privacy Policy", destination: Legal.privacyPolicy)
+            }
+            .font(.caption2)
+            .foregroundStyle(Palette.secondaryLabel)
             Text("No free trial · cancel anytime")
                 .font(.caption2).foregroundStyle(Palette.secondaryLabel)
         }
