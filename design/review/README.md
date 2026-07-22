@@ -39,6 +39,10 @@ xcrun simctl io <iphone-udid> screenshot design/review/paywall-review-screenshot
 Check both plan cards are fully above the footer. If they aren't, the paywall has outgrown the
 screen again — fix the layout rather than reaching for a taller device.
 
+**App Store Connect wants one per subscription, with that plan highlighted.** Yearly is the default;
+add `SIMCTL_CHILD_PAYWALL_PLAN=monthly` to the launch for the monthly one (DEBUG-only hook, same
+family as `SHOW_SCREEN`). `simctl` cannot tap, which is why the hook exists.
+
 Then re-upload it in App Store Connect — the file here is a record of what was submitted, not the
 submission itself. **Check the rendered prices against the console before uploading**; never against
 `Budgetty.storekit`, which is a Simulator fixture (see `APP_STORE_CONNECT_SETUP.md`).

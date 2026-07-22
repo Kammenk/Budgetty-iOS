@@ -20,7 +20,16 @@ struct PaywallView: View {
     @State private var busy = false
 
     private enum Plan { case yearly, monthly }
-    @State private var plan: Plan = .yearly
+
+    /// Yearly is the default the user sees. `PAYWALL_PLAN=monthly` preselects the other card in
+    /// DEBUG — App Store Connect wants a review screenshot per subscription with that plan
+    /// highlighted, and `simctl` can't tap. Same family as `SHOW_SCREEN` / `SCAN_PHASE`.
+    @State private var plan: Plan = {
+        #if DEBUG
+        if ProcessInfo.processInfo.environment["PAYWALL_PLAN"] == "monthly" { return .monthly }
+        #endif
+        return .yearly
+    }()
 
     private var selectedProduct: Product? {
         store.product(plan == .yearly ? StoreManager.yearlyID : StoreManager.monthlyID)
