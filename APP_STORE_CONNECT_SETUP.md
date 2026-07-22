@@ -36,11 +36,26 @@ needed.
 - [ ] **Product ID:** `com.budgetty.premium.monthly`  ← exact
 - [ ] Subscription Duration: **1 Month**
 
+**Both**
+- [ ] **Tax Category** — required on each subscription. Easy to miss: App Store Connect doesn't name
+      the field it's waiting on, so the product just sits at *Missing Metadata* and is never returned
+      to the app. Pick the category that matches how you sell (Budgetty is an app subscription, not
+      a physical good or a regulated service) — confirm with your accountant if in doubt, since it
+      drives what tax Apple collects on your behalf.
+
 ⚠️ Product IDs are permanent once saved — triple-check the spelling.
 
 ## 3. Pricing
 - [ ] Each subscription → **Subscription Prices → Add** → base region (e.g. Germany/EUR) → closest
       point to **€29.99** (yearly) / **€3.99** (monthly). App Store Connect fills the other regions.
+
+⚠️ **Two paywall strings are hardcoded and only true at €29.99 / €3.99.** `PaywallView.planCard`
+renders the *price* from StoreKit, but the yearly row's `detail: "€2.50 / month"` and
+`badge: "BEST VALUE · SAVE 37%"` are literals — correct only for these amounts (29.99 ÷ 12 = €2.50;
+versus 12 × €3.99 = €47.88 a year, a 37% saving). **Price anything else and those two lines become
+false**, which is exactly the defect `Store/PremiumBenefits.swift` exists to prevent elsewhere on
+that screen. If the prices change, derive both from the loaded `Product`s rather than editing the
+literals — the same rule as the benefit list: never restate a number the system already knows.
 
 ## 4. Localization (shown to users)
 - [ ] Each subscription → **Add localization** (English at minimum):
@@ -79,5 +94,7 @@ needed.
 - The app's fallback prices and the `.storekit` config already use €29.99 / €3.99, so the paywall
   looks identical whether or not live products load.
 - If products don't appear on device: check the Paid Apps agreement is Active, the bundle ID
-  matches, and the subscription status is at least "Ready to Submit."
+  matches, every required field (including **Tax Category**) is filled, and the subscription status
+  is at least "Ready to Submit." A product stuck at *Missing Metadata* is silently omitted from
+  `Product.products(for:)` — the paywall simply renders no plans, with no error.
 - See `DEVICE_TEST_CHECKLIST.md` for the rest of the on-device pass.
