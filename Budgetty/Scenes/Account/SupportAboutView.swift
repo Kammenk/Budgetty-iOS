@@ -13,6 +13,13 @@ struct SupportAboutView: View {
     @AppStorage(SettingsKey.premium) private var premium = false
     @AppStorage(SettingsKey.testerPremium) private var testerUnlocked = false
     @State private var versionTaps = 0
+    @Environment(\.openURL) private var openURL
+
+    /// The hosted policy, same document the Android app links to (`URL_PRIVACY` in AccountScreen.kt)
+    /// and the one the App Store listing points at. Section 1(f) is what discloses crash reporting,
+    /// so this link is part of the Crashlytics shipping gate — an app that collects crash data has
+    /// to give the user a way to read what that means.
+    private static let privacyPolicy = URL(string: "https://budgetty-96a3d.web.app/")!
 
     var body: some View {
         ScrollView {
@@ -30,8 +37,12 @@ struct SupportAboutView: View {
 
                 sectionHeader("Legal")
                 VStack(spacing: 0) {
-                    link("Privacy Policy", "hand.raised.fill", Color(argb: 0xFF34C759))
+                    link("Privacy Policy", "hand.raised.fill", Color(argb: 0xFF34C759),
+                         url: Self.privacyPolicy)
                     divider
+                    // ⚠️ Still inert, and not fixable by picking a URL: no terms document exists on
+                    // either platform. Apple's standard EULA covers subscriptions by default, but
+                    // which document this row points at is the owner's call.
                     link("Terms of Service", "doc.text.fill", Color(argb: 0xFF8E8E93))
                 }
                 .contentCard(cornerRadius: 14)
@@ -91,8 +102,13 @@ struct SupportAboutView: View {
         Rectangle().fill(Palette.separator).frame(height: 0.5)
     }
 
-    private func link(_ title: LocalizedStringKey, _ symbol: String, _ tint: Color) -> some View {
-        Button {} label: {
+    /// ⚠️ `url` is optional only because most of this screen's rows have never been wired to
+    /// anything — FAQ, Contact us, Suggest a feature, Rate and Share are all still no-ops that draw
+    /// an outward arrow. Passing a URL is the fix; see the note on the Terms row for why that one
+    /// isn't just a missing string.
+    private func link(_ title: LocalizedStringKey, _ symbol: String, _ tint: Color,
+                      url: URL? = nil) -> some View {
+        Button { if let url { openURL(url) } } label: {
             HStack(spacing: 12) {
                 SettingsIcon(symbol: symbol, background: tint)
                 Text(title).foregroundStyle(Palette.label)

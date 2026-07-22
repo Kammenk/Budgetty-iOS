@@ -56,6 +56,23 @@
 				<string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
 			</array>
 		</dict>
+		<!-- Firebase Crashlytics. NOT linked: the wrapper never calls setUserID, so a report carries
+		     the stack trace, device model, OS and app version, device state, and the Firebase
+		     installation id — nothing tying it to the signed-in account. Default-on with a real
+		     opt-out in Account > Privacy & Security. This must agree with the App Store Connect App
+		     Privacy label (Diagnostics > Crash Data); Apple compares the two. -->
+		<dict>
+			<key>NSPrivacyCollectedDataType</key>
+			<string>NSPrivacyCollectedDataTypeCrashData</string>
+			<key>NSPrivacyCollectedDataTypeLinked</key>
+			<false/>
+			<key>NSPrivacyCollectedDataTypeTracking</key>
+			<false/>
+			<key>NSPrivacyCollectedDataTypePurposes</key>
+			<array>
+				<string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
+			</array>
+		</dict>
 	</array>
 	<key>NSPrivacyAccessedAPITypes</key>
 	<array>

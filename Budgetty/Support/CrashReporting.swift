@@ -14,9 +14,17 @@
 //  `setCrashlyticsCollectionEnabled` persists inside Crashlytics and survives process death, so a
 //  user who opts out stays opted out even before startup re-applies the preference.
 //
-//  ⚠️ SHIPPING BLOCKER (not code): releasing this also requires the App Store Connect **App Privacy**
-//  nutrition label to declare Crash Data / Diagnostics, plus a privacy-policy disclosure. Android has
-//  the equivalent Play Data-safety change pending. Do not ship Crashlytics without it.
+//  ⚠️ SHIPPING BLOCKER (not code). Two of the three disclosure pieces are now done:
+//   ✅ `PrivacyInfo.xcprivacy` declares `NSPrivacyCollectedDataTypeCrashData` — not linked, not
+//      tracking. "Not linked" is only true because nothing here calls `setUserID`; add that and the
+//      manifest and the App Store label both become wrong.
+//   ✅ The privacy policy discloses crash reporting in §1(f), and Support & About finally links to
+//      it — every row on that screen used to be a no-op.
+//   ❌ The **App Store Connect App Privacy label** must declare Diagnostics › Crash Data, purpose
+//      App Functionality, not linked to the user, not used for tracking. Apple compares the label
+//      against the manifest above. It's a console action — it cannot be done from the repo.
+//  Do not upload a build until that last one is set. Android's equivalent Play Data-safety change
+//  is still pending on its side.
 //
 
 import Foundation
