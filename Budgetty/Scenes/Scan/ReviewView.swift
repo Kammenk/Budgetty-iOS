@@ -19,6 +19,7 @@ struct ReviewView: View {
     @State private var oldCategory = ""
     @State private var memoryCtx: MemoryCtx?
     @State private var noticeDismissed = false
+    @State private var inflatedNoticeDismissed = false
     @State private var showDroppedAlert = false
 
     // MARK: - Total-reconciliation checks (Android parity)
@@ -43,6 +44,25 @@ struct ReviewView: View {
         return (draft.subtotal - sub) > tolerance(sub) ? sub : nil
     }
 
+    /// Same data-losing direction as `droppedShortfall`, for receipts that print NO subtotal to anchor
+    /// against — the exact hole a dual-currency receipt slips through. The saved total is inflated far
+    /// past the items by an unexplained residual: money not itemized as fees, tip or tax, which lands
+    /// in `extraCharges`. Bulgaria's euro changeover is the canonical case — a leva grand total read
+    /// against euro line items nearly doubles the total.
+    ///
+    /// Soft and non-blocking on purpose: the items themselves are usually read correctly and the user
+    /// reviews them before saving, so a hard stop they can't easily resolve would overdo it.
+    private var inflatedTotal: Decimal? {
+        guard draft.printedSubtotal == nil else { return nil }
+        let unexplainedFloor = max(draft.subtotal * Self.unexplainedTotalRatio, Self.unexplainedTotalAbs)
+        return draft.extraCharges > unexplainedFloor ? draft.total : nil
+    }
+
+    /// Flagged only once the residual clears BOTH bars, so an ordinary deposit or bag fee — small
+    /// against the bill — never trips it.
+    private static let unexplainedTotalRatio = Decimal(string: "0.5")!
+    private static let unexplainedTotalAbs = Decimal(string: "1.50")!
+
     /// Route Save through the dropped-line check: confirm on a shortfall, else save straight away.
     private func attemptSave() {
         if droppedShortfall != nil { showDroppedAlert = true } else { onSave() }
@@ -60,6 +80,9 @@ struct ReviewView: View {
                     storeAndDate
                     if let anchor = overReadAnchor, !noticeDismissed {
                         mismatchNotice(anchor)
+                    }
+                    if let inflated = inflatedTotal, !inflatedNoticeDismissed {
+                        inflatedNotice(inflated)
                     }
                     ForEach(draft.items) { item in
                         ItemCard(item: item, onDelete: { draft.remove(item) },
@@ -175,16 +198,35 @@ struct ReviewView: View {
     // MARK: - Price-mismatch notice
 
     /// Soft, dismissible over-read banner (mockup): warn-tinted card at the top of the item list.
+    private func inflatedNotice(_ total: Decimal) -> some View {
+        // One literal, not a concatenation: LocalizedStringKey only picks up an interpolated string
+        // literal, so `"a" + "b"` would silently become a plain String and lose both the lookup and
+        // the markdown bolding.
+        cautionNotice(
+            "These items add up to **\(draft.subtotal.formatMoney())**, but the total came to **\(total.formatMoney())**. If the receipt lists both euros and leva, double-check you're saving the euro amount.",
+            onDismiss: { inflatedNoticeDismissed = true }
+        )
+    }
+
     private func mismatchNotice(_ anchor: Decimal) -> some View {
+        cautionNotice(
+            "Totals don't quite match — items add up to **\(draft.subtotal.formatMoney())**, the receipt shows **\(anchor.formatMoney())**. You can still save.",
+            onDismiss: { noticeDismissed = true }
+        )
+    }
+
+    /// Shared caution chrome for the soft, non-blocking review notices: warning-tinted, dismissible,
+    /// and deliberately not the red error colour — it informs, it never gates Save or edits a total.
+    private func cautionNotice(_ text: LocalizedStringKey, onDismiss: @escaping () -> Void) -> some View {
         HStack(alignment: .top, spacing: 10) {
             Image(systemName: "exclamationmark.triangle")
                 .font(.system(size: 14, weight: .semibold)).foregroundStyle(Palette.warn)
                 .padding(.top, 1)
-            Text("Totals don't quite match — items add up to **\(draft.subtotal.formatMoney())**, the receipt shows **\(anchor.formatMoney())**. You can still save.")
+            Text(text)
                 .font(.system(size: 13)).foregroundStyle(Palette.label)
                 .lineSpacing(2)
                 .frame(maxWidth: .infinity, alignment: .leading)
-            Button { noticeDismissed = true } label: {
+            Button(action: onDismiss) {
                 Image(systemName: "xmark")
                     .font(.system(size: 9, weight: .bold)).foregroundStyle(Palette.secondaryLabel)
                     .frame(width: 22, height: 22)
