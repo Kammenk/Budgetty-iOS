@@ -51,6 +51,7 @@ struct CategoryTransactionsSheet: View {
             .navigationTitle(Categories.displayName(category)).navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
         }
+        .coversFloatingDock()
     }
 }
 
@@ -86,6 +87,7 @@ struct StoreTransactionsSheet: View {
             .navigationTitle(store).navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
         }
+        .coversFloatingDock()
     }
 }
 

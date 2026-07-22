@@ -18,11 +18,10 @@ struct AccountView: View {
     @AppStorage(SettingsKey.currency) private var currency = "EUR"
     @AppStorage(SettingsKey.language) private var language = "system"
     @AppStorage(SettingsKey.dateFormat) private var dateFormatRaw = DateFormatOption.system.rawValue
-    @AppStorage(SettingsKey.notifications) private var notifications = true
     @AppStorage(SettingsKey.faceID) private var faceID = false
-    @AppStorage(SettingsKey.analytics) private var analytics = true
     @AppStorage(SettingsKey.crashReporting) private var crashReporting = true
     @AppStorage(SettingsKey.premium) private var premium = false
+    private let theme = AppTheme.shared
 
     @State private var confirmSignOut = false
     @State private var confirmDelete = false
@@ -87,6 +86,7 @@ struct AccountView: View {
             .padding(.horizontal, 20).padding(.top, 6).padding(.bottom, 40)
             .adaptiveReadableWidth()
         }
+        .underFloatingDock(reportingScroll: false)
         .screenCanvas()
         .navigationTitle("Account")
         .confirmationDialog("Sign out of Budgetty?", isPresented: $confirmSignOut, titleVisibility: .visible) {
@@ -146,10 +146,6 @@ struct AccountView: View {
             }
             .buttonStyle(.plain)
             divider
-            Toggle(isOn: $notifications) { label("Notifications", "bell.fill", Palette.bad) }
-                .tint(Palette.good)
-                .padding(.vertical, 8).padding(.horizontal, 16)
-            divider
             NavigationLink { CurrencyPickerView(selection: $currency) } label: {
                 row("Currency", "eurosign", Palette.good) {
                     value("\(currency) (\(CurrencyOption.symbol(currency)))")
@@ -187,9 +183,13 @@ struct AccountView: View {
             .buttonStyle(.plain)
             divider
             if premium {
-                row("Accent color", "sun.max.fill", Palette.tint) {
-                    Text("Violet").font(.subheadline).fontWeight(.semibold).foregroundStyle(Palette.tint)
+                NavigationLink { accentPicker } label: {
+                    row("Accent color", "sun.max.fill", Palette.tint) {
+                        value(theme.accent.label)
+                        chevron
+                    }
                 }
+                .buttonStyle(.plain)
             } else {
                 NavigationLink { PaywallView() } label: {
                     row("Accent color", "sun.max.fill", Palette.tint) {
@@ -222,13 +222,13 @@ struct AccountView: View {
         .contentCard(cornerRadius: 14)
     }
 
+    /// Two real switches. Android deleted its whole Privacy section because every switch in it wrote
+    /// a boolean nothing read; both of these are wired to something — `faceID` to `LockGate` →
+    /// `BiometricLockView` (a platform difference, Android has no biometric lock), and
+    /// `crashReporting` to the Crashlytics SDK.
     private var privacyCard: some View {
         VStack(spacing: 0) {
             Toggle(isOn: $faceID) { label("Face ID", "lock.fill", Color(argb: 0xFF30B0C7)) }
-                .tint(Palette.good)
-                .padding(.vertical, 8).padding(.horizontal, 16)
-            divider
-            Toggle(isOn: $analytics) { label("Analytics", "chart.bar.fill", Color(argb: 0xFF5AC8FA)) }
                 .tint(Palette.good)
                 .padding(.vertical, 8).padding(.horizontal, 16)
             divider
@@ -355,6 +355,7 @@ struct AccountView: View {
                 }
             }
         }
+        .underFloatingDock(reportingScroll: false)
         .navigationTitle("Appearance")
         .navigationBarTitleDisplayMode(.inline)
     }
@@ -379,7 +380,36 @@ struct AccountView: View {
                 Text("How dates appear on receipts and lists.")
             }
         }
+        .underFloatingDock(reportingScroll: false)
         .navigationTitle("Date format")
+        .navigationBarTitleDisplayMode(.inline)
+    }
+
+    /// Premium accent picker. Only reachable while `premium` — the free path sends you to the
+    /// paywall instead — and the choice applies live, since every tinted view observes `AppTheme`.
+    private var accentPicker: some View {
+        List {
+            Section {
+                ForEach(AccentOption.allCases) { option in
+                    Button {
+                        theme.accent = option
+                    } label: {
+                        HStack(spacing: 12) {
+                            Circle().fill(option.color).frame(width: 22, height: 22)
+                            Text(option.label).foregroundStyle(Palette.label)
+                            Spacer()
+                            if option == theme.accent {
+                                Image(systemName: "checkmark").foregroundStyle(Palette.tint).fontWeight(.semibold)
+                            }
+                        }
+                    }
+                }
+            } footer: {
+                Text("Tints buttons, highlights and the spending card.")
+            }
+        }
+        .underFloatingDock(reportingScroll: false)
+        .navigationTitle("Accent color")
         .navigationBarTitleDisplayMode(.inline)
     }
 
@@ -424,6 +454,7 @@ struct LanguagePickerView: View {
                 Text("Your preferred language for Budgetty.")
             }
         }
+        .underFloatingDock(reportingScroll: false)
         .navigationTitle("Language")
         .navigationBarTitleDisplayMode(.inline)
     }
@@ -454,6 +485,7 @@ struct CurrencyPickerView: View {
                 }
             }
         }
+        .underFloatingDock(reportingScroll: false)
         .navigationTitle("Currency")
         .navigationBarTitleDisplayMode(.inline)
     }

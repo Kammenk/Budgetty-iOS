@@ -57,7 +57,13 @@ struct SupportAboutView: View {
                 Text("Budgetty").font(.headline).foregroundStyle(Palette.label)
                 Button {
                     versionTaps += 1
-                    if versionTaps >= 11 { premium = true; testerUnlocked = true }
+                    if versionTaps >= 11 {
+                        premium = true
+                        testerUnlocked = true
+                        // Widgets enforce their own cap in another process — tell them too, or a
+                        // tester's locked widgets would stay locked.
+                        WidgetSharing.premiumDidChange()
+                    }
                 } label: {
                     Text(testerUnlocked ? "Budgetty 1.0 · Premium unlocked ✓" : "Budgetty 1.0 · Made with 💜")
                         .font(.caption).foregroundStyle(Palette.secondaryLabel)
@@ -68,6 +74,7 @@ struct SupportAboutView: View {
             .padding(.horizontal, 20).padding(.top, 6).padding(.bottom, 40)
             .adaptiveReadableWidth()
         }
+        .underFloatingDock(reportingScroll: false)
         .screenCanvas()
         .navigationTitle("Support & About")
     }

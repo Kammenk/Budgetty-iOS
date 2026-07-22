@@ -160,12 +160,132 @@ check `iOS Insights Extra Cards.dc.html` for LG coverage, request variants for t
 **Android:** `ui/home/HomeSection.kt` + settings-persisted order/hidden set, phone-only by
 design. Mirror the existing iOS `InsightsCustomize` pattern.
 
-### 10. Widgets: 1 type on iOS vs 3 on Android
+### 10. Widgets: 3 types on iOS vs 5 on Android
 **Status:** PORTED (2026-07-15, build-verified) — 3 widget types × 2 sizes per the iOS Widgets mockup: Spend Total (spend + top categories), Budget Ring, Recent Receipts; snapshot extended with top categories + receipt count
-small+medium). Android has 3 widget types × 2 sizes (Jetpack Glance, 2026-06-30).
-Low priority; decide which two remaining types are worth WidgetKit equivalents.
+**Corrected 2026-07-22:** the old title ("1 type on iOS vs 3") was stale in both numbers. iOS has 3
+(`SpendingWidget`, `BudgetRingWidget`, `RecentReceiptsWidget`); Android has **5** — Budget, Summary,
+This Week, Scan, Top Categories. The two missing faces (Scan shortcut, This Week) remain low
+priority; decide whether they're worth WidgetKit equivalents. Note the free-tier cap (below) counts
+faces, so adding a type widens what a free user can choose between, not how many they can place.
 
 ---
+
+### 11. Category split — "Subscriptions & Services" → "Subscriptions" + "Services"
+**Status:** PORTED (2026-07-21, sim-verified iPhone 17 Pro incl. the upgrade path)
+**Android:** `581302f` (2026-07-21). The sub-category was near-indistinguishable from the group
+holding it ("Services & Subscriptions"), so it became two: `Subscriptions` 🔁 (reusing the old slot
+in `defs`, which keeps its colour — sub-hues walk the list in order) and `Services` 🧰 (appended, for
+the same reason). Group name unchanged.
+**⚠️ Why this was urgent:** `functions/receiptPrompt.js` is the SHARED prompt and already lists both
+new names, so a deployed function emits categories iOS didn't know — they'd fall back to Other.
+**iOS:** `Category/Categories.swift` (defs + `cat_*` key map), `Localizable.xcstrings`
+(`cat_subscriptions`/`cat_services` added from Android's finished translations, `cat_subscriptions_services`
+retired — 16 locales, no re-translation), and `Data/Migrations.swift` +
+`BudgettyApp.prepare(_:)`. The name IS the stored reference, so the migration repoints `Category`,
+`LineItem`, `Recurring`, `CategoryRule` and the `CAT:<name>` budget key — the iOS counterpart of
+Android's `MIGRATION_17_18`. Everything lands on `Subscriptions`, matching Android. Covered by
+`BudgettyTests/MigrationsTests.swift` (4 cases incl. the collision and idempotence).
+
+### 12. Per-user local data isolation
+**Status:** PORTED (2026-07-21) — was a live data-bleed bug on iOS
+**Android:** `UserDatabaseManager` (on main, v10.5.0) — one Room file per Firebase uid.
+**iOS was worse than "not ported":** a single `ModelContainer` was built once in `BudgettyApp.init()`
+with no uid at all, so two accounts on one device shared receipts, budgets and categories outright.
+**iOS:** `Data/UserStore.swift` — `budgetty-u-<uid>.store` per account, `budgetty-anon.store` when
+signed out, containers cached per file, legacy `default.store` adopted by the first signed-in account
+(sidecars moved too), and `deleteData(for:)` wired into `AuthModel.deleteAccount()`. The container is
+`@State` and swapped in `.onChange(of: auth.uid)`, which also seeds/migrates the newly opened store.
+**⚠️ Untested:** the actual two-account switch needs a second Firebase account — verified so far are
+the uid-named store on a fresh install and the legacy-store adoption + migration on upgrade.
+
+### 13. Third-party sign-in — Apple ✅, Google ✅
+**Status:** DONE 2026-07-21. Apple is iOS-first (no Android counterpart); Google reaches parity with
+Android's `AuthRepository` Google flow.
+
+**Apple (done).** Fully native — `AuthenticationServices` + `CryptoKit`, no new dependency:
+`Auth/AuthModel.swift` (`prepareAppleRequest`/`signInWithApple`, SHA-256 nonce,
+`OAuthProvider.appleCredential`) and a `SignInWithAppleButton` under an "or" divider in
+`Scenes/Auth/LoginView.swift`, plus the `com.apple.developer.applesignin` entitlement. New
+sign-ups arm the setup quiz via `additionalUserInfo?.isNewUser`, matching Android's `e328102`
+behaviour for third-party sign-ups. Apple returns name/email **only on the first authorisation**, so
+the display name is captured there or never.
+- ⚠️ **Two steps outside the repo, both still open:** the **Apple provider must be enabled in the
+  Firebase console** (without it the credential exchange fails `operation-not-allowed`), and the App
+  ID needs the Sign In with Apple capability (automatic signing usually registers it on the next
+  archive). Verified as far as a simulator allows: the system flow engages and the no-Apple-Account
+  path shows friendly copy; the actual round trip needs a real Apple Account.
+- ⚠️ Once Google lands, Apple becomes **mandatory** under App Review 4.8 — that direction is now safe.
+
+**Google (done).** Native OAuth 2.0 + PKCE via `ASWebAuthenticationSession` — **no GoogleSignIn
+SDK**, keeping the prefer-native convention. `Auth/GoogleOAuth.swift` builds the consent URL from the
+`CLIENT_ID`/`REVERSED_CLIENT_ID` already in `GoogleService-Info.plist`, verifies `state`, and
+exchanges the code for an ID token; `AuthModel.signInWithGoogle` hands that to
+`GoogleAuthProvider.credential`. Only the ID token is used — same as Android's
+`GoogleAuthProvider.getCredential(idToken, null)` — and `isNewUser` arms the setup quiz.
+- Why not the SDK: it needs `CFBundleURLTypes`, and this app target has **no physical Info.plist**
+  (`GENERATE_INFOPLIST_FILE = YES`). `ASWebAuthenticationSession` intercepts its own
+  `callbackURLScheme`, so nothing has to be registered and no pbxproj surgery was needed.
+- Verified on the simulator up to Google's real sign-in page (client id, redirect URI and PKCE all
+  accepted; the page names the project, see below) and the cancel path. The signed-in round trip
+  needs a real Google account.
+- ⚠️ **Follow-up, Google Cloud console:** the OAuth consent screen has no app name set, so the page
+  reads "to continue to **project-773376958569**" instead of "Budgetty". Cosmetic but it looks
+  untrustworthy at exactly the wrong moment. Set App name + logo under APIs & Services → OAuth
+  consent screen.
+- ⚠️ **Follow-up, branding:** Google's mark isn't bundled, so the button is a neutral capsule with an
+  SF Symbol rather than Google's branded button. Add the official asset to comply with their
+  identity guidelines before public release. Android's `e328102` ("show the setup quiz to Google sign-ups too") therefore has
+no iOS counterpart to fix; whenever Google sign-in lands, it needs the same `isNewUser`-based arming
+of `SettingsKey.quizPending`.
+
+### 14. Scan guards — two Android checks missing on iOS
+**Status:** PORTED 2026-07-22 — `Scenes/Scan/ReceiptExtractor.swift` (`validate`) and
+`Scenes/Scan/ReviewView.swift` (`inflatedTotal`). All seven thresholds copied verbatim from Android
+so a receipt is judged identically on both platforms; `BudgettyTests/ExtractionGuardTests.swift`
+pins them, leaning on the cases that must NOT be rejected. Note iOS was missing a **third** guard the
+audit hadn't spotted: the money-sanity overshoot check. Ported alongside.
+- **Article-count guard.** Android cross-checks the receipt's printed item count against the parsed
+  lines/units (`HaikuReceiptExtractor.validateExtraction`; `1d12a44` fixed it over-rejecting multi-buy
+  receipts). iOS decodes the field (`Data/Remote/ReceiptAPI.swift:40` `printedItemCount`) and never
+  reads it — that is its only reference in the repo. A genuine under-read is silently accepted.
+- **Inflated-total warning.** Android `651b638` warns on Review when the total runs far past the item
+  sum *with no printed subtotal* — the dual-currency backstop. iOS's two reconciliation checks in
+  `Scenes/Scan/ReviewView.swift` are both gated on `printedSubtotal` being present, so this case shows
+  nothing and the gap is absorbed into `extraCharges`.
+- NB the dual-currency fix itself (`21a1213`) is **server-side** in the shared prompt — iOS gets it
+  free, no action.
+
+### 15. Premium offer — iOS unlocked 2 things, Android 4
+**Status:** PORTED 2026-07-22 (iOS branch `android-premium-parity`, sim-verified iPhone 17 Pro)
+
+Not drift in a feature so much as a **hole in the product**, surfaced when the paywall was made
+honest on 2026-07-21: once the false rows came out, iOS Premium bought unlimited scans and unlimited
+custom categories, and nothing else. Android charges for two more things that simply didn't exist
+here. Both were built rather than dropping the claim.
+
+- **Recurring-bill cap.** Android caps free users at `RecurringRepository.FREE_RECURRING_LIMIT` (3)
+  bills; income is never capped. iOS now has `RecurringQuota.freeLimit`, enforced on the Budget
+  screen: the section header shows "3 / 3" and the Add row becomes an "Upgrade to add more" row.
+  Nothing persisted, matching Android — the live bill count is the state, so deleting one frees a
+  slot.
+- **Accent themes.** Android overrides its Material `primary` per `AccentTheme`
+  (Violet/Sage/Ocean/Plum). iOS re-points the `Palette.tint` token — the Liquid Glass spec already
+  reserves it for exactly what Android overrides (primary action, active tab, links, selected
+  states), so one indirection reaches ~80 call sites. `AppTheme` is `@Observable`, not `@AppStorage`:
+  SwiftUI's observation tracking then re-renders every view that read the tint, with no `.id()` reset
+  that would pop the user out of the picker mid-change. Sage/Ocean/Plum use **Android's exact hexes**.
+  - ⚠️ **The non-obvious part, if you touch this:** the hero card and the CTA capsule carry white
+    text, and green at the violet gradient's HSB brightness is far lighter to the eye than violet.
+    Copying the mockup's numbers to another hue would have shipped a Sage hero at ~1.6:1 contrast.
+    They derive by matching the reference colour's **luminance** instead, so every accent is exactly
+    as readable as the one the mockups were drawn for. `AccentTests` holds that floor.
+  - Divergence from the mockups: the ambient canvas glows stay violet (decorative, and they sit
+    behind content rather than under text).
+
+Also in this pass, though not a parity item: the paywall's plan card hardcoded "€2.50 / month" and
+"SAVE 37%" beside a StoreKit-supplied price — arithmetic on €29.99/€3.99 that a re-price in App Store
+Connect would have quietly falsified. Both now derive from the loaded products (`PlanPricing`,
+unit-tested) and the saving is dropped rather than invented when it can't be computed.
 
 ## Android → iOS (in flight on Android — do NOT port yet)
 
@@ -179,10 +299,179 @@ Low priority; decide which two remaining types are worth WidgetKit equivalents.
   **Localized 2026-07-16** — 55 new keys × 15 target locales added to `Localizable.xcstrings`
   (413 keys total), terminology matched to the existing glossary; sim-verified in German
   (`Frage %lld von 7`) and Swedish (`Inkomst inställd — 2 400,00 €/månad`).
-- **Per-user local data isolation** — one local DB file per Firebase uid (Android
-  `UserDatabaseManager`), fixing cross-account data bleed on shared devices. Same branch.
-  When it merges: check whether the iOS local store has the same bleed (receipt data was
-  account-agnostic on Android; iOS likely mirrors that).
+- **Per-user local data isolation** — ✅ **PORTED to iOS 2026-07-21**, see §12 above. iOS did have
+  the same bleed, and worse (one container, no uid at all).
+- **Account trim + full paywall benefit list + no AI wording** — ✅ **PORTED 2026-07-22** (iOS branch
+  `android-premium-parity`, sim-verified iPhone 17 Pro). Android side merged as `a8ef389`
+  (`6547e73` code, `af23d0f` onboarding AI, `6df1ef9` paywall compact-height). The notes below are
+  kept because they record *why* each row went the way it did; the ⚠️ product gap they end on is now
+  closed — see §15.
+  ⚠️ **Do not mirror mechanically — the iOS side of every point below differs.** iOS findings
+  spot-checked 2026-07-16 against this repo.
+
+  **a. Inert toggles — applies, except Face ID.** Android deleted Push notifications /
+  Biometric / Analytics because each wrote a boolean nothing ever read.
+  - `Notifications` (`Scenes/Account/AccountView.swift:148`) — **inert here too**: no
+    `UNUserNotificationCenter` / `requestAuthorization` anywhere → remove.
+  - `Analytics` (`AccountView.swift:230`) — **inert here too**: no analytics SDK → remove.
+  - `Face ID` (`AccountView.swift:226`) — ⚠️ **REAL on iOS. Keep it.** `LAContext` +
+    `evaluatePolicy` in `Scenes/Lock/BiometricLockView.swift`, wired via `LockGate { RootView() }`
+    (`BudgettyApp.swift:81`). Android had no biometric dependency at all — this is a genuine
+    platform divergence, not drift. So iOS **keeps a Privacy & Security section** (Face ID only)
+    where Android deleted it, and `iOS Biometric Lock.dc.html` stays live where the Android
+    `BiometricLockScreen.dc.html` is being retired.
+  - Currency already sits under Preferences on iOS (`AccountView.swift:152`) → no move needed.
+  - `Contact support` → **"Contact us"** + second line "Report an issue, suggest a feature, or
+    just say hello", and the mail subject goes neutral ("Budgetty feedback"). ⚠️ On iOS a key IS
+    its English text, so this **renames a key** — migrate all 16 locale entries in
+    `Localizable.xcstrings`, don't strand the old one (see §6 mechanics).
+
+  **b. Paywall — iOS is in worse shape than Android was.** `Scenes/Paywall/PaywallView.swift:36-40`
+  already uses the title+subtitle `Feature` shape Android just adopted, but **3 of its 5 claims
+  are wrong**:
+  - "Cloud backup & sync / Your data safe and on all devices" — **does not exist** (same phantom
+    Android had). Product decision was to **keep it, demoted to a muted "Coming soon" row** with
+    a clock instead of a check — not to delete it.
+  - "Home screen widgets / Spending at a glance" — **not premium-gated** on iOS (no premium check
+    near the widget code) and free on Android. This advertises a free feature as paid → drop it.
+  - "10 custom categories / vs. 3 on the free plan" — **factually wrong**:
+    `Categories.maxCustomLimit = Int.max` (`Category/Categories.swift:29`) = unlimited. It both
+    undersells the product and quotes a number that doesn't exist.
+  - "Unlimited scans" ✅ real (`ScanQuota.freeLimit = 10`, `App/Settings.swift:31`).
+  - ⚠️ **CORRECTION (2026-07-21): "Accent color themes" is NOT real either** — this tracker had it
+    wrong. There is no accent preference on iOS at all: no key in `SettingsKey`, `Palette.tint` is a
+    single hard-coded colour, and Account shows Premium users a static row reading "Violet" with no
+    picker. So four of the five original rows were false, not three.
+  - **Recurring bills**: Android's 4th unlock is unlimited recurring bills (free cap 3,
+    `RecurringRepository.FREE_RECURRING_LIMIT`). No equivalent cap found on iOS — **confirm the
+    gate exists** before listing it, or the same "advertise what you don't enforce" bug appears.
+  - The principle worth copying, not the strings: **one shared benefit list** feeding every
+    layout, each row = title + the free-tier limit, every number **interpolated from the constant
+    that enforces it** so a retuned cap can't leave stale copy.
+  - ✅ **DONE 2026-07-21 — `Store/PremiumBenefits.swift`.** Widgets row deleted (free, ungated);
+    categories row now "Unlimited custom categories / vs `Categories.freeCustomLimit` on the free
+    plan"; cloud and accent themes demoted to muted `soon` rows with a clock. Numbers interpolate
+    from `ScanQuota.freeLimit` and `Categories.freeCustomLimit`; `BudgettyTests/
+    PremiumBenefitsTests.swift` fails if a row claims a number the code doesn't enforce.
+  - ⚠️ **Product gap this exposed:** iOS Premium honestly unlocked **2** things; Android unlocked
+    **4**. ✅ **CLOSED 2026-07-22 — the features were built rather than the offer thinned** (§15).
+  - ⚠️ **Was dishonest elsewhere:** Account's "Accent color" row wore a **Premium** badge and pushed
+    the paywall for a feature that didn't exist. ✅ Fixed 2026-07-22 — the row now leads to a real
+    picker for Premium users.
+
+  **c. Onboarding AI wording — ✅ DONE on iOS 2026-07-21.** Both mentions on onboarding page 2
+  (`Scenes/Onboarding/OnboardingView.swift:20` and `:22`) now read "Budgetty" instead of "AI",
+  matching Android's reword (`af23d0f`) where Budgetty itself is the sentence's subject. Verified on
+  the simulator via `SIMCTL_CHILD_ONBOARDING=force`. No translation work: this copy is still a Swift
+  literal, not in `Localizable.xcstrings` (one of the ~69 English-only iOS literals). The only
+  whole-word `AI` left in the iOS bundle is two code comments (`ScanFlowView.swift:34`,
+  `Settings.swift:23`); iOS's login panel never carried the AI line Android dropped in §d. ⚠️ The **privacy policy's AI limited-use disclosure naming
+  Anthropic must stay** — required store disclosure, product copy only.
+
+  **d. Login brand panel.** Android's dropped "Snap a receipt — AI reads it" and "Budget tracking
+  & alerts" (alerts were as unimplemented as the notifications toggle — the same phantom sold in
+  a second place) and gained a closing "Premium unlocks unlimited scans, categories & bills" line.
+  It stays a **pre-auth app pitch, deliberately not a paywall**. Check the iPad login for the same
+  AI + alerts wording.
+
+  **Design:** Android's `ACCOUNT_PAYWALL_DESIGN_REQUEST.md` deliberately leaves every `iOS
+  *.dc.html` untouched so the mockups keep matching iOS code until this ports. An iOS port needs
+  its own request (`IOS_DESIGN_REQUEST_*` precedent) covering `iOS Account`, `iOS Paywall`,
+  `iOS Login`, `iOS Support & About` — and, unlike Android, **not** `iOS Biometric Lock`.
+
+- **Free-tier widget cap: 2 placed widgets** — ✅ **PORTED 2026-07-22** (iOS branch
+  `widget-free-cap`), ⚠️ **ahead of the Android branch merging**. Android's `widget-free-cap`
+  (`b2ac479`) is still unmerged and not device-verified, so it was used as the spec by explicit
+  decision — **if that branch changes before it merges, re-check this port.** The enforcement
+  mechanism did not port; the iOS decision is recorded at the end of this entry.
+
+  **The rule (product):** a free user may have **2 widget instances placed at once**, counted
+  per *placed instance* across every type and size — two Budget widgets on two home screens use
+  both slots. The cap is **live, not a high-water mark**: remove one from the home screen and the
+  slot frees immediately. Existing free users over the cap when this ships get their extras
+  locked (the 2 oldest keep working) — user chose this over grandfathering.
+
+  **Android's mechanism (`WidgetQuota.kt`):** nothing is persisted. `AppWidgetManager
+  .getAppWidgetIds()` across all 10 providers *is* the state; ids are sorted ascending (the
+  system allocates them from an incrementing counter, so ascending == placement order) and the
+  first 2 are allowed. Over-cap instances render a locked card deep-linking to the paywall. This
+  is what makes removal self-healing with zero migration.
+
+  ⚠️ **The critical bit: Android cannot refuse a placement.** The system widget picker
+  (long-press home screen) bypasses the app entirely, so the in-app picker's button gate is a
+  courtesy only — the cap is really enforced **at render time**, by the widget drawing a locked
+  card instead of its data. iOS has the same property (a user always adds widgets from the home
+  screen; there is no `requestPinAppWidget` equivalent at all), so **iOS must also enforce in the
+  timeline provider, not in `WidgetsView.swift`.**
+
+  ⚠️ **`WidgetKit` has no per-instance identity — the Android approach does not port.**
+  `WidgetCenter.shared.getCurrentConfigurations` gives `[WidgetInfo]`, and `WidgetInfo` exposes
+  only `kind`, `family`, and `configuration`. There is **no unique id per placed widget**, so two
+  medium Budget Ring widgets are indistinguishable and "lock the 3rd one" is not directly
+  expressible. Options, in preference order:
+  1. **Cap distinct `(kind, family)` pairs instead of instances** — sort the pairs by a fixed
+     order, allow the first 2; duplicates of the same pair share a fate. Closest workable
+     analogue, and it keeps removal self-healing. Cost: a user can place three copies of one
+     allowed pair for free.
+  2. Count-only: if `getCurrentConfigurations().count > 2`, lock *all* of them with a "remove
+     some" message. Honest but heavy-handed; avoid.
+
+  Whichever is picked, iOS **diverges from Android's per-instance rule** — record the decision
+  here, because the paywall copy must not promise a cap the platform doesn't enforce.
+
+  **Also required on iOS:** the premium flag must be readable from the widget extension (check
+  `Budgetty/Widget/WidgetSharing.swift` — the App Group store is the natural home) and timelines
+  must be reloaded when the entitlement changes, or a purchase won't unlock anything until the
+  next refresh.
+
+  **Scope note:** §10 above says "1 type on iOS vs 3 on Android" and was **stale twice over** —
+  iOS has 3 (`SpendingWidget`, `BudgetRingWidget`, `RecentReceiptsWidget`) and Android has **5**
+  (Budget, Summary, This Week, Scan, Top Categories). Corrected in §10 on 2026-07-22.
+
+  ---
+
+  **✅ THE iOS DECISION (recorded 2026-07-22, as this entry asked).** Option 1 from the list above:
+  **the cap counts distinct faces — `(kind, family)` pairs — not instances.** `WidgetQuota` (in
+  `Budgetty/Widget/` and duplicated byte-for-byte in `BudgettyWidget/`, since the two targets can't
+  share a file under the synchronized-folder layout, same as `WidgetSnapshot`).
+
+  What this means, and what the copy must therefore never promise:
+  - Two *sizes* of one widget are two faces and use both free slots.
+  - Three copies of the *same* face are one slot — a free user can place three identical Budget
+    Rings. Android, counting instances, would lock the third. **This is the accepted divergence**;
+    it's forced by WidgetKit, which gives `WidgetInfo` only kind/family/configuration and no
+    per-instance id.
+  - Android keeps the *oldest* widgets working (ascending system ids encode placement order). iOS
+    surfaces no placement order at all, so a fixed canonical rank (`kindOrder`) decides which two
+    stay lit. Arbitrary from the user's side, but deterministic — the same two survive every reload
+    instead of flickering — and still self-healing: remove one and its slot frees immediately.
+  - Enforced in each widget's **timeline provider** (`LockedWidgetView`), never in `WidgetsView` —
+    the home-screen picker never runs app code, so the in-app gate is courtesy only. The gallery's
+    `getSnapshot` is deliberately never locked, or the widget picker would preview a padlock.
+  - Fails **open**: an empty enumeration, or a missing premium flag in the App Group, renders the
+    data. A widget can be asked for a timeline before the system registers it, and locking someone
+    out on a half-known state is the worse failure.
+  - Entitlement reaches the extension through `WidgetQuota.premiumKey` in the App Group, written by
+    `WidgetSharing.publishPremium()`; `StoreManager` and the 11-tap tester unlock both call
+    `premiumDidChange()` so a purchase re-renders locked widgets immediately instead of hours later.
+
+  **Locked-card copy differs from Android on purpose.** Android says "Tap to upgrade" because it
+  deep-links to the paywall. iOS has no physical Info.plist (`GENERATE_INFOPLIST_FILE = YES`), so no
+  custom URL scheme is registered and a tap merely opens the app — the card says "Unlock more
+  widgets" instead, which is true. Same reason the Google SDK was ruled out (§13).
+
+  **Not device-verified**, and two things can only be proven there: that
+  `WidgetCenter.currentConfigurations()` answers from inside the extension, and that a real purchase
+  reloads the timelines. The decision logic itself is unit-tested (`WidgetQuotaTests`).
+
+  **Strings:** 8 new keys on Android × 16 locales (`widgets_slots_used`, `widgets_slots_full`,
+  `widgets_slots_unlimited`, `widgets_unlock`, `widget_locked_title`, `widget_locked_body`,
+  `paywall_benefit_widgets`, `paywall_benefit_widgets_detail`). The paywall detail line
+  **interpolates the enforcing constant** (`WidgetQuota.FREE_LIMIT`) rather than hardcoding "2" —
+  keep that on iOS so retuning the cap can't leave the copy stale.
+
+  **Paywall:** this makes **5 real unlocks + 1 "Coming soon"** on Android's shared benefits list.
+  iOS's paywall benefit list needs the same new row.
 
 ## iOS → Android (pending)
 
@@ -219,4 +508,24 @@ NB: Android's 4 options (DAY_MONTH_YEAR / DMY_SLASH / MDY_SLASH / ISO) differ fr
 
 ---
 
-*Last synced: 2026-07-15 (parity batch `9f08eef` ports §§1-5 and 7-9; REMAINING: §6 localization, §10 widgets-optional, and the Android-side date-format port) — Android `main`/`eb9a1b7` (+ unmerged `insights-questionnaire`) · iOS `android-parity`/`9f08eef`.*
+*Last synced: 2026-07-21 — full audit against both codebases (PARITY.md was 5 days stale and wrong in
+one place: the Account/paywall work had already merged on Android). Ported this pass: §11 category
+split and §12 per-user data isolation, both on iOS branch `android-parity-cats-user-isolation`. Newly
+found and still open: §13 Google Sign-In, §14 the two scan guards, plus §4's Account/paywall port and
+the 69 English-only iOS literals in LOCALIZATION_TODO.md. Confirmed NOT gaps: the dual-currency fix
+(server-side), Crashlytics (deliberately unmerged on iOS for the App Privacy label), and the
+platform-specific tooling. Android `main`/`d0db412` · iOS `main`/`90b3d0d`.*
+
+*Updated 2026-07-22 — closed the remaining feature gaps. Ported: §15 (the two missing premium gates —
+recurring-bill cap and accent themes), the Account trim half of §4, and the free-tier widget cap,
+across iOS branches `android-premium-parity` and `widget-free-cap`. Also fixed the paywall's
+hardcoded price arithmetic and corrected §10's stale widget counts. All copy came from Android's
+finished translations — 15 keys × 15 locales, nothing re-translated; the English-only list in
+LOCALIZATION_TODO.md gained the accent names (Android ships those untranslated too) and lost the two
+NotificationsView strings with that screen. **Two carried-forward risks:** the widget cap was ported
+from Android's `widget-free-cap` branch **before it merged**, so re-check it if that branch moves;
+and none of this is device-verified — what's left there is `WidgetCenter.currentConfigurations()`
+answering from inside the extension, and a real purchase reloading widget timelines. Remaining known
+gaps after this pass: Crashlytics (still deliberately unmerged, blocked on the App Privacy label),
+MetricKit + snapshot tests from QUALITY_TOOLING_TODO.md, and the English-only iOS literals.
+Android `main`/`fe136cd` · iOS `main`/`1165b6a`.*

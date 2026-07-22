@@ -20,3 +20,6 @@ xcuserdata/
 .swiftpm/xcode/package.xcworkspace/contents.xcworkspacedata
 
 # Keep: project.pbxproj and shared swiftpm/Package.resolved are tracked on purpose.
+
+.spm/
+*.xcresult

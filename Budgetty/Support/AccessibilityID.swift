@@ -17,6 +17,8 @@
 
 enum A11y {
     enum Login {
+        static let apple = "login_apple"
+        static let google = "login_google"
         static let email = "login_email"          // == Android LoginTagEmail
         static let password = "login_password"     // == Android LoginTagPassword
         static let signIn = "login_sign_in"        // == Android LoginTagSignIn
@@ -66,6 +68,7 @@ enum A11y {
     enum Budget {
         static let periodToggle = "budget_period_toggle"
         static let overall = "budget_overall"
+        static let recurringUpgrade = "budget_recurring_upgrade"
     }
 
     enum Insights {

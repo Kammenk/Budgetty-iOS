@@ -67,6 +67,7 @@ struct APIReceiptExtractor: ReceiptExtractor {
             )
         }
         if items.isEmpty { throw ExtractError.unreadable }
+        try Self.validate(resp, items: items)
 
         let discount = Decimal.fromDouble(resp.discount)
         let tax = Decimal.fromDouble(resp.tax)
@@ -101,6 +102,56 @@ struct APIReceiptExtractor: ReceiptExtractor {
             items: items + chargeItems, readable: true,
             printedSubtotal: printedSubtotal > 0 ? printedSubtotal + chargesTotal : nil
         )
+    }
+
+    // MARK: - Extraction guards (Android `HaikuReceiptExtractor.validateExtraction`)
+
+    /// Rejects an extraction that demonstrably misread the receipt, so a wrong basket never reaches
+    /// review. Client-side by necessity — the server returns its best effort and only the client knows
+    /// what a plausible basket looks like — which also means loosening these ships in an app release,
+    /// not a deploy.
+    /// `internal` rather than `private` so the guard tests can drive it directly — `@testable`
+    /// reaches internal, not private.
+    static func validate(_ resp: ExtractResponse, items: [ExtractedDraftItem]) throws {
+        // Article-count cross-check: capturing far fewer or more lines than the receipt itself prints
+        // ("N АРТИКУЛА") means we misread it.
+        //
+        // The printed count is EITHER product lines OR units, depending on the receipt format — Greek
+        // "ΣΥΝΟΛΟ ΕΙΔΩΝ" counts units, so a basket with multi-buy lines ("6 X 1,42") prints many more
+        // articles than it has lines. Accept whichever reading lands in band; only a count matching
+        // NEITHER is a genuine misread. Android learned this the hard way — its first version checked
+        // the line count alone and rejected legitimate multi-buy receipts (`1d12a44`).
+        let printedCount = resp.printedItemCount ?? 0
+        if printedCount >= Guards.minPrintedCountToCheck {
+            let units = items.reduce(0) { $0 + $1.quantity }
+            let inBand = { (n: Int) -> Bool in
+                Double(n) >= Double(printedCount) * Guards.minCountRatio
+                    && Double(n) <= Double(printedCount) * Guards.maxCountRatio
+            }
+            if !inBand(items.count) && !inBand(units) { throw ExtractError.unreadable }
+        }
+
+        // Money sanity: the lines, net of the discount the model itself reported, shouldn't overshoot
+        // the printed grand total by a wide margin. Deposits and fees only ever RAISE a total, so they
+        // can't trip this — a large overshoot means invented or duplicated lines.
+        let printedTotal = Decimal.fromDouble(resp.total)
+        guard printedTotal > 0 else { return }
+        let gross = items.reduce(Decimal.zero) { $0 + $1.price * Decimal($1.quantity) }
+        let overshoot = gross - Decimal.fromDouble(resp.discount) - printedTotal
+        if overshoot > max(printedTotal * Guards.maxOvershootRatio, Guards.maxOvershootAbs) {
+            throw ExtractError.unreadable
+        }
+    }
+
+    /// Thresholds mirror Android's, so a receipt is judged identically on both platforms.
+    private enum Guards {
+        /// Below this, the printed count is too small to be a reliable signal.
+        static let minPrintedCountToCheck = 3
+        static let minCountRatio = 0.6
+        static let maxCountRatio = 1.5
+        /// Lines may exceed the printed total by this fraction, or `maxOvershootAbs` — whichever is larger.
+        static let maxOvershootRatio = Decimal(string: "0.35")!
+        static let maxOvershootAbs = Decimal(string: "1.5")!
     }
 
     /// A charge amount worth materializing: rounded to cents, nil when missing or below the 5-cent
