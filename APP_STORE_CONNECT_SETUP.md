@@ -7,7 +7,12 @@ exactly** (`StoreManager.swift`) or the app can't find the products.
 |---|---|---|
 | **Product ID** (permanent — cannot be changed) | `com.budgetty.premium.yearly` | `com.budgetty.premium.monthly` |
 | Duration | 1 Year | 1 Month |
-| Price | €29.99 | €3.99 |
+| Price | €59.99 | €5.99 |
+
+⚠️ **These must match Google Play, and Play is the reference.** Play sells the same two products at
+**EUR 59.99 / EUR 5.99**. Verify against the Play Console before changing either store — **never**
+against `Budgetty.storekit` or paywall copy, which are local fixtures. Getting this backwards once
+put the wrong prices live (2026-07-22).
 
 Bundle ID: **`com.budgetty.Budgetty`**. StoreKit 2 is used, so **no App-Specific Shared Secret** is
 needed.
@@ -46,16 +51,18 @@ needed.
 ⚠️ Product IDs are permanent once saved — triple-check the spelling.
 
 ## 3. Pricing
-- [ ] Each subscription → **Subscription Prices → Add** → base region (e.g. Germany/EUR) → closest
-      point to **€29.99** (yearly) / **€3.99** (monthly). App Store Connect fills the other regions.
+- [ ] Each subscription → **Subscription Prices → Edit Price → "Recalculate prices for all countries
+      or regions"** → base region **Germany (EUR)** → **€59.99** (yearly) / **€5.99** (monthly).
+      App Store Connect fills the other 174 regions.
 
-⚠️ **Two paywall strings are hardcoded and only true at €29.99 / €3.99.** `PaywallView.planCard`
-renders the *price* from StoreKit, but the yearly row's `detail: "€2.50 / month"` and
-`badge: "BEST VALUE · SAVE 37%"` are literals — correct only for these amounts (29.99 ÷ 12 = €2.50;
-versus 12 × €3.99 = €47.88 a year, a 37% saving). **Price anything else and those two lines become
-false**, which is exactly the defect `Store/PremiumBenefits.swift` exists to prevent elsewhere on
-that screen. If the prices change, derive both from the loaded `Product`s rather than editing the
-literals — the same rule as the benefit list: never restate a number the system already knows.
+⚠️ **Apple's price is the customer-facing, tax-INCLUSIVE figure** (the separate *Proceeds* column is
+what you receive). Play is the opposite — its box takes a tax-*exclusive* number, which is why the
+same €59.99 is entered there as `49.99`. Don't copy a figure between the two consoles.
+
+The paywall no longer hardcodes anything: `PlanPricing` derives both the "/ mo" line and the saving
+badge from the loaded `Product`s, so re-pricing here can't leave stale copy. Note the saving differs
+per storefront because Apple's price points aren't proportional (the same ladder is ≈ −16% in USD and
+≈ −29% in EUR) — which is precisely why it must stay derived and never be restated as a literal.
 
 ## 4. Localization (shown to users)
 - [ ] Each subscription → **Add localization** (English at minimum):
@@ -91,8 +98,13 @@ literals — the same rule as the benefit list: never restate a number the syste
 - **Simulator testing needs none of this** — the bundled `Budgetty.storekit` config (selected in the
   shared scheme's Run options) drives the flow in the Simulator. Console + sandbox is only for
   real/TestFlight builds.
-- The app's fallback prices and the `.storekit` config already use €29.99 / €3.99, so the paywall
-  looks identical whether or not live products load.
+- ⚠️ **`Budgetty.storekit` is a TEST FIXTURE, not a record of what customers pay.** It's kept at
+  €59.99 / €5.99 to mirror production, but it is what the Simulator reads — so a sim run can never
+  contradict it, and it must never be used as evidence of a live price. The same goes for anything
+  in the app source. Prices live only in the two store consoles. (Treating this file as a source of
+  truth is what put the wrong prices live on 2026-07-22.)
+- The app has **no fallback prices**: when StoreKit hasn't loaded the products the paywall renders
+  "—" and the Subscribe button is disabled, rather than showing a number nobody is charged.
 - If products don't appear on device: check the Paid Apps agreement is Active, the bundle ID
   matches, every required field (including **Tax Category**) is filled, and the subscription status
   is at least "Ready to Submit." A product stuck at *Missing Metadata* is silently omitted from

@@ -13,8 +13,18 @@ import Testing
 @testable import Budgetty
 
 struct PlanPricingTests {
-    /// The prices the hardcoded copy was derived from: €29.99/yr really is €2.50/mo and 37% off.
-    /// Compared at currency precision, since that's what the paywall renders.
+    /// The prices actually shipping (€59.99/yr vs €5.99/mo, matching Google Play). Pinned here so
+    /// the live figures are written down somewhere a test can fail on — `Budgetty.storekit` looks
+    /// like it serves that purpose but is only a Simulator fixture.
+    @Test func matchesTheShippingPrices() {
+        #expect(cents(PlanPricing.perMonth(yearly: 59.99)) == Decimal(string: "5.00")!)
+        #expect(PlanPricing.savingsPercent(yearly: 59.99, monthly: 5.99) == 16)
+    }
+
+    /// The prices the old hardcoded copy was derived from: €29.99/yr really was €2.50/mo and 37%
+    /// off. Kept as a regression case — those literals were only ever true at these amounts, which
+    /// is the whole reason the figures are computed now. Compared at currency precision, since
+    /// that's what the paywall renders.
     @Test func matchesTheFiguresTheOldCopyHardcoded() {
         #expect(cents(PlanPricing.perMonth(yearly: 29.99)) == Decimal(string: "2.50")!)
         #expect(PlanPricing.savingsPercent(yearly: 29.99, monthly: 3.99) == 37)

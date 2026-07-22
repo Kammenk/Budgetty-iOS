@@ -2,8 +2,9 @@
 //  PlanPricing.swift
 //  Budgetty
 //
-//  The paywall's derived figures — "€2.50 / mo" and the "−37%" badge — as pure arithmetic over the
-//  loaded products' prices.
+//  The paywall's derived figures — the "/ mo" line and the savings badge — as pure arithmetic over
+//  the loaded products' prices. At the shipping prices (€59.99/yr, €5.99/mo) that renders
+//  "€5.00 / mo" and "−16%".
 //
 //  These used to be hardcoded strings sitting next to a StoreKit-supplied price, so re-pricing the
 //  subscription in App Store Connect would have made the paywall quietly lie. Keeping the maths here
