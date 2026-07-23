@@ -561,3 +561,16 @@ once the app is live.
 Bonus verification this pass: with StoreKit products actually loading, the derived paywall pricing
 proved out end-to-end — $49.99/yr rendered "$4.17 / mo" and "BEST VALUE · −16%" against a $4.99
 monthly, both computed, neither typed.*
+
+*Updated 2026-07-23 — **build 8 shipped to TestFlight**, the first build carrying Crashlytics (iOS
+`main`/`50cdd54`: `CURRENT_PROJECT_VERSION` → 8 at all six pbxproj sites, plus a string-catalog
+re-extraction of the accent/Crashlytics/paywall keys — 9 keys added, none re-translated). This closes
+the gate every 07-22 entry above ended on: the App Store Connect **App Privacy label is published**
+(verified live on ASC 2026-07-23 — Crash Data + Other Diagnostic Data under Diagnostics, App
+Functionality, not linked, not tracking), and the shared privacy policy's Apple-billing fix (`23e996d`)
+is deployed to Firebase Hosting — so nothing about crash reporting is undeclared for the store. Build 8
+processed clean ("Ready to Submit"), auto-distributed to the Internal group, and is already installed
+and running on a tester's iPhone 16 Pro / iOS 26.5.2 — iOS internal testing now has **2 real testers,
+no longer zero**. ⚠️ Build 7 was archived 2026-07-22 but never uploaded, so 8 was the first free build
+number — check an archive's CFBundleVersion before assuming one is free. No feature-parity change:
+build 8 is compliance/tooling, not a new feature. Android `main`/`22009e2` · iOS `main`/`50cdd54`.*
