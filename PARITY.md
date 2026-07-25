@@ -575,13 +575,12 @@ no longer zero**. ⚠️ Build 7 was archived 2026-07-22 but never uploaded, so 
 number — check an archive's CFBundleVersion before assuming one is free. No feature-parity change:
 build 8 is compliance/tooling, not a new feature. Android `main`/`22009e2` · iOS `main`/`50cdd54`.*
 
-*Port brief 2026-07-25 — **three period/money-flow changes, all still on Android feature branches
-(NOT yet on `main`)**, from a tester's feedback. Spec them from the ViewModels/repos as usual; treat
-each as independent (the three branches touch overlapping files and will conflict with each other on
-merge), and — per the `widget-free-cap` precedent above — re-verify against Android `main` before
-shipping, since none is merged or device-verified yet. Port each as its own iOS branch.*
+*Port brief 2026-07-25 (updated — now MERGED + RELEASED) — **three period/money-flow changes from a
+tester's feedback, all merged to Android `main` and shipped in Android release 10.8.0/vc1080 (tag
+`v10.8.0`)**; emulator-verified (Pixel_6), not physical-device-run. Spec them from the ViewModels/repos
+as usual and port each as its own iOS branch. Nothing is ported to iOS yet.*
 
-***1. Money-flow back-projection fix** (Android branch `fix-money-flow-no-backprojection`, `14d5731`).
+***1. Money-flow back-projection fix** (Android `bd7bb21`, was branch `fix-money-flow-no-backprojection`).
 The Insights "money in vs out" card and History's Budgets snapshot scaled a recurring income/bill by
 the *number of months in the selected window*, so a multi-month view (e.g. first half-year) invented
 income for months the entry never existed in — a salary added in July showing 6× across Jan–Jun.
@@ -595,8 +594,8 @@ Insights money-flow totals through the selected period's actual window instead o
 factor`. Find the iOS analogues of that recurring-scaling math and apply the same `createdAt` clip.
 Unit-tested on Android (`RecurringWindowAmountTest`).*
 
-***2. Configurable pay-cycle month — "Month starts on"** (Android branch `custom-month-start-day`,
-`16b46ec`). New setting `monthStartDay` (Int 1–31, default 1 = calendar month) so the financial month
+***2. Configurable pay-cycle month — "Month starts on"** (Android `8a49680`, was branch
+`custom-month-start-day`). New setting `monthStartDay` (Int 1–31, default 1 = calendar month) so the financial month
 begins on the user's pay day. Core helper `PayCycle.month(today, startDay, offset)` → inclusive
 start/end dates of the cycle `offset` steps from the one containing `today`; the cycle containing
 today starts on this-month's `startDay` once it's arrived, else last-month's; a 29/30/31 pay day
@@ -610,9 +609,55 @@ changes. Settings UI: a "Month starts on" row → picker of 1–31 (1 labelled "
 Default 1 means existing users see no change until they opt in. Unit-tested (`PayCycleTest`: paging,
 the before/after-pay-day boundary, short-month clamping).*
 
-***3. All-time (lifetime) period filter** (Android branch `all-time-filter`, `5551b2f`). Home gains an
+***3. All-time (lifetime) period filter** (Android `7dda9ae`, was branch `all-time-filter`). Home gains an
 "All time" preset spanning every recorded transaction through today; its daily-average anchors to the
 **first transaction** (not the epoch), and it has **no** period-over-period comparison (previous
 window is empty). Insights gains an "All time" entry in the period-stepper dropdown that **reuses the
 custom-range window** (earliest transaction → today) — deliberately, so the trend buckets and averages
 stay bounded to real data instead of blowing up from 1970. New string `period_all_time`.*
+
+*Released as **Android 10.8.0 / vc1080** on 2026-07-25 (release commit `009c24d`, tag `v10.8.0`, signed
+AAB built — pending Play upload to the Closed "Alpha" track). It supersedes 10.7.1/vc1071 (built but
+never uploaded) and carries its receipt/breakdown fixes forward. Emulator proof (Pixel_6): pay-cycle
+"Month starts on = 15" → Home "This month" 70 → 30; All-time → 370 across all history; a past
+half-year showed income 6,000 not 18,000 (salary added mid-window). Play release notes: "Month starts
+on" pay-cycle, "All time" view, and the income/bills back-projection fix (full text in the Android
+`CHANGELOG.md` 10.8.0 entry). Android `main`/`009c24d` (tag `v10.8.0`) · iOS `main`/`6311e02` (unchanged
+— nothing ported yet).*
+
+*iOS port 2026-07-25 — **all three PORTED on one branch `period-money-flow-parity`** (they're
+interdependent and shipped together in Android 10.8.0, so a single branch, not three). New
+`Budgetty/Support/PayCycle.swift` (a Swift port of Android's `PayCycle`, same five cases) +
+`BudgettyTests/PayCycleTests.swift` (**6/6 pass**, mirrors `PayCycleTest`). Build clean; sim-verified
+on iPhone 17 Pro with sample data.*
+
+- ***#2 pay-cycle month — full port.*** `SettingsKey.monthStartDay` + an Account → Preferences
+  "Month starts on" picker (1–31; "1 (calendar month)"), threaded through `InsightsPeriod.interval`
+  (the `.month` case only — week/quarter/half stay calendar-aligned, matching Android's scope), Home
+  (`monthReceipts`/`monthLabel`/`daysProgress`), Budget (`spent`/`categorySpent`),
+  `CategoryBudgetSheet`, the in-app `WidgetsView` preview, and the published `WidgetSharing` snapshot.
+  Reactive via `@AppStorage(SettingsKey.monthStartDay)` in each view; non-view callers read
+  `PayCycle.startDay` from `UserDefaults` (the `DateFormatOption.current` pattern). **Proof:** launching
+  with `monthStartDay = 28` relabelled the Home hero **July → June 2026** and shifted **25 of 31 → 28
+  of 30 days** (Jul 25 sits in the cycle Jun 28–Jul 27); spend unchanged, as every sample receipt falls
+  inside it.
+- ***#1 became a smaller, honest fix — NOT Android's back-projection fix.*** iOS's money-flow cards
+  (`IncomeCards.swift`) are **monthly-only** — income/bills always use `monthlyEquivalent`, never
+  scaled by the selected period — so Android's 6×-a-salary back-projection **cannot occur here** and
+  there is no `periodAmount`/`windowAmount` to correct. The real (small) iOS bug was that the card was
+  fed the *selected period's* spend while income/bills stayed monthly, going incoherent in any
+  non-month view. Fix (owner-approved): feed it the current **pay-cycle month's** spend
+  (`currentMonthSpent`), a consistent "this month" snapshot in every period. `windowAmount` was
+  deliberately **not** ported.
+- ***#3 is Insights-only — no Home "All time" preset.*** iOS Home has **no period filter at all**
+  (hard-scoped to the current month, no This/Last/Last-3/Last-6 presets like Android), so the Home
+  half of the change has no analogue and was not built — adding a Home period filter is a separate
+  feature needing a mockup, and PARITY never flagged its absence, so it's treated as intentional iOS
+  design. Ported: an **"All time"** item (∞) in the Insights period menu that sets a custom range
+  earliest-receipt → today, reusing the custom-range path exactly as Android's Insights entry does.
+- **⚠️ Not tap-verified** (the MCP simulator panel's `xcode-select` preflight is stale-blocked on this
+  Mac, so no input injection — drove `simctl` screenshots instead): the Account "Month starts on"
+  **picker** interaction and the Insights **"All time" menu** item. Both build clean and are
+  near-verbatim copies of working patterns (`dateFormatPicker`; the custom-range menu button). A
+  physical-device / tap pass is the remaining step, consistent with the branch not yet being merged.
+  Android `main`/`009c24d` · iOS branch `period-money-flow-parity` (off `6311e02`, uncommitted).*
