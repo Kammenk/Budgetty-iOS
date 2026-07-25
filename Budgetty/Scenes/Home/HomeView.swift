@@ -19,6 +19,9 @@ struct HomeView: View {
 
     @AppStorage(HomeLayoutStore.orderKey) private var orderRaw = ""
     @AppStorage(HomeLayoutStore.hiddenKey) private var hiddenRaw = HomeLayoutStore.defaultHidden
+    /// The pay day the financial month starts on (1 = calendar month); the hero's "this month"
+    /// figures follow it. Re-read here so the card updates live when the setting changes.
+    @AppStorage(SettingsKey.monthStartDay) private var monthStartDay = 1
     @State private var showCustomize = false
 
     private var visibleSections: [HomeSection] {
@@ -37,8 +40,8 @@ struct HomeView: View {
     }
 
     private var monthReceipts: [Receipt] {
-        let cal = Calendar.current
-        return receipts.filter { cal.isDate($0.createdAt, equalTo: .now, toGranularity: .month) }
+        let window = PayCycle.monthInterval(startDay: monthStartDay)
+        return receipts.filter { window.contains($0.createdAt) }
     }
 
     private var monthSpent: Decimal { monthReceipts.reduce(.zero) { $0 + $1.paidTotal } }
@@ -136,7 +139,7 @@ struct HomeView: View {
                     .foregroundStyle(.white.opacity(0.8))
                 Spacer()
                 // A static period label — no chevron, so it doesn't read as a tappable control.
-                Text(Self.monthLabel(.now)).font(.caption).fontWeight(.semibold)
+                Text(Self.monthLabel(.now, startDay: monthStartDay)).font(.caption).fontWeight(.semibold)
                     .foregroundStyle(.white)
                     .padding(.horizontal, 10).padding(.vertical, 4)
                     .background(.white.opacity(0.2), in: RoundedRectangle(cornerRadius: 8))
@@ -151,7 +154,7 @@ struct HomeView: View {
             }
             .padding(.vertical, 4)
 
-            Text("\(String(localized: "\(monthReceipts.count) receipts")) · \(Self.daysProgress())")
+            Text("\(String(localized: "\(monthReceipts.count) receipts")) · \(Self.daysProgress(startDay: monthStartDay))")
                 .font(.footnote)
                 .foregroundStyle(.white.opacity(0.7))
                 .padding(.bottom, 14)
@@ -415,15 +418,21 @@ struct HomeView: View {
         return (value / total as NSDecimalNumber).doubleValue
     }
 
-    static func monthLabel(_ date: Date) -> String {
-        let f = DateFormatter(); f.dateFormat = "MMMM yyyy"; return f.string(from: date)
+    /// "June 2026" — named for the pay-cycle month's opening month (so a cycle running 25 Jun–24 Jul
+    /// reads as June), which is the calendar month when `startDay == 1`.
+    static func monthLabel(_ date: Date, startDay: Int = PayCycle.startDay) -> String {
+        let start = PayCycle.month(date, startDay: startDay).start
+        let f = DateFormatter(); f.dateFormat = "MMMM yyyy"; return f.string(from: start)
     }
 
-    static func daysProgress() -> String {
+    /// "12 of 30 days" — day count within the current pay-cycle month, not the calendar month.
+    static func daysProgress(startDay: Int = PayCycle.startDay) -> String {
         let cal = Calendar.current
-        let day = cal.component(.day, from: .now)
-        let range = cal.range(of: .day, in: .month, for: .now)?.count ?? 30
-        return String(localized: "\(day) of \(range) days")
+        let (start, end) = PayCycle.month(.now, startDay: startDay)
+        let startDay0 = cal.startOfDay(for: start)
+        let total = (cal.dateComponents([.day], from: startDay0, to: cal.startOfDay(for: end)).day ?? 29) + 1
+        let elapsed = min(total, (cal.dateComponents([.day], from: startDay0, to: cal.startOfDay(for: .now)).day ?? 0) + 1)
+        return String(localized: "\(elapsed) of \(total) days")
     }
 }
 

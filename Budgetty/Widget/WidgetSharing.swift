@@ -34,7 +34,10 @@ enum WidgetSharing {
         let cal = Calendar.current
         let receipts = (try? context.fetch(
             FetchDescriptor<Receipt>(sortBy: [SortDescriptor(\.createdAt, order: .reverse)]))) ?? []
-        let month = receipts.filter { cal.isDate($0.createdAt, equalTo: .now, toGranularity: .month) }
+        // Honor the user's pay-cycle "Month starts on" setting so the widgets agree with the app.
+        let startDay = PayCycle.startDay
+        let monthWindow = PayCycle.monthInterval(startDay: startDay, calendar: cal)
+        let month = receipts.filter { monthWindow.contains($0.createdAt) }
         let spent = month.reduce(Decimal.zero) { $0 + $1.paidTotal }
 
         let budgets = (try? context.fetch(FetchDescriptor<Budget>())) ?? []
@@ -60,7 +63,7 @@ enum WidgetSharing {
         }
 
         let snapshot = WidgetSnapshot(
-            monthLabel: mf.string(from: .now),
+            monthLabel: mf.string(from: PayCycle.month(startDay: startDay, calendar: cal).start),
             monthSpent: (spent as NSDecimalNumber).doubleValue,
             monthlyBudget: (monthlyBudget as NSDecimalNumber).doubleValue,
             currencyCode: UserDefaults.standard.string(forKey: SettingsKey.currency) ?? "EUR",

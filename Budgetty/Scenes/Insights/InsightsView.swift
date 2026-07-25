@@ -21,6 +21,9 @@ struct InsightsView: View {
     @Query private var budgets: [Budget]
     @Query private var storedCategories: [Category]
     @AppStorage("insights.breakdownAllCats") private var breakdownAllCats = false
+    /// The pay-cycle start day; the money-flow snapshot and the MONTH period follow it (re-read here
+    /// so the screen re-renders when "Month starts on" changes).
+    @AppStorage(SettingsKey.monthStartDay) private var monthStartDay = 1
 
     /// The window the whole screen is scoped to; the stepper walks it one unit at a time.
     @State private var period: InsightsPeriod = {
@@ -107,7 +110,16 @@ struct InsightsView: View {
     private var incomeCards: some View {
         IncomeInsightsCards(income: recurring.filter(\.isIncome),
                             bills: recurring.filter { !$0.isIncome },
-                            monthSpent: totalSpent)
+                            monthSpent: currentMonthSpent)
+    }
+
+    /// Spend in the current pay-cycle month, independent of the selected period. The money-flow cards
+    /// are a fixed "this month" snapshot (income/bills are monthly equivalents), so pairing them with
+    /// the selected period's spend would mismatch the windows in any non-month view — a half-year
+    /// selection would show six months of spend against one month of income.
+    private var currentMonthSpent: Decimal {
+        let window = PayCycle.monthInterval(startDay: monthStartDay)
+        return receipts.filter { window.contains($0.createdAt) }.reduce(.zero) { $0 + $1.paidTotal }
     }
 
     /// iPhone: one column, in the user's chosen order with hidden sections removed.
@@ -268,6 +280,17 @@ struct InsightsView: View {
                 }
             }
             Divider()
+            // "All time" reuses the custom-range window, bounded to the earliest recorded receipt so
+            // the trend and averages stay meaningful (no epoch-to-today blow-up). Reuses the custom
+            // path so the arrows disable and the pill reads as a span, matching Android.
+            Button {
+                // receipts are newest-first, so `.last` is the earliest; clamp below today so a
+                // future-dated receipt can't invert the range.
+                let earliest = min(receipts.last?.createdAt ?? .now, .now)
+                customRange = earliest ... .now
+            } label: {
+                Label("All time", systemImage: "infinity")
+            }
             Button {
                 if case .custom(let s, let e) = period { customRange = s...e }
                 showCustomSheet = true

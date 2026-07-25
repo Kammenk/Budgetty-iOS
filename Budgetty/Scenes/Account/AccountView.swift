@@ -18,6 +18,7 @@ struct AccountView: View {
     @AppStorage(SettingsKey.currency) private var currency = "EUR"
     @AppStorage(SettingsKey.language) private var language = "system"
     @AppStorage(SettingsKey.dateFormat) private var dateFormatRaw = DateFormatOption.system.rawValue
+    @AppStorage(SettingsKey.monthStartDay) private var monthStartDay = 1
     @AppStorage(SettingsKey.faceID) private var faceID = false
     @AppStorage(SettingsKey.crashReporting) private var crashReporting = true
     @AppStorage(SettingsKey.premium) private var premium = false
@@ -36,6 +37,10 @@ struct AccountView: View {
 
     private var appearance: AppearancePref { AppearancePref(rawValue: appearanceRaw) ?? .system }
     private var dateFormat: DateFormatOption { DateFormatOption(rawValue: dateFormatRaw) ?? .system }
+    /// Compact value on the "Month starts on" row: the plain day, or "1 (calendar month)" for the default.
+    private var monthStartLabel: String {
+        monthStartDay == 1 ? String(localized: "1 (calendar month)") : "\(monthStartDay)"
+    }
 
     var body: some View {
         ScrollView {
@@ -206,6 +211,14 @@ struct AccountView: View {
             NavigationLink { dateFormatPicker } label: {
                 row("Date format", "calendar", Color(argb: 0xFFFF9500)) {
                     value(dateFormat.settingLabel)
+                    chevron
+                }
+            }
+            .buttonStyle(.plain)
+            divider
+            NavigationLink { monthStartPicker } label: {
+                row("Month starts on", "calendar.badge.clock", Color(argb: 0xFFAF52DE)) {
+                    value(monthStartLabel)
                     chevron
                 }
             }
@@ -382,6 +395,34 @@ struct AccountView: View {
         }
         .underFloatingDock(reportingScroll: false)
         .navigationTitle("Date format")
+        .navigationBarTitleDisplayMode(.inline)
+    }
+
+    /// "Month starts on" — the pay day the financial month begins (1–31; 1 = calendar month). Applies
+    /// live: every screen that shows a monthly figure reads `@AppStorage(SettingsKey.monthStartDay)`.
+    private var monthStartPicker: some View {
+        List {
+            Section {
+                ForEach(1...31, id: \.self) { day in
+                    Button {
+                        monthStartDay = day
+                    } label: {
+                        HStack {
+                            Text(day == 1 ? String(localized: "1 (calendar month)") : "\(day)")
+                                .foregroundStyle(Palette.label)
+                            Spacer()
+                            if day == monthStartDay {
+                                Image(systemName: "checkmark").foregroundStyle(Palette.tint).fontWeight(.semibold)
+                            }
+                        }
+                    }
+                }
+            } footer: {
+                Text("The day your financial month begins — set it to your pay day. Shifts “this month” totals, the monthly budget and the Insights month view. Weekly, quarterly and half-year stay calendar-aligned.")
+            }
+        }
+        .underFloatingDock(reportingScroll: false)
+        .navigationTitle("Month starts on")
         .navigationBarTitleDisplayMode(.inline)
     }
 

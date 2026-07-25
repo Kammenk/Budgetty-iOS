@@ -29,6 +29,9 @@ struct BudgetView: View {
     @Query(sort: \Recurring.createdAt) private var recurring: [Recurring]
 
     @AppStorage(SettingsKey.premium) private var premium = false
+    /// The pay day the financial month starts on (1 = calendar month); the monthly budget and the
+    /// per-category bars scope to it. Re-read here so the bars recompute when the setting changes.
+    @AppStorage(SettingsKey.monthStartDay) private var monthStartDay = 1
 
     @State private var period: BudgetPeriod = .monthly
     @State private var showPaywall = false
@@ -109,17 +112,23 @@ struct BudgetView: View {
     private var allItems: [LineItem] { receipts.flatMap(\.items) }
 
     private var spent: Decimal {
-        let cal = Calendar.current
-        let granularity: Calendar.Component = isWeekly ? .weekOfYear : .month
+        if isWeekly {
+            let cal = Calendar.current
+            return receipts
+                .filter { cal.isDate($0.createdAt, equalTo: .now, toGranularity: .weekOfYear) }
+                .reduce(.zero) { $0 + $1.paidTotal }
+        }
+        // The monthly budget resets on the user's pay day (see PayCycle); weekly stays calendar-aligned.
+        let window = PayCycle.monthInterval(startDay: monthStartDay)
         return receipts
-            .filter { cal.isDate($0.createdAt, equalTo: .now, toGranularity: granularity) }
+            .filter { window.contains($0.createdAt) }
             .reduce(.zero) { $0 + $1.paidTotal }
     }
 
     private func categorySpent(_ group: String) -> Decimal {
-        let cal = Calendar.current
+        let window = PayCycle.monthInterval(startDay: monthStartDay)
         return allItems
-            .filter { cal.isDate($0.createdAt, equalTo: .now, toGranularity: .month) }
+            .filter { window.contains($0.createdAt) }
             .filter { Categories.groupOf($0.category).caseInsensitiveCompare(group) == .orderedSame
                 || $0.category.caseInsensitiveCompare(group) == .orderedSame }
             .reduce(.zero) { $0 + $1.lineTotal }

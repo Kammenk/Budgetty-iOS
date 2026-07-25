@@ -14,6 +14,8 @@ struct CategoryBudgetSheet: View {
     @Environment(\.modelContext) private var context
     @Environment(\.dismiss) private var dismiss
     @AppStorage(SettingsKey.currency) private var currency = "EUR"
+    /// The pay day the financial month starts on; the "spent" figures match the Budget screen's bars.
+    @AppStorage(SettingsKey.monthStartDay) private var monthStartDay = 1
 
     @Query private var budgets: [Budget]
     @Query(sort: \Receipt.createdAt, order: .reverse) private var receipts: [Receipt]
@@ -91,9 +93,9 @@ struct CategoryBudgetSheet: View {
     }
 
     private func spent(_ name: String) -> Decimal {
-        let cal = Calendar.current
+        let window = PayCycle.monthInterval(startDay: monthStartDay)
         return receipts.flatMap(\.items)
-            .filter { cal.isDate($0.createdAt, equalTo: .now, toGranularity: .month) }
+            .filter { window.contains($0.createdAt) }
             .filter { $0.category.caseInsensitiveCompare(name) == .orderedSame }
             .reduce(.zero) { $0 + $1.lineTotal }
     }

@@ -13,16 +13,18 @@ struct WidgetsView: View {
     @Query(sort: \Receipt.createdAt, order: .reverse) private var receipts: [Receipt]
     @Query private var budgets: [Budget]
     @AppStorage(SettingsKey.premium) private var premium = false
+    /// The pay day the financial month starts on; the previews match the real widgets' pay-cycle month.
+    @AppStorage(SettingsKey.monthStartDay) private var monthStartDay = 1
 
     /// Faces currently on a home screen, for the slots caption. Read on appear — iOS gives no
     /// change notification for placements, and this screen is short-lived enough not to need one.
     @State private var placed: [WidgetSlot] = []
     @State private var showPaywall = false
 
+    private var monthWindow: DateInterval { PayCycle.monthInterval(startDay: monthStartDay) }
+    private var monthReceipts: [Receipt] { receipts.filter { monthWindow.contains($0.createdAt) } }
     private var monthSpent: Decimal {
-        let cal = Calendar.current
-        return receipts.filter { cal.isDate($0.createdAt, equalTo: .now, toGranularity: .month) }
-            .reduce(.zero) { $0 + $1.paidTotal }
+        monthReceipts.reduce(.zero) { $0 + $1.paidTotal }
     }
     private var monthlyBudget: Decimal? { budgets.first { $0.key == Budget.monthlyKey }?.amount }
 
@@ -99,7 +101,7 @@ struct WidgetsView: View {
                 Spacer()
                 Text(monthSpent.formatMoney()).font(.title2).fontWeight(.bold).foregroundStyle(.white)
                     .minimumScaleFactor(0.6).lineLimit(1)
-                Text("\(receipts.filter { Calendar.current.isDate($0.createdAt, equalTo: .now, toGranularity: .month) }.count) receipts")
+                Text("\(monthReceipts.count) receipts")
                     .font(.caption2).foregroundStyle(.white.opacity(0.7))
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)

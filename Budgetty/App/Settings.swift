@@ -13,6 +13,8 @@ enum SettingsKey {
     static let currency = "pref.currency"
     static let language = "pref.language"
     static let dateFormat = "pref.dateFormat"
+    /// The pay day the financial "month" starts on (1–31; 1 = calendar month). See `PayCycle`.
+    static let monthStartDay = "pref.monthStartDay"
     static let accent = "pref.accent"             // Premium accent theme (see AccentOption/AppTheme)
     static let faceID = "pref.faceID"
     /// Crashlytics collection — default-ON with an opt-out toggle (see `CrashReporting`).

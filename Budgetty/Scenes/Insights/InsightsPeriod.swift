@@ -52,10 +52,9 @@ enum InsightsPeriod: Equatable {
                 let end = cal.date(byAdding: .weekOfYear, value: 1, to: start) ?? start
                 return DateInterval(start: start, end: end)
             case .month:
-                let base = cal.dateInterval(of: .month, for: now)?.start ?? now
-                let start = cal.date(byAdding: .month, value: offset, to: base) ?? base
-                let end = cal.date(byAdding: .month, value: 1, to: start) ?? start
-                return DateInterval(start: start, end: end)
+                // The financial month runs from the user's pay day (`monthStartDay`); startDay 1
+                // reduces to the plain calendar month, so the default is unchanged.
+                return PayCycle.monthInterval(now, offset: offset, calendar: cal)
             case .quarter:
                 let c = cal.dateComponents([.year, .month], from: now)
                 let firstMonth = ((c.month! - 1) / 3) * 3 + 1
