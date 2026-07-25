@@ -625,8 +625,9 @@ on" pay-cycle, "All time" view, and the income/bills back-projection fix (full t
 `CHANGELOG.md` 10.8.0 entry). Android `main`/`009c24d` (tag `v10.8.0`) · iOS `main`/`6311e02` (unchanged
 — nothing ported yet).*
 
-*iOS port 2026-07-25 — **all three PORTED on one branch `period-money-flow-parity`** (they're
-interdependent and shipped together in Android 10.8.0, so a single branch, not three). New
+*iOS port 2026-07-25 — **all three PORTED, MERGED to iOS `main` + pushed `origin/main`** (port code
+`d756855`, on the now-merged branch `period-money-flow-parity`; they're interdependent and shipped
+together in Android 10.8.0, so a single branch, not three). New
 `Budgetty/Support/PayCycle.swift` (a Swift port of Android's `PayCycle`, same five cases) +
 `BudgettyTests/PayCycleTests.swift` (**6/6 pass**, mirrors `PayCycleTest`). Build clean; sim-verified
 on iPhone 17 Pro with sample data.*
@@ -659,5 +660,6 @@ on iPhone 17 Pro with sample data.*
   Mac, so no input injection — drove `simctl` screenshots instead): the Account "Month starts on"
   **picker** interaction and the Insights **"All time" menu** item. Both build clean and are
   near-verbatim copies of working patterns (`dateFormatPicker`; the custom-range menu button). A
-  physical-device / tap pass is the remaining step, consistent with the branch not yet being merged.
-  Android `main`/`009c24d` · iOS branch `period-money-flow-parity` (off `6311e02`, uncommitted).*
+  physical-device / tap pass is the only remaining verification step (the port merged without it, as
+  the branch convention allows).
+  Android `main`/`009c24d` · iOS `main`/`2612555` (`d756855` port + `2612555` a pbxproj-comment restore).*
