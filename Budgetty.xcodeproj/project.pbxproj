@@ -513,6 +513,9 @@
 				CURRENT_PROJECT_VERSION = 8;
 				DEVELOPMENT_TEAM = 6J95GYU5VQ;
 				ENABLE_PREVIEWS = YES;
+				/* Crashlytics' upload-symbols needs to read the dSYM and reach the network, which the
+				   script sandbox forbids. Scoped to Release only — Debug keeps sandboxing on, and the
+				   phase exits immediately there. */
 				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
