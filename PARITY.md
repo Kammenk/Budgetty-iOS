@@ -577,8 +577,8 @@ build 8 is compliance/tooling, not a new feature. Android `main`/`22009e2` · iO
 
 *Port brief 2026-07-25 (updated — now MERGED + RELEASED) — **three period/money-flow changes from a
 tester's feedback, all merged to Android `main` and shipped in Android release 10.8.0/vc1080 (tag
-`v10.8.0`)**; emulator-verified (Pixel_6), not physical-device-run. Spec them from the ViewModels/repos
-as usual and port each as its own iOS branch. Nothing is ported to iOS yet.*
+`v10.8.0`)**; emulator-verified (Pixel_6), not physical-device-run. Spec'd from the ViewModels/repos.
+**All three are now ported to iOS and merged to iOS `main`** — see the "iOS port 2026-07-25" record at the bottom of this brief.*
 
 ***1. Money-flow back-projection fix** (Android `bd7bb21`, was branch `fix-money-flow-no-backprojection`).
 The Insights "money in vs out" card and History's Budgets snapshot scaled a recurring income/bill by
@@ -622,8 +622,8 @@ never uploaded) and carries its receipt/breakdown fixes forward. Emulator proof 
 "Month starts on = 15" → Home "This month" 70 → 30; All-time → 370 across all history; a past
 half-year showed income 6,000 not 18,000 (salary added mid-window). Play release notes: "Month starts
 on" pay-cycle, "All time" view, and the income/bills back-projection fix (full text in the Android
-`CHANGELOG.md` 10.8.0 entry). Android `main`/`009c24d` (tag `v10.8.0`) · iOS `main`/`6311e02` (unchanged
-— nothing ported yet).*
+`CHANGELOG.md` 10.8.0 entry). Android `main`/`009c24d` (tag `v10.8.0`) · iOS `main`/`d4cfee3` (all three
+ported — see the "iOS port 2026-07-25" note below).*
 
 *iOS port 2026-07-25 — **all three PORTED, MERGED to iOS `main` + pushed `origin/main`** (port code
 `d756855`, on the now-merged branch `period-money-flow-parity`; they're interdependent and shipped
