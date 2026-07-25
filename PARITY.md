@@ -663,3 +663,63 @@ on iPhone 17 Pro with sample data.*
   physical-device / tap pass is the only remaining verification step (the port merged without it, as
   the branch convention allows).
   Android `main`/`009c24d` · iOS `main`/`2612555` (`d756855` port + `2612555` a pbxproj-comment restore).*
+
+---
+
+## Android → iOS — budgeting/saving parity batch (2026-07-25, owner-directed)
+
+*Owner directive: **budgeting & saving features must be identical on both platforms** — only platform-native
+differences may diverge (Sign in with Apple, Face ID lock, Liquid Glass). See the Android memory
+`cross-platform-parity-principle-2026-07`. Six items below. #1–#4 make iOS match Android's **existing**
+behavior (Android is the spec, no Android change); #5–#6 are **new features added to BOTH** (Android built in
+this batch). Port from the Android ViewModels/repos as usual. Designs: mockups needed for #3/#4/#5/#6 — being
+created in the Budgetty design project; match the Liquid Glass mockups when they land.*
+
+***1. Money-flow / savings cards → make period-scaled (currently monthly-only).*** iOS `IncomeCards.swift`
+computes income/bills from a fixed `monthlyEquivalent` and pairs them with `currentMonthSpent`, so on
+quarter / half-year / all-time / custom the cards still show **one month** while the rest of Insights scales.
+Android scales them to the selected period: income & bills go through `RecurringMath.windowAmount(windowStart,
+windowEnd)` (per-month rate × eligible whole months in the window, **clipped to the entry's `createdAt`
+month**; partial windows scale by days ÷ 30.4375), and the paired spend is the selected period's actual spend.
+Port that: make money-in-vs-out, savings-rate, where-your-income-goes and income-by-source period-scaled — which
+**requires porting the `windowAmount` createdAt-clip** (Android `bd7bb21`) so a multi-month view doesn't
+back-project a just-added salary. Upcoming-bills stays date-based. Android ref: `InsightsViewModel.recurringInsights`
++ `ui/util/RecurringMath.windowAmount`.
+
+***2. History "Budgets" tab → make time-scoped (currently a live plan mirror).*** iOS's Budgets tab mirrors the
+*current* plan (`monthlyEquivalent`, no window). Android scopes it to the History Date filter: `periodIncome` /
+`periodBills` via `windowAmount(windowStart, windowEnd)`, section headers keep the per-month rate. Make iOS
+scope to the selected History window the same way. Android ref: `HistoryViewModel` (`budgetPeriod` → `windowAmount`).
+
+***3. Home period filter (iOS has none).*** iOS Home is hard-scoped to the current month (static label,
+`HomeView.swift:141`). Android's Home has a period filter — This month / Last month / Last 3 / Last 6 / **All
+time** — though on Android it appears **only in the wide/tablet layout** (the phone Home has none either). Add an
+equivalent period switcher to iOS Home. **Needs a mockup.** Android ref: `ui/home/DateRangeFilter` (the enum,
+incl. `ALL_TIME`) + `PeriodFilterMenu` + the wide `HomeScreen` header.
+
+***4. Widgets → match Android's set (iOS has 3, Android 5).*** iOS: Spend Total, Budget Ring, Recent Receipts.
+Android: Budget, Summary, This Week, Scan, Top Categories. Add the missing faces so the sets match. **Needs
+mockups.** The free-tier 2-widget cap already ported (per-face on iOS). Android ref: `widget/` (5 providers) +
+`WidgetDataProvider`.
+
+***5. Budget rollover / carry-over — NEW, add to BOTH.*** Owner-chosen model: **unspent-only, opt-in toggle,
+applies to the overall budget AND each category budget.** When on, at the start of each new period the leftover
+(**positive only** — overspend is forgiven, never rolls negative) carries into the next period's available;
+the UI shows "includes €X carried over" and the progress bar/limit uses budget + carried. Requires
+**persisting each period's carried amount** — budget amounts change without history, so it can't be recomputed;
+roll forward at the first open in a new period (handle multiple skipped periods). Android impl: **pending in this
+batch — commit ref to be appended when built** (`BudgetViewModel` / `BudgetRepository`, a new rollover store,
+Budget-screen toggle + carried line). iOS: SwiftData model addition + the Budget scene.
+
+***6. Recurring "mark as paid" — NEW, add to BOTH (Android `fcc06ff`).*** Each recurring **bill** gets a
+tap-to-toggle paid check for its **current occurrence**: paid rows dim their amount, the Payments section shows
+"N of M paid", and a paid bill drops off the Insights **"upcoming bills"** list until its next occurrence.
+**No transaction is posted** — recurring stays planning-only, so it never double-counts a scanned receipt.
+Android derives paid-state from the **reused `lastPosted` timestamp** falling inside the bill's current window
+(pay-cycle month for monthly, Mon–Sun week for weekly, calendar year for yearly; a one-off stays paid once set),
+so it **auto-resets each cycle with no schema change and no scheduled job**. iOS `Recurring` already has
+`lastPosted: Date?` (reserved) — reuse it the same way. Android ref: `ui/util/RecurringMath.isPaidThisCycle`,
+`BudgetViewModel.setBillPaid`, `RecurringDao.setLastPosted`, Budget `MoneyRow` paid toggle + `RecurringPaidTest`.
+
+*Status: iOS = all six PENDING. Android = #6 built (`fcc06ff`, branch `recurring-mark-as-paid`); #5 in progress;
+#1–#4 are already Android's shipped behavior (10.8.0). Android `main`/`009c24d`.*
