@@ -574,3 +574,45 @@ and running on a tester's iPhone 16 Pro / iOS 26.5.2 — iOS internal testing no
 no longer zero**. ⚠️ Build 7 was archived 2026-07-22 but never uploaded, so 8 was the first free build
 number — check an archive's CFBundleVersion before assuming one is free. No feature-parity change:
 build 8 is compliance/tooling, not a new feature. Android `main`/`22009e2` · iOS `main`/`50cdd54`.*
+
+*Port brief 2026-07-25 — **three period/money-flow changes, all still on Android feature branches
+(NOT yet on `main`)**, from a tester's feedback. Spec them from the ViewModels/repos as usual; treat
+each as independent (the three branches touch overlapping files and will conflict with each other on
+merge), and — per the `widget-free-cap` precedent above — re-verify against Android `main` before
+shipping, since none is merged or device-verified yet. Port each as its own iOS branch.*
+
+***1. Money-flow back-projection fix** (Android branch `fix-money-flow-no-backprojection`, `14d5731`).
+The Insights "money in vs out" card and History's Budgets snapshot scaled a recurring income/bill by
+the *number of months in the selected window*, so a multi-month view (e.g. first half-year) invented
+income for months the entry never existed in — a salary added in July showing 6× across Jan–Jun.
+Rule (owner-chosen, "count from the date added"): a recurring cadence contributes **only for the
+months of the window on/after the entry's `createdAt` month**; before that, nothing. One-offs still
+count their full amount once, only if `createdAt` falls in the window. The **current** period still
+shows the full expected month (not clipped to today). Android replaced the `periodAmount(window,
+monthSpan)` helper with `windowAmount(windowStart, windowEnd)` (in `RecurringMath`) — whole-month
+windows count eligible months exactly, partial windows scale active days / 30.4375 — and routed the
+Insights money-flow totals through the selected period's actual window instead of `currentMonthRange ×
+factor`. Find the iOS analogues of that recurring-scaling math and apply the same `createdAt` clip.
+Unit-tested on Android (`RecurringWindowAmountTest`).*
+
+***2. Configurable pay-cycle month — "Month starts on"** (Android branch `custom-month-start-day`,
+`16b46ec`). New setting `monthStartDay` (Int 1–31, default 1 = calendar month) so the financial month
+begins on the user's pay day. Core helper `PayCycle.month(today, startDay, offset)` → inclusive
+start/end dates of the cycle `offset` steps from the one containing `today`; the cycle containing
+today starts on this-month's `startDay` once it's arrived, else last-month's; a 29/30/31 pay day
+**clamps to the short month's last day** (the same clamp iOS already uses for a bill's due-day).
+Thread it through everything that means "month": Home This/Last/Last-3/Last-6 windows, the Insights
+**month** stepper + its labels + "days left"/projection, the **monthly budget reset + category bars**,
+the recurring plan's current-month anchor, History's budget window, and the home widgets — so every
+"month" agrees. **Week, quarter and half-year stay calendar/locale-aligned** (owner scope decision;
+flag if iOS wants them shifted too). Wire it reactively so open screens update when the setting
+changes. Settings UI: a "Month starts on" row → picker of 1–31 (1 labelled "1 (calendar month)").
+Default 1 means existing users see no change until they opt in. Unit-tested (`PayCycleTest`: paging,
+the before/after-pay-day boundary, short-month clamping).*
+
+***3. All-time (lifetime) period filter** (Android branch `all-time-filter`, `5551b2f`). Home gains an
+"All time" preset spanning every recorded transaction through today; its daily-average anchors to the
+**first transaction** (not the epoch), and it has **no** period-over-period comparison (previous
+window is empty). Insights gains an "All time" entry in the period-stepper dropdown that **reuses the
+custom-range window** (earliest transaction → today) — deliberately, so the trend buckets and averages
+stay bounded to real data instead of blowing up from 1970. New string `period_all_time`.*
