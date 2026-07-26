@@ -704,12 +704,32 @@ mockups.** The free-tier 2-widget cap already ported (per-face on iOS). Android 
 
 ***5. Budget rollover / carry-over — NEW, add to BOTH.*** Owner-chosen model: **unspent-only, opt-in toggle,
 applies to the overall budget AND each category budget.** When on, at the start of each new period the leftover
-(**positive only** — overspend is forgiven, never rolls negative) carries into the next period's available;
-the UI shows "includes €X carried over" and the progress bar/limit uses budget + carried. Requires
+(**positive only** — overspend is forgiven, never rolls negative) carries into the next period's available; the
+progress bar/limit uses **budget + carried** and a green **"+€X carried over"** line appears. Requires
 **persisting each period's carried amount** — budget amounts change without history, so it can't be recomputed;
-roll forward at the first open in a new period (handle multiple skipped periods). Android impl: **pending in this
-batch — commit ref to be appended when built** (`BudgetViewModel` / `BudgetRepository`, a new rollover store,
-Budget-screen toggle + carried line). iOS: SwiftData model addition + the Budget scene.
+roll forward at the first open in a new period (accumulate each elapsed period's `max(0, budget + carried −
+spent)`, handling multiple skipped periods). **Only the overall MONTHLY budget + category budgets carry — a
+weekly overall budget never does.**
+
+**⚠️ Display scope = EVERY budget surface, not just the Budget scene.** This is the part the parity directive
+turns on: Android first shipped rollover Budget-screen-only (`274519b`), then threaded the display everywhere as
+a follow-up (`c8d8863`) precisely so the two platforms stay identical — don't repeat the narrow first cut on iOS.
+Port the effective budget (base + carried) **and** the "+€X carried over" indicator to: the Budget scene (overall
+card + per-category rows/tiles, incl. iPad), **Home** budget card, **Insights** budget card (overall + per-
+category limits), and the **budget widget**; per-category "+X" labels on the category tiles/rows too. **Carry
+applies only to the CURRENT period** — never project the stored balance onto a past/stepped period (matters for
+Insights period stepping), and weekly views show no carry.
+
+Android impl (branch `budget-rollover`, on `origin/budget-rollover`, **NOT merged to Android `main`**): backend +
+roll-forward math + Budget-screen UI = **`274519b`**; the all-surface display wiring = **`c8d8863`**. The VMs
+expose a **setting-gated carried map** (empty when the toggle is off; only ever `MONTHLY` + `CAT:` keys, so weekly
+gets no carry for free) and each surface computes `effective = base + carried`. Refs: `ui/util/BudgetRollover`
+(pure roll-forward math, unit-tested by `BudgetRolloverTest`), `BudgetRolloverEntity` / `BudgetRolloverRepository`
++ `MIGRATION_18_19` (new `budget_rollover` table keyed by budgetKey, storing carried + periodKey `"yyyy-MM"`),
+`BudgetViewModel.rollForwardIfNeeded`, `HomeViewModel.monthlyCarried`, `InsightsViewModel` carried combine +
+`InsightsScreen.BudgetSectionCard`, `WidgetDataProvider` (bakes carry into the effective monthly budget), and the
+`budget_rollover_enabled` setting. Phone + tablet emulator-verified. iOS: SwiftData model addition (a rollover
+store keyed by budget key + period) + the gated-carried plumbing across **all** budget surfaces above.
 
 ***6. Recurring "mark as paid" — NEW, add to BOTH (Android `fcc06ff`).*** Each recurring **bill** gets a
 tap-to-toggle paid check for its **current occurrence**: paid rows dim their amount, the Payments section shows
@@ -721,5 +741,7 @@ so it **auto-resets each cycle with no schema change and no scheduled job**. iOS
 `lastPosted: Date?` (reserved) — reuse it the same way. Android ref: `ui/util/RecurringMath.isPaidThisCycle`,
 `BudgetViewModel.setBillPaid`, `RecurringDao.setLastPosted`, Budget `MoneyRow` paid toggle + `RecurringPaidTest`.
 
-*Status: iOS = all six PENDING. Android = #6 built (`fcc06ff`, branch `recurring-mark-as-paid`); #5 in progress;
-#1–#4 are already Android's shipped behavior (10.8.0). Android `main`/`009c24d`.*
+*Status: iOS = all six PENDING. Android = **#5 built** (rollover backend + all-surface display; branch
+`budget-rollover` → `origin/budget-rollover`; `274519b` + `c8d8863`; phone + tablet emulator-verified) and **#6
+built** (`fcc06ff`, branch `recurring-mark-as-paid`) — **neither merged to Android `main` yet**; #1–#4 are already
+Android's shipped behavior (10.8.0). Android `main`/`009c24d`.*
