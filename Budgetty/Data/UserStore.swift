@@ -20,6 +20,7 @@ enum UserStore {
     /// Every persisted model. Declared once so the per-account containers can't drift apart.
     static let models: [any PersistentModel.Type] = [
         LineItem.self, Receipt.self, Category.self, Budget.self, Recurring.self, CategoryRule.self,
+        BudgetRollover.self,
     ]
 
     private static var containers: [String: ModelContainer] = [:]

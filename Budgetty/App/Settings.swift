@@ -15,6 +15,8 @@ enum SettingsKey {
     static let dateFormat = "pref.dateFormat"
     /// The pay day the financial "month" starts on (1–31; 1 = calendar month). See `PayCycle`.
     static let monthStartDay = "pref.monthStartDay"
+    /// Unspent budget carries into the next period (opt-in, default off). See `BudgetRolloverMath`.
+    static let budgetRolloverEnabled = "pref.budgetRolloverEnabled"
     static let accent = "pref.accent"             // Premium accent theme (see AccentOption/AppTheme)
     static let faceID = "pref.faceID"
     /// Crashlytics collection — default-ON with an opt-out toggle (see `CrashReporting`).
