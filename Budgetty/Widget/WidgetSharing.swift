@@ -20,6 +20,8 @@ struct WidgetSnapshot: Codable {
     var monthReceiptCount: Int
     var rows: [Row]
     var topCategories: [TopCat]
+    var thisWeekSpent: Double?
+    var lastWeekSpent: Double?
 
     struct Row: Codable { var store: String; var amount: Double; var date: String }
     struct TopCat: Codable { var emoji: String; var amount: Double; var colorArgb: Int }
@@ -39,6 +41,17 @@ enum WidgetSharing {
         let monthWindow = PayCycle.monthInterval(startDay: startDay, calendar: cal)
         let month = receipts.filter { monthWindow.contains($0.createdAt) }
         let spent = month.reduce(Decimal.zero) { $0 + $1.paidTotal }
+
+        // This week vs last (Mon–Sun, matching Android) for the This Week widget face.
+        var weekCal = cal
+        weekCal.firstWeekday = 2 // Monday
+        let thisWeekStart = weekCal.dateInterval(of: .weekOfYear, for: .now)?.start ?? cal.startOfDay(for: .now)
+        let nextWeekStart = weekCal.date(byAdding: .day, value: 7, to: thisWeekStart) ?? .now
+        let lastWeekStart = weekCal.date(byAdding: .day, value: -7, to: thisWeekStart) ?? thisWeekStart
+        let weekThis = receipts.filter { $0.createdAt >= thisWeekStart && $0.createdAt < nextWeekStart }
+            .reduce(Decimal.zero) { $0 + $1.paidTotal }
+        let weekLast = receipts.filter { $0.createdAt >= lastWeekStart && $0.createdAt < thisWeekStart }
+            .reduce(Decimal.zero) { $0 + $1.paidTotal }
 
         let budgets = (try? context.fetch(FetchDescriptor<Budget>())) ?? []
         let monthlyBudget = budgets.first { $0.key == Budget.monthlyKey }?.amount ?? 0
@@ -69,7 +82,9 @@ enum WidgetSharing {
             currencyCode: UserDefaults.standard.string(forKey: SettingsKey.currency) ?? "EUR",
             monthReceiptCount: month.count,
             rows: Array(rows),
-            topCategories: Array(topCats))
+            topCategories: Array(topCats),
+            thisWeekSpent: (weekThis as NSDecimalNumber).doubleValue,
+            lastWeekSpent: (weekLast as NSDecimalNumber).doubleValue)
 
         guard let data = try? JSONEncoder().encode(snapshot),
               let defaults = UserDefaults(suiteName: suite) else { return }

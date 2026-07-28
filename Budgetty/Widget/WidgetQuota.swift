@@ -42,7 +42,8 @@ enum WidgetQuota {
     /// *oldest*; iOS surfaces no placement order, so a stable canonical rank stands in — arbitrary
     /// from the user's side, but deterministic, so the same two stay lit across every reload rather
     /// than shuffling.
-    static let kindOrder = ["BudgettySpending", "BudgettyBudgetRing", "BudgettyRecentReceipts"]
+    static let kindOrder = ["BudgettySpending", "BudgettyBudgetRing", "BudgettyRecentReceipts",
+                            "BudgettyThisWeek", "BudgettyTopCategories"]
 
     static func rank(_ slot: WidgetSlot) -> Int {
         (kindOrder.firstIndex(of: slot.kind) ?? kindOrder.count) * 100 + slot.family.rawValue

@@ -14,5 +14,7 @@ struct BudgettyWidgetBundle: WidgetBundle {
         SpendingWidget()
         BudgetRingWidget()
         RecentReceiptsWidget()
+        ThisWeekWidget()
+        TopCategoriesWidget()
     }
 }

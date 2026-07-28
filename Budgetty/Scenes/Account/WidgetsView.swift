@@ -28,15 +28,35 @@ struct WidgetsView: View {
     }
     private var monthlyBudget: Decimal? { budgets.first { $0.key == Budget.monthlyKey }?.amount }
 
+    /// This week's spend (Mon–Sun) for the This Week preview.
+    private var weekSpent: Decimal {
+        var c = Calendar.current; c.firstWeekday = 2
+        let start = c.dateInterval(of: .weekOfYear, for: .now)?.start ?? Calendar.current.startOfDay(for: .now)
+        let end = c.date(byAdding: .day, value: 7, to: start) ?? .now
+        let window = DateInterval(start: start, end: end)
+        return receipts.filter { window.contains($0.createdAt) }.reduce(.zero) { $0 + $1.paidTotal }
+    }
+
+    /// This month's top category groups by spend, for the Top Categories preview.
+    private var topCats: [(emoji: String, amount: Decimal)] {
+        var sums: [String: Decimal] = [:]
+        for item in monthReceipts.flatMap(\.items) {
+            sums[Categories.groupOf(item.category), default: .zero] += item.lineTotal
+        }
+        return sums.sorted { $0.value > $1.value }.prefix(3).map { (Categories.emoji(for: $0.key), $0.value) }
+    }
+
     var body: some View {
         ScrollView {
             VStack(spacing: 20) {
                 banner
                 slotsCard
                 section("Small") {
-                    HStack(spacing: 16) {
-                        spendWidget.frame(width: 150, height: 150)
-                        budgetWidget.frame(width: 150, height: 150)
+                    LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 16) {
+                        spendWidget.frame(height: 150)
+                        budgetWidget.frame(height: 150)
+                        thisWeekWidget.frame(height: 150)
+                        topCategoriesWidget.frame(height: 150)
                     }
                 }
                 section("Medium") { recentWidget.frame(height: 150) }
@@ -146,6 +166,46 @@ struct WidgetsView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
             .padding(16)
             .background(Palette.card)
+        }
+    }
+
+    private var thisWeekWidget: some View {
+        widgetCard {
+            VStack(alignment: .leading, spacing: 6) {
+                Text("This week").font(.caption2).foregroundStyle(.white.opacity(0.8))
+                Spacer()
+                Text(weekSpent.formatMoney()).font(.title2).fontWeight(.bold).foregroundStyle(.white)
+                    .minimumScaleFactor(0.6).lineLimit(1)
+                Text("vs last week").font(.caption2).foregroundStyle(.white.opacity(0.7))
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+            .padding(16)
+            .background(Palette.heroGradient)
+        }
+    }
+
+    private var topCategoriesWidget: some View {
+        widgetCard {
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Top categories").font(.caption2).fontWeight(.semibold).foregroundStyle(.white.opacity(0.8))
+                Spacer(minLength: 2)
+                if topCats.isEmpty {
+                    Text("No spending yet").font(.caption2).foregroundStyle(.white.opacity(0.7))
+                } else {
+                    ForEach(Array(topCats.enumerated()), id: \.offset) { _, c in
+                        HStack(spacing: 6) {
+                            Text(c.emoji).font(.system(size: 13))
+                            Text(c.amount.formatMoney()).font(.caption2).fontWeight(.semibold)
+                                .foregroundStyle(.white).minimumScaleFactor(0.7).lineLimit(1)
+                            Spacer(minLength: 0)
+                        }
+                    }
+                }
+                Spacer(minLength: 0)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+            .padding(16)
+            .background(Palette.heroGradient)
         }
     }
 
