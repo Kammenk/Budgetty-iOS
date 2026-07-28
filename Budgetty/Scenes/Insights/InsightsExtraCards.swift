@@ -214,11 +214,14 @@ struct BudgetVsActualCard: View {
     let spent: Decimal
     let budget: Decimal
     let daysLeft: Int?
+    /// Carry-over rolled in from prior periods (0 unless rollover is on and this is the current month).
+    var carried: Decimal = 0
 
     var body: some View {
-        let frac = HomeView.fraction(spent, of: budget)
+        let effective = budget + carried
+        let frac = HomeView.fraction(spent, of: effective)
         let color: Color = frac >= 1 ? Palette.bad : (frac >= 0.85 ? Palette.warn : Palette.good)
-        let left = budget - spent
+        let left = effective - spent
 
         VStack(alignment: .leading, spacing: 0) {
             HStack {
@@ -235,10 +238,16 @@ struct BudgetVsActualCard: View {
                 Text(spent.formatMoney())
                     .font(.system(size: 28, weight: .bold)).foregroundStyle(Palette.label)
                     .lineLimit(1)
-                Text("of \(budget.formatMoney())")
+                Text("of \(effective.formatMoney())")
                     .font(.system(size: 15)).foregroundStyle(Palette.secondaryLabel)
             }
-            .padding(.bottom, 10)
+            .padding(.bottom, carried > 0 ? 4 : 10)
+
+            if carried > 0 {
+                Text("+\(carried.formatMoney()) carried over")
+                    .font(.system(size: 12, weight: .semibold)).foregroundStyle(Palette.good)
+                    .padding(.bottom, 10)
+            }
 
             ProgressBarView(fraction: frac, color: color, height: 8, track: Palette.fill)
 

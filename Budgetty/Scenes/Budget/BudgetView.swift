@@ -28,11 +28,15 @@ struct BudgetView: View {
     @Query(sort: \Receipt.createdAt, order: .reverse) private var receipts: [Receipt]
     @Query private var budgets: [Budget]
     @Query(sort: \Recurring.createdAt) private var recurring: [Recurring]
+    @Query private var rollovers: [BudgetRollover]
 
     @AppStorage(SettingsKey.premium) private var premium = false
     /// The pay day the financial month starts on (1 = calendar month); the monthly budget and the
     /// per-category bars scope to it. Re-read here so the bars recompute when the setting changes.
     @AppStorage(SettingsKey.monthStartDay) private var monthStartDay = 1
+    /// Opt-in unspent-budget carry-over (default off). Drives the "+X carried over" lines and the
+    /// effective (budget + carried) progress; toggling it reconciles the stored carry rows.
+    @AppStorage(SettingsKey.budgetRolloverEnabled) private var rolloverEnabled = false
 
     @State private var period: BudgetPeriod = .monthly
     @State private var showPaywall = false
@@ -63,6 +67,10 @@ struct BudgetView: View {
             // The mockup puts the title at the very top of the scroll content (no nav-bar row above
             // it), so draw our own header and hide the bar — the Home pattern.
             .toolbar(.hidden, for: .navigationBar)
+            // Bring carry-over up to date on open and whenever rollover is toggled (the mirror of
+            // Android's BudgetViewModel.rollForwardIfNeeded).
+            .task { reconcileRollover() }
+            .onChange(of: rolloverEnabled) { reconcileRollover() }
             .sheet(item: $recurringEditor) { ed in
                 RecurringSheet(isIncome: ed.isIncome, existing: ed.existing)
             }
@@ -97,6 +105,7 @@ struct BudgetView: View {
         VStack(spacing: 16) {
             periodPicker
             overallCard
+            rolloverToggle
             incomeSection
             recurringSection
             activeSubBudgetsSection
@@ -138,6 +147,27 @@ struct BudgetView: View {
     private var income: [Recurring] { recurring.filter(\.isIncome) }
     private var bills: [Recurring] { recurring.filter { !$0.isIncome } }
 
+    // MARK: - Rollover
+
+    /// Carried-over amount for a budget key (0 unless rollover is on and the key has accrued some). A
+    /// weekly overall budget never carries — no row is ever written for the WEEKLY key.
+    private func carriedFor(_ key: String) -> Decimal {
+        guard rolloverEnabled else { return 0 }
+        return rollovers.first { $0.key == key }?.carried ?? 0
+    }
+
+    /// True once any budget has accrued carry-over — gates the "starts next period" first-run caption.
+    private var anyCarried: Bool { rolloverEnabled && rollovers.contains { $0.carried > 0 } }
+
+    /// Reconciles the stored carry rows with the current period (rolling each elapsed period's unspent
+    /// leftover forward), or clears them when rollover is off. Mirrors Android's rollForwardIfNeeded.
+    private func reconcileRollover() {
+        BudgetRolloverRunner.reconcile(
+            context: context, budgets: budgets, items: allItems,
+            enabled: rolloverEnabled, startDay: monthStartDay
+        )
+    }
+
     // MARK: - Overall card
 
     private var overallCard: some View {
@@ -150,7 +180,11 @@ struct BudgetView: View {
                     .font(.subheadline).foregroundStyle(Palette.secondaryLabel)
                     .padding(.bottom, 8)
                 if let b = overallBudget {
-                    let frac = HomeView.fraction(spent, of: b.amount)
+                    // Carry-over (monthly only — the WEEKLY key never accrues) lifts the effective
+                    // limit; the bar, percentage and "left" all read against budget + carried.
+                    let carried = carriedFor(overallKey)
+                    let effective = b.amount + carried
+                    let frac = HomeView.fraction(spent, of: effective)
                     let color: Color = frac >= 1 ? Palette.bad : (frac >= 0.85 ? Palette.warn : Palette.good)
                     HStack(alignment: .firstTextBaseline, spacing: 6) {
                         Text(b.amount.formatMoney())
@@ -158,12 +192,17 @@ struct BudgetView: View {
                         Text(isWeekly ? "/ week" : "/ month")
                             .font(.subheadline).foregroundStyle(Palette.secondaryLabel)
                     }
-                    .padding(.bottom, 14)
+                    .padding(.bottom, carried > 0 ? 4 : 14)
+                    if carried > 0 {
+                        Text("+\(carried.formatMoney()) carried over")
+                            .font(.footnote).fontWeight(.semibold).foregroundStyle(Palette.good)
+                            .padding(.bottom, 12)
+                    }
                     ProgressBarView(fraction: frac, color: color, height: 8)
                     HStack {
                         Text("\(spent.formatMoney()) spent · \(Int(frac * 100))%")
                         Spacer()
-                        Text("\((b.amount - spent).formatMoney()) left").fontWeight(.semibold)
+                        Text("\((effective - spent).formatMoney()) left").fontWeight(.semibold)
                             .foregroundStyle(color)
                     }
                     .font(.footnote).foregroundStyle(Palette.secondaryLabel)
@@ -183,6 +222,32 @@ struct BudgetView: View {
         }
         .buttonStyle(.plain)
         .accessibilityIdentifier(A11y.Budget.overall)
+    }
+
+    // MARK: - Rollover toggle
+
+    /// Opt-in "carry over unused budget" row (off by default). When on with nothing accrued yet, a
+    /// tiny caption notes that carry-over begins next period.
+    private var rolloverToggle: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Toggle(isOn: $rolloverEnabled) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Carry over unused budget")
+                        .font(.subheadline).fontWeight(.semibold).foregroundStyle(Palette.label)
+                    Text("Unspent budget rolls into next period")
+                        .font(.caption).foregroundStyle(Palette.secondaryLabel)
+                }
+            }
+            .tint(Palette.tint)
+            if rolloverEnabled && !anyCarried {
+                Text("Carry-over starts next period.")
+                    .font(.caption).foregroundStyle(Palette.secondaryLabel)
+            }
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .contentCard(cornerRadius: 14)
+        .accessibilityIdentifier(A11y.Budget.rolloverToggle)
     }
 
     // MARK: - Income
@@ -400,8 +465,11 @@ struct BudgetView: View {
     }
 
     private func subBudgetRow(_ s: (sub: String, parent: String, amount: Decimal)) -> some View {
+        let key = Budget.categoryKey(s.sub)
         let sp = categorySpent(s.sub)
-        let frac = HomeView.fraction(sp, of: s.amount)
+        let carried = carriedFor(key)
+        let effective = s.amount + carried
+        let frac = HomeView.fraction(sp, of: effective)
         let color: Color = frac >= 1 ? Palette.bad : (frac >= 0.85 ? Palette.warn : Palette.good)
         return Button {
             categoryRoute = CategoryRoute(id: s.parent)
@@ -413,7 +481,11 @@ struct BudgetView: View {
                         Text(s.sub).font(.subheadline).foregroundStyle(Palette.label)
                         Text("· \(s.parent)").font(.caption).foregroundStyle(Palette.secondaryLabel)
                         Spacer(minLength: 4)
-                        Text("\(sp.formatMoney()) / \(s.amount.formatMoney())")
+                        if carried > 0 {
+                            Text("+\(carried.formatMoney())")
+                                .font(.caption2).fontWeight(.semibold).foregroundStyle(Palette.good)
+                        }
+                        Text("\(sp.formatMoney()) / \(effective.formatMoney())")
                             .font(.caption).fontWeight(.semibold).foregroundStyle(color)
                     }
                     ProgressBarView(fraction: frac, color: color, height: 4)
@@ -453,10 +525,16 @@ struct BudgetView: View {
                 Text(Categories.displayName(group)).font(.subheadline).fontWeight(.semibold).foregroundStyle(Palette.label)
                     .lineLimit(1)
                 if let b = budget {
-                    let frac = HomeView.fraction(spent, of: b.amount)
+                    let carried = carriedFor(key)
+                    let effective = b.amount + carried
+                    let frac = HomeView.fraction(spent, of: effective)
                     let color: Color = frac >= 1 ? Palette.bad : (frac >= 0.85 ? Palette.warn : Palette.good)
-                    Text("\(spent.formatMoney()) / \(b.amount.formatMoney())")
+                    Text("\(spent.formatMoney()) / \(effective.formatMoney())")
                         .font(.caption).foregroundStyle(color)
+                    if carried > 0 {
+                        Text("+\(carried.formatMoney())")
+                            .font(.caption2).fontWeight(.semibold).foregroundStyle(Palette.good)
+                    }
                     ProgressBarView(fraction: frac, color: Color(argb: Categories.color(for: group)), height: 4)
                 } else {
                     Text("Set a budget").font(.caption).foregroundStyle(Palette.tint)

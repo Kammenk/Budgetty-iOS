@@ -16,12 +16,14 @@ struct HomeView: View {
     @Query(sort: \Receipt.createdAt, order: .reverse) private var receipts: [Receipt]
     @Query private var budgets: [Budget]
     @Query private var recurrings: [Recurring]
+    @Query private var rollovers: [BudgetRollover]
 
     @AppStorage(HomeLayoutStore.orderKey) private var orderRaw = ""
     @AppStorage(HomeLayoutStore.hiddenKey) private var hiddenRaw = HomeLayoutStore.defaultHidden
     /// The pay day the financial month starts on (1 = calendar month); the hero's "this month"
     /// figures follow it. Re-read here so the card updates live when the setting changes.
     @AppStorage(SettingsKey.monthStartDay) private var monthStartDay = 1
+    @AppStorage(SettingsKey.budgetRolloverEnabled) private var rolloverEnabled = false
     @State private var showCustomize = false
 
     private var visibleSections: [HomeSection] {
@@ -49,6 +51,13 @@ struct HomeView: View {
 
     private func budget(_ key: String) -> Decimal? {
         budgets.first { $0.key == key }.map(\.amount)
+    }
+
+    /// Carried-over amount on the overall monthly budget (0 unless rollover is on). Home shows only
+    /// the current month, so no offset gating is needed. Weekly never carries.
+    private var monthlyCarried: Decimal {
+        guard rolloverEnabled else { return 0 }
+        return rollovers.first { $0.key == Budget.monthlyKey }?.carried ?? 0
     }
 
     var body: some View {
@@ -295,7 +304,7 @@ struct HomeView: View {
                 .accessibilityIdentifier(A11y.Home.seeAllBudgets)
             }
             if showMonthly, let m = monthly {
-                budgetRow(title: "Monthly", spent: monthSpent, limit: m)
+                budgetRow(title: "Monthly", spent: monthSpent, limit: m, carried: monthlyCarried)
             } else if let w = weekly {
                 budgetRow(title: "Weekly", spent: weekSpent, limit: w)
             }
@@ -346,14 +355,19 @@ struct HomeView: View {
         .contentCard(cornerRadius: 16)
     }
 
-    private func budgetRow(title: LocalizedStringKey, spent: Decimal, limit: Decimal) -> some View {
-        let frac = Self.fraction(spent, of: limit)
+    private func budgetRow(title: LocalizedStringKey, spent: Decimal, limit: Decimal, carried: Decimal = 0) -> some View {
+        let effective = limit + carried
+        let frac = Self.fraction(spent, of: effective)
         let color: Color = frac >= 1 ? Palette.bad : (frac >= 0.85 ? Palette.warn : Palette.good)
         return VStack(spacing: 7) {
             HStack {
                 Text(title).font(.subheadline)
                 Spacer()
-                Text("\(spent.formatMoney()) / \(limit.formatMoney())")
+                if carried > 0 {
+                    Text("+\(carried.formatMoney())")
+                        .font(.caption2).fontWeight(.semibold).foregroundStyle(Palette.good)
+                }
+                Text("\(spent.formatMoney()) / \(effective.formatMoney())")
                     .font(.caption).fontWeight(.semibold).foregroundStyle(color)
             }
             ProgressBarView(fraction: frac, color: color)

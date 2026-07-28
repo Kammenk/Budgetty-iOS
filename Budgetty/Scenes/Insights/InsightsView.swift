@@ -19,11 +19,13 @@ struct InsightsView: View {
     @Query(sort: \Receipt.createdAt, order: .reverse) private var receipts: [Receipt]
     @Query(sort: \Recurring.createdAt) private var recurring: [Recurring]
     @Query private var budgets: [Budget]
+    @Query private var rollovers: [BudgetRollover]
     @Query private var storedCategories: [Category]
     @AppStorage("insights.breakdownAllCats") private var breakdownAllCats = false
     /// The pay-cycle start day; the money-flow snapshot and the MONTH period follow it (re-read here
     /// so the screen re-renders when "Month starts on" changes).
     @AppStorage(SettingsKey.monthStartDay) private var monthStartDay = 1
+    @AppStorage(SettingsKey.budgetRolloverEnabled) private var rolloverEnabled = false
 
     /// The window the whole screen is scoped to; the stepper walks it one unit at a time.
     @State private var period: InsightsPeriod = {
@@ -177,7 +179,7 @@ struct InsightsView: View {
     @ViewBuilder
     private var budgetSection: some View {
         if let budget = periodBudget, budget > 0 {
-            BudgetVsActualCard(spent: totalSpent, budget: budget, daysLeft: daysLeftInPeriod)
+            BudgetVsActualCard(spent: totalSpent, budget: budget, daysLeft: daysLeftInPeriod, carried: periodCarried)
         }
     }
 
@@ -382,6 +384,13 @@ struct InsightsView: View {
         case .week: return budgets.first { $0.key == Budget.weeklyKey }?.amount
         default: return nil
         }
+    }
+
+    /// Carry-over on the overall monthly budget — only for the CURRENT pay-cycle month (offset 0);
+    /// other periods and non-month units show the base budget, and weekly never carries.
+    private var periodCarried: Decimal {
+        guard rolloverEnabled, case .stepped(.month, 0) = period else { return 0 }
+        return rollovers.first { $0.key == Budget.monthlyKey }?.carried ?? 0
     }
 
     /// Remaining days of the in-progress period (nil for past/future/custom windows).
