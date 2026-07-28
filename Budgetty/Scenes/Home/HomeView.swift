@@ -10,6 +10,32 @@
 import SwiftUI
 import SwiftData
 
+/// Home's spending period — the pill in the hero card. Mirrors Android's Home `DateRangeFilter`.
+private enum HomePeriod: String, CaseIterable, Identifiable {
+    case thisMonth, lastMonth, last3, last6, allTime
+    var id: String { rawValue }
+    var label: LocalizedStringKey {
+        switch self {
+        case .thisMonth: "This month"
+        case .lastMonth: "Last month"
+        case .last3: "Last 3 months"
+        case .last6: "Last 6 months"
+        case .allTime: "All time"
+        }
+    }
+    /// The single-month periods keep Home's monthly-plan cards (budget + planned bills); the rest hide
+    /// them and show a spend-focused read instead.
+    var isMonth: Bool { self == .thisMonth || self == .lastMonth }
+    /// Whole months back from the current cycle for the multi-month windows (nil otherwise).
+    var monthsBack: Int? {
+        switch self {
+        case .last3: 3
+        case .last6: 6
+        default: nil
+        }
+    }
+}
+
 struct HomeView: View {
     @Environment(AuthModel.self) private var auth
     @Environment(\.selectTab) private var selectTab
@@ -25,6 +51,8 @@ struct HomeView: View {
     @AppStorage(SettingsKey.monthStartDay) private var monthStartDay = 1
     @AppStorage(SettingsKey.budgetRolloverEnabled) private var rolloverEnabled = false
     @State private var showCustomize = false
+    /// The Home period filter (the hero pill). Default = this month, so Home opens exactly as before.
+    @State private var period: HomePeriod = .thisMonth
 
     private var visibleSections: [HomeSection] {
         let hidden = HomeLayoutStore.hidden(hiddenRaw)
@@ -41,13 +69,30 @@ struct HomeView: View {
         budget(Budget.monthlyKey) != nil || budget(Budget.weeklyKey) != nil
     }
 
-    private var monthReceipts: [Receipt] {
-        let window = PayCycle.monthInterval(startDay: monthStartDay)
-        return receipts.filter { window.contains($0.createdAt) }
+    /// The window for the selected [period]: a pay-cycle month (this / last), the last N whole cycles,
+    /// or earliest-receipt-to-now for all time.
+    private func periodWindow(_ p: HomePeriod) -> DateInterval {
+        let cal = Calendar.current
+        switch p {
+        case .thisMonth: return PayCycle.monthInterval(startDay: monthStartDay)
+        case .lastMonth: return PayCycle.monthInterval(startDay: monthStartDay, offset: -1)
+        case .last3, .last6:
+            let back = (p.monthsBack ?? 1) - 1
+            let start = PayCycle.month(.now, startDay: monthStartDay, offset: -back).start
+            let end = PayCycle.monthInterval(startDay: monthStartDay).end
+            return DateInterval(start: start, end: end)
+        case .allTime:
+            let earliest = receipts.map(\.createdAt).min() ?? PayCycle.monthInterval(startDay: monthStartDay).start
+            let end = cal.date(byAdding: .day, value: 1, to: cal.startOfDay(for: .now)) ?? .now
+            return DateInterval(start: cal.startOfDay(for: earliest), end: end)
+        }
     }
 
-    private var monthSpent: Decimal { monthReceipts.reduce(.zero) { $0 + $1.paidTotal } }
-    private var monthSavings: Decimal { monthReceipts.reduce(.zero) { $0 + $1.discount } }
+    private var periodReceipts: [Receipt] {
+        let window = periodWindow(period)
+        return receipts.filter { window.contains($0.createdAt) }
+    }
+    private var periodSpent: Decimal { periodReceipts.reduce(.zero) { $0 + $1.paidTotal } }
 
     private func budget(_ key: String) -> Decimal? {
         budgets.first { $0.key == key }.map(\.amount)
@@ -127,7 +172,8 @@ struct HomeView: View {
                 switch section {
                 case .totalSpent: heroCard
                 case .weekComparison: if lastWeekSpent > 0 { weekCard }
-                case .budgets: if hasBudget { budgetsCard }
+                // The monthly budget card is a single-month concept — hidden for multi-month / all-time.
+                case .budgets: if hasBudget && period.isMonth { budgetsCard }
                 case .receipts: recentReceiptsSection
                 }
             }
@@ -137,56 +183,30 @@ struct HomeView: View {
     // MARK: - Hero
 
     private var heroCard: some View {
-        let monthlyBudget = budget(Budget.monthlyKey)
-        let frac = monthlyBudget.map { Self.fraction(monthSpent, of: $0) } ?? 0
-        let left = monthlyBudget.map { $0 - monthSpent }
-
-        return VStack(alignment: .leading, spacing: 0) {
+        VStack(alignment: .leading, spacing: 0) {
             HStack {
                 Text("Total spent")
                     .font(.subheadline).fontWeight(.medium)
                     .foregroundStyle(.white.opacity(0.8))
                 Spacer()
-                // A static period label — no chevron, so it doesn't read as a tappable control.
-                Text(Self.monthLabel(.now, startDay: monthStartDay)).font(.caption).fontWeight(.semibold)
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 10).padding(.vertical, 4)
-                    .background(.white.opacity(0.2), in: RoundedRectangle(cornerRadius: 8))
+                periodPill
             }
             .padding(.bottom, 6)
 
             // Mockup: the big figure never truncates — very large amounts scroll horizontally.
             ScrollView(.horizontal, showsIndicators: false) {
-                Text(monthSpent.formatMoney())
+                Text(periodSpent.formatMoney())
                     .font(.system(size: 46, weight: .bold))
                     .foregroundStyle(.white)
             }
             .padding(.vertical, 4)
 
-            Text("\(String(localized: "\(monthReceipts.count) receipts")) · \(Self.daysProgress(startDay: monthStartDay))")
+            Text("\(String(localized: "\(periodReceipts.count) receipts")) · \(periodDescriptor)")
                 .font(.footnote)
                 .foregroundStyle(.white.opacity(0.7))
                 .padding(.bottom, 14)
 
-            if monthBills > 0 {
-                billsBlock
-            } else if let monthlyBudget {
-                ProgressBarView(fraction: frac, color: .white.opacity(0.85), height: 5,
-                                track: .white.opacity(0.22))
-                HStack {
-                    Text("\(Int(frac * 100))% of monthly budget")
-                    Spacer()
-                    if let left { Text("\(left.formatMoney()) left") }
-                }
-                .font(.caption2)
-                .foregroundStyle(.white.opacity(0.65))
-                .padding(.top, 5)
-            } else {
-                Text("Set a budget to track your spending")
-                    .font(.caption)
-                    .foregroundStyle(.white.opacity(0.7))
-                let _ = monthlyBudget // keep branch explicit
-            }
+            heroDetail
         }
         .padding(20)
         .background(Palette.heroGradient, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
@@ -205,14 +225,171 @@ struct HomeView: View {
         .shadow(color: Color(argb: 0xFF6650A4).opacity(0.38), radius: 14, y: 8)
     }
 
+    /// The period selector on the hero card. A native menu (as Insights / History use), so the
+    /// checkmarked list comes for free; "All time" sits below a divider, mirroring the Android filter.
+    private var periodPill: some View {
+        Menu {
+            Picker("Period", selection: $period) {
+                ForEach([HomePeriod.thisMonth, .lastMonth, .last3, .last6]) { Text($0.label).tag($0) }
+            }
+            .pickerStyle(.inline)
+            Divider()
+            Picker("Period", selection: $period) {
+                Text(HomePeriod.allTime.label).tag(HomePeriod.allTime)
+            }
+            .pickerStyle(.inline)
+        } label: {
+            HStack(spacing: 5) {
+                Text(period.label).font(.caption).fontWeight(.semibold)
+                Image(systemName: "chevron.down").font(.system(size: 9, weight: .bold))
+            }
+            .foregroundStyle(.white)
+            .padding(.horizontal, 11).padding(.vertical, 5)
+            .background(.white.opacity(0.22), in: Capsule())
+            .overlay(Capsule().strokeBorder(.white.opacity(0.4), lineWidth: 0.5))
+        }
+        .accessibilityLabel("Spending period")
+    }
+
+    /// The lower half of the hero, which changes by period: the planned-bills strip / budget bar for a
+    /// single month; per-month bars + a monthly average for multi-month; a monthly average for all time.
+    @ViewBuilder
+    private var heroDetail: some View {
+        let monthlyBudget = budget(Budget.monthlyKey)
+        switch period {
+        case .thisMonth:
+            if monthBills > 0 {
+                billsBlock
+            } else if let mb = monthlyBudget {
+                heroBudgetBar(spent: periodSpent, budget: mb) {
+                    Text("\(Int(Self.fraction(periodSpent, of: mb) * 100))% of monthly budget")
+                }
+            } else {
+                Text("Set a budget to track your spending")
+                    .font(.caption).foregroundStyle(.white.opacity(0.7))
+            }
+        case .lastMonth:
+            if let mb = monthlyBudget {
+                heroBudgetBar(spent: periodSpent, budget: mb) {
+                    Text("\(Int(Self.fraction(periodSpent, of: mb) * 100))% of last month's budget")
+                }
+            } else {
+                Text("Set a budget to track your spending")
+                    .font(.caption).foregroundStyle(.white.opacity(0.7))
+            }
+        case .last3, .last6:
+            heroMonthlyBars
+            heroAverage(note: String(localized: "Monthly budget and planned bills apply to a single month."))
+        case .allTime:
+            heroAverage(note: allTimeNote)
+        }
+    }
+
+    private func heroBudgetBar(spent: Decimal, budget: Decimal, @ViewBuilder label: () -> Text) -> some View {
+        VStack(spacing: 0) {
+            ProgressBarView(fraction: Self.fraction(spent, of: budget), color: .white.opacity(0.85),
+                            height: 5, track: .white.opacity(0.22))
+            HStack {
+                label()
+                Spacer()
+                Text("\((budget - spent).formatMoney()) left")
+            }
+            .font(.caption2).foregroundStyle(.white.opacity(0.65)).padding(.top, 5)
+        }
+    }
+
+    /// A bar per whole pay-cycle month in the window (last 3 / 6), scaled to the busiest month.
+    private var heroMonthlyBars: some View {
+        let months = period.monthsBack ?? 3
+        let mf = DateFormatter(); mf.dateFormat = "MMM"
+        let bars: [(label: String, value: Double)] = (0..<months).reversed().map { back in
+            let w = PayCycle.monthInterval(startDay: monthStartDay, offset: -back)
+            let spent = receipts.filter { w.contains($0.createdAt) }.reduce(Decimal.zero) { $0 + $1.paidTotal }
+            let label = mf.string(from: PayCycle.month(.now, startDay: monthStartDay, offset: -back).start)
+            return (label, (spent as NSDecimalNumber).doubleValue)
+        }
+        let maxV = bars.map(\.value).max() ?? 1
+        return HStack(alignment: .bottom, spacing: 5) {
+            ForEach(Array(bars.enumerated()), id: \.offset) { _, b in
+                VStack(spacing: 6) {
+                    RoundedRectangle(cornerRadius: 4).fill(.white.opacity(0.62))
+                        .frame(height: CGFloat(16 + 30 * (maxV > 0 ? b.value / maxV : 0)))
+                    Text(b.label).font(.system(size: 9.5, weight: .medium)).foregroundStyle(.white.opacity(0.62))
+                }
+                .frame(maxWidth: .infinity)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .bottom)
+        .padding(.bottom, 12)
+    }
+
+    private func heroAverage(note: String) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Rectangle().fill(.white.opacity(0.24)).frame(height: 1).padding(.bottom, 4)
+            HStack(alignment: .firstTextBaseline) {
+                Text("Monthly average").font(.system(size: 12.5)).foregroundStyle(.white.opacity(0.78))
+                Spacer()
+                Text(monthlyAverage.formatMoney())
+                    .font(.system(size: 16, weight: .bold)).foregroundStyle(.white).lineLimit(1)
+            }
+            Text(note).font(.system(size: 11)).foregroundStyle(.white.opacity(0.6))
+        }
+    }
+
+    // MARK: - Period helpers
+
+    /// The "N receipts · …" descriptor under the hero total: a month name, a month range, or "since X".
+    private var periodDescriptor: String {
+        let cal = Calendar.current
+        switch period {
+        case .thisMonth: return Self.monthLabel(.now, startDay: monthStartDay)
+        case .lastMonth:
+            let d = cal.date(byAdding: .month, value: -1, to: .now) ?? .now
+            return Self.monthLabel(d, startDay: monthStartDay)
+        case .last3, .last6:
+            let w = periodWindow(period)
+            let last = cal.date(byAdding: .day, value: -1, to: w.end) ?? w.end
+            let m = DateFormatter(); m.dateFormat = "MMM"
+            let y = DateFormatter(); y.dateFormat = "yyyy"
+            return "\(m.string(from: w.start)) – \(m.string(from: last)) \(y.string(from: last))"
+        case .allTime:
+            guard let earliest = receipts.map(\.createdAt).min() else { return String(localized: "all time") }
+            let f = DateFormatter(); f.dateFormat = "d MMM yyyy"
+            return String(localized: "since \(f.string(from: earliest))")
+        }
+    }
+
+    /// Whole months spanned by the window, for the monthly-average denominator.
+    private var periodMonthCount: Int {
+        if let m = period.monthsBack { return m }
+        guard let earliest = receipts.map(\.createdAt).min() else { return 1 }
+        let cal = Calendar.current
+        let a = PayCycle.month(earliest, startDay: monthStartDay).start
+        let b = PayCycle.month(.now, startDay: monthStartDay).start
+        return max(1, (cal.dateComponents([.month], from: a, to: b).month ?? 0) + 1)
+    }
+
+    private var monthlyAverage: Decimal {
+        let months = periodMonthCount
+        return months > 0 ? periodSpent / Decimal(months) : periodSpent
+    }
+
+    private var allTimeNote: String {
+        guard let earliest = receipts.map(\.createdAt).min() else {
+            return String(localized: "All your spending so far.")
+        }
+        let f = DateFormatter(); f.dateFormat = "d MMM yyyy"
+        return String(localized: "\(periodMonthCount) months tracked · first receipt \(f.string(from: earliest))")
+    }
+
     // MARK: - Bills strip (mockup "1b planned strip")
 
     /// Actual spend paired with this month's planned recurring bills: a two-segment strip (solid
     /// spent, hatched planned), a legend, and the combined "With bills" total. The hatching keeps
     /// the planned portion visually lighter than money already spent.
     private var billsBlock: some View {
-        let withBills = monthSpent + monthBills
-        let spentShare = Self.fraction(monthSpent, of: withBills)
+        let withBills = periodSpent + monthBills
+        let spentShare = Self.fraction(periodSpent, of: withBills)
 
         return VStack(alignment: .leading, spacing: 0) {
             GeometryReader { geo in
@@ -226,7 +403,7 @@ struct HomeView: View {
             .padding(.bottom, 10)
 
             legendRow(swatch: AnyView(RoundedRectangle(cornerRadius: 2.5).fill(.white.opacity(0.85))),
-                      label: "Spent", value: monthSpent.formatMoney())
+                      label: "Spent", value: periodSpent.formatMoney())
             legendRow(swatch: AnyView(hatchedFill(in: RoundedRectangle(cornerRadius: 2.5))),
                       label: "Bills · planned", value: monthBills.formatMoney(), valueOpacity: 0.9)
                 .padding(.top, 6)
@@ -304,7 +481,10 @@ struct HomeView: View {
                 .accessibilityIdentifier(A11y.Home.seeAllBudgets)
             }
             if showMonthly, let m = monthly {
-                budgetRow(title: "Monthly", spent: monthSpent, limit: m, carried: monthlyCarried)
+                // Period-scoped spend (period filter) + rollover carry, but carry-in only applies to
+                // the current period, so it shows only for "this month".
+                budgetRow(title: "Monthly", spent: periodSpent, limit: m,
+                          carried: period == .thisMonth ? monthlyCarried : 0)
             } else if let w = weekly {
                 budgetRow(title: "Weekly", spent: weekSpent, limit: w)
             }
@@ -393,11 +573,11 @@ struct HomeView: View {
             .padding(.horizontal, 16)
             .padding(.top, 4)
 
-            if receipts.isEmpty {
+            if periodReceipts.isEmpty {
                 emptyReceipts
             } else {
                 VStack(spacing: 0) {
-                    let recent = Array(receipts.prefix(5))
+                    let recent = Array(periodReceipts.prefix(5))
                     ForEach(Array(recent.enumerated()), id: \.element.persistentModelID) { idx, r in
                         NavigationLink { ReceiptDetailView(receipt: r) } label: { ReceiptRowView(receipt: r) }
                             .buttonStyle(.plain)
