@@ -41,7 +41,15 @@ enum WidgetSharing {
         let spent = month.reduce(Decimal.zero) { $0 + $1.paidTotal }
 
         let budgets = (try? context.fetch(FetchDescriptor<Budget>())) ?? []
-        let monthlyBudget = budgets.first { $0.key == Budget.monthlyKey }?.amount ?? 0
+        let baseMonthlyBudget = budgets.first { $0.key == Budget.monthlyKey }?.amount ?? 0
+        // Opt-in rollover: bake the overall monthly carry-over into the effective budget the ring
+        // shows, so the widget agrees with the app's Budget/Home cards. Monthly-set only.
+        let carried: Decimal = {
+            guard UserDefaults.standard.bool(forKey: SettingsKey.budgetRolloverEnabled) else { return 0 }
+            let rows = (try? context.fetch(FetchDescriptor<BudgetRollover>())) ?? []
+            return rows.first { $0.key == Budget.monthlyKey }?.carried ?? 0
+        }()
+        let monthlyBudget = baseMonthlyBudget + carried
 
         let df = DateFormatter(); df.dateFormat = "d MMM"
         let rows = receipts.prefix(4).map {
