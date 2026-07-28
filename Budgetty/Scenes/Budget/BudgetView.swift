@@ -24,6 +24,7 @@ private enum BudgetPeriod: String, CaseIterable, Identifiable {
 
 struct BudgetView: View {
     @Environment(\.horizontalSizeClass) private var hSize
+    @Environment(\.modelContext) private var context
     @Query(sort: \Receipt.createdAt, order: .reverse) private var receipts: [Receipt]
     @Query private var budgets: [Budget]
     @Query(sort: \Recurring.createdAt) private var recurring: [Recurring]
@@ -205,12 +206,24 @@ struct BudgetView: View {
     /// Free tier caps bills at `RecurringQuota.freeLimit`; income is never capped.
     private var billLimitReached: Bool { !premium && bills.count >= RecurringQuota.freeLimit }
 
+    /// Header badge: "N of M paid" once bills exist (the free-tier cap is already signalled by the
+    /// upgrade row replacing the Add row), mirroring Android's Payments section counter.
+    private var recurringBadge: String? {
+        guard !bills.isEmpty else { return nil }
+        let paid = bills.filter { $0.isPaidThisCycle() }.count
+        return String(localized: "\(paid) of \(bills.count) paid")
+    }
+
+    /// True when at least one bill is paid this cycle — greens the section's "N of M paid" counter.
+    private var anyBillPaid: Bool { bills.contains { $0.isPaidThisCycle() } }
+
     private var recurringSection: some View {
         VStack(spacing: 0) {
-            sectionHeader("Recurring", badge: billLimitReached ? "\(bills.count) / \(RecurringQuota.freeLimit)" : nil)
+            sectionHeader("Recurring", badge: recurringBadge,
+                          badgeTint: anyBillPaid ? Palette.good : Palette.secondaryLabel)
             VStack(spacing: 0) {
                 ForEach(bills) { r in
-                    moneyRow(r)
+                    billRow(r)
                     Divider().padding(.leading, 60)
                 }
                 // At the cap the Add row becomes the upsell rather than a button that fails — the
@@ -265,6 +278,55 @@ struct BudgetView: View {
             .padding(.horizontal, 16).padding(.vertical, 12)
         }
         .buttonStyle(.plain)
+    }
+
+    /// A bill row: a leading paid toggle (tap to mark this occurrence paid — dims and strikes the
+    /// amount) plus the same tap-to-edit body as an income row. Paid-state is derived, so it clears
+    /// itself when the next occurrence begins.
+    private func billRow(_ r: Recurring) -> some View {
+        let paid = r.isPaidThisCycle()
+        return HStack(spacing: 12) {
+            Button {
+                recurringEditor = RecurringEditor(isIncome: false, existing: r)
+            } label: {
+                HStack(spacing: 12) {
+                    iconTile(for: r)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(r.label).font(.body).foregroundStyle(Palette.label)
+                        Text(Self.cadenceSubtitle(r)).font(.caption).foregroundStyle(Palette.secondaryLabel)
+                    }
+                    Spacer(minLength: 8)
+                    // Paid rows dim their amount (~40% alpha) rather than striking it.
+                    Text("−\(r.amount.formatMoney())")
+                        .font(.body).fontWeight(.semibold)
+                        .foregroundStyle(Palette.bad)
+                        .opacity(paid ? 0.4 : 1)
+                }
+            }
+            .buttonStyle(.plain)
+            // Trailing paid toggle: hollow circle → filled green check for the current cycle.
+            Button {
+                setPaid(r, !paid)
+            } label: {
+                Image(systemName: paid ? "checkmark.circle.fill" : "circle")
+                    .font(.system(size: 22))
+                    .foregroundStyle(paid ? Palette.good : Palette.tertiaryLabel)
+                    .frame(width: 30, height: 44)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(paid ? Text("Paid") : Text("Mark as paid"))
+            .accessibilityAddTraits(paid ? [.isSelected] : [])
+        }
+        .padding(.horizontal, 16).padding(.vertical, 6)
+    }
+
+    /// Marks a bill paid (or not) for its current cycle by stamping `lastPosted` — reused as the paid
+    /// marker so it auto-resets when the next occurrence begins. No transaction is posted (recurring
+    /// stays planning-only), so it never double-counts a scanned receipt.
+    private func setPaid(_ bill: Recurring, _ paid: Bool) {
+        bill.lastPosted = paid ? .now : nil
+        try? context.save()
     }
 
     @ViewBuilder
@@ -414,8 +476,10 @@ struct BudgetView: View {
 
     // MARK: - Bits
 
-    /// `badge` carries the free-tier counter ("3 / 3") when a section is at its cap.
-    private func sectionHeader(_ title: LocalizedStringKey, badge: String? = nil) -> some View {
+    /// `badge` carries a trailing counter (the free-tier cap, or "N of M paid"); `badgeTint` colours
+    /// its text — green once any bill is paid, the muted default otherwise.
+    private func sectionHeader(_ title: LocalizedStringKey, badge: String? = nil,
+                               badgeTint: Color = Palette.secondaryLabel) -> some View {
         HStack {
             Text(title).font(.caption).fontWeight(.semibold).textCase(.uppercase)
                 .foregroundStyle(Palette.secondaryLabel).tracking(0.5)
@@ -423,7 +487,7 @@ struct BudgetView: View {
             if let badge {
                 Text(badge)
                     .font(.caption2).fontWeight(.bold)
-                    .foregroundStyle(Palette.secondaryLabel)
+                    .foregroundStyle(badgeTint)
                     .padding(.horizontal, 8).padding(.vertical, 2)
                     .background(Palette.fill, in: Capsule())
             }

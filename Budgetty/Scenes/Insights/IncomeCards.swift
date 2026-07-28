@@ -20,6 +20,8 @@ struct IncomeInsightsCards: View {
 
     private var periodIncome: Decimal { income.reduce(.zero) { $0 + $1.windowAmount(window) } }
     private var periodBills: Decimal { bills.reduce(.zero) { $0 + $1.windowAmount(window) } }
+    /// Bills not yet marked paid for their current occurrence — the only ones shown as "upcoming".
+    private var unpaidBills: [Recurring] { bills.filter { !$0.isPaidThisCycle() } }
     private var net: Decimal { periodIncome - periodBills - periodSpent }
     private func dbl(_ d: Decimal) -> Double { (d as NSDecimalNumber).doubleValue }
 
@@ -28,7 +30,7 @@ struct IncomeInsightsCards: View {
             VStack(spacing: 14) {
                 if periodIncome > 0 { incomeVsSpending; savingsRate }
                 if periodBills > 0 || periodSpent > 0 { fixedVsFlexible }
-                if !bills.isEmpty { upcomingBills }
+                if !unpaidBills.isEmpty { upcomingBills }
                 if !income.isEmpty { incomeBySource }
             }
         }
@@ -123,7 +125,7 @@ struct IncomeInsightsCards: View {
     private var upcomingBills: some View {
         card("Upcoming bills") {
             VStack(spacing: 0) {
-                let sorted = bills.sorted { $0.dueDay < $1.dueDay }
+                let sorted = unpaidBills.sorted { $0.dueDay < $1.dueDay }
                 ForEach(Array(sorted.enumerated()), id: \.element.persistentModelID) { idx, b in
                     HStack(spacing: 12) {
                         CategoryTile(category: b.category.isEmpty ? Categories.defaultName : b.category, size: 30)
