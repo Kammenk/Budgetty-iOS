@@ -383,9 +383,23 @@ struct HistoryView: View {
     private var monthlyBills: Decimal { bills.reduce(.zero) { $0 + $1.monthlyEquivalent } }
     private var hasBudgetPlan: Bool { !income.isEmpty || !bills.isEmpty }
 
+    /// The History date filter as a window — the current pay-cycle month when no filter is set. The
+    /// "left after bills" summary scales income & bills to it via `windowAmount` (Android parity); the
+    /// section cards below keep showing the per-month rate.
+    private var budgetWindow: DateInterval {
+        guard let r = dateRange else { return PayCycle.monthInterval() }
+        let cal = Calendar.current
+        let start = cal.startOfDay(for: r.lowerBound)
+        let end = cal.date(byAdding: .day, value: 1, to: cal.startOfDay(for: r.upperBound)) ?? r.upperBound
+        return DateInterval(start: start, end: end)
+    }
+    private var periodIncome: Decimal { income.reduce(.zero) { $0 + $1.windowAmount(budgetWindow) } }
+    private var periodBills: Decimal { bills.reduce(.zero) { $0 + $1.windowAmount(budgetWindow) } }
+
     /// A read-only snapshot of the money plan (income + recurring payments) mirrored from the Budget
-    /// screen, topped by a "left after bills" summary — the Android History Budgets tab. It reflects
-    /// the current plan (not time-scoped), so it links out to Budget to make changes.
+    /// screen, topped by a "left after bills" summary — the Android History Budgets tab. The summary
+    /// scales to the History date filter (windowAmount); the section rows keep the per-month plan, and
+    /// it links out to Budget to make changes.
     private var budgetsTab: some View {
         Group {
             if !hasBudgetPlan {
@@ -421,16 +435,18 @@ struct HistoryView: View {
         }
     }
 
-    /// income − recurring bills = what's left after fixed costs for the month.
+    /// income − recurring bills = what's left after fixed costs, scaled to the selected History window
+    /// (the current month when no date filter is set).
     private var budgetsSummaryCard: some View {
-        let left = monthlyIncome - monthlyBills
+        let left = periodIncome - periodBills
         return VStack(alignment: .leading, spacing: 0) {
-            Text("Monthly").font(.caption).fontWeight(.semibold).textCase(.uppercase)
+            Text(dateRange == nil ? "Monthly" : "Selected period")
+                .font(.caption).fontWeight(.semibold).textCase(.uppercase)
                 .foregroundStyle(Palette.secondaryLabel).tracking(0.5)
                 .padding(.bottom, 8)
-            summaryLine("Income", amount: "+\(monthlyIncome.formatMoney())", color: Palette.good)
+            summaryLine("Income", amount: "+\(periodIncome.formatMoney())", color: Palette.good)
             Divider()
-            summaryLine("Recurring bills", amount: "−\(monthlyBills.formatMoney())",
+            summaryLine("Recurring bills", amount: "−\(periodBills.formatMoney())",
                         color: Palette.secondaryLabel)
             Divider().padding(.bottom, 8)
             HStack {

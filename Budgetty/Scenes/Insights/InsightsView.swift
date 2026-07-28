@@ -108,18 +108,14 @@ struct InsightsView: View {
     }
 
     private var incomeCards: some View {
+        // Income & bills scale to the selected period via windowAmount and pair with that period's
+        // actual spend (Android parity). windowAmount's createdAt-clip stops a just-added salary being
+        // projected back over months it didn't exist for, so a non-month view no longer mismatches the
+        // income and spend windows — the reason this was previously pinned to a "this month" snapshot.
         IncomeInsightsCards(income: recurring.filter(\.isIncome),
                             bills: recurring.filter { !$0.isIncome },
-                            monthSpent: currentMonthSpent)
-    }
-
-    /// Spend in the current pay-cycle month, independent of the selected period. The money-flow cards
-    /// are a fixed "this month" snapshot (income/bills are monthly equivalents), so pairing them with
-    /// the selected period's spend would mismatch the windows in any non-month view — a half-year
-    /// selection would show six months of spend against one month of income.
-    private var currentMonthSpent: Decimal {
-        let window = PayCycle.monthInterval(startDay: monthStartDay)
-        return receipts.filter { window.contains($0.createdAt) }.reduce(.zero) { $0 + $1.paidTotal }
+                            periodSpent: totalSpent,
+                            window: period.interval)
     }
 
     /// iPhone: one column, in the user's chosen order with hidden sections removed.

@@ -79,4 +79,48 @@ final class Recurring {
         case .yearly: amount / Decimal(12)
         }
     }
+
+    /// The entry's contribution to `window`, counting a recurring cadence only from the calendar month
+    /// it was added (`createdAt`) onward — so a salary or bill is never projected back onto months it
+    /// didn't yet exist for (a half-year view no longer shows 6× a just-added salary). A one-time entry
+    /// counts its full amount once, and only if it was added inside the window. Whole calendar-month
+    /// windows scale the monthly rate by eligible months; partial windows (a week step, a custom range,
+    /// or a pay-cycle month) scale by active days over an average month (30.4375). A direct port of
+    /// Android's `RecurringEntity.windowAmount` — the createdAt-clip that fixed the back-projection bug.
+    func windowAmount(_ window: DateInterval, calendar cal: Calendar = .current) -> Decimal {
+        if cadence == .once {
+            return window.contains(createdAt) ? amount : 0
+        }
+        let rate = monthlyEquivalent
+        if rate == 0 { return 0 }
+
+        let startDate = cal.startOfDay(for: window.start)
+        // window.end is exclusive, so the last included day is the day before it.
+        let lastDate = cal.startOfDay(for: cal.date(byAdding: .day, value: -1, to: window.end) ?? window.end)
+        let createdMonth = cal.date(from: cal.dateComponents([.year, .month], from: createdAt)) ?? startDate
+        // Clip to the part of the window on/after the month the entry was added.
+        let activeStart = max(startDate, createdMonth)
+        if activeStart > lastDate { return 0 }
+
+        let daysInLastMonth = cal.range(of: .day, in: .month, for: lastDate)?.count ?? 0
+        let wholeMonths = cal.component(.day, from: startDate) == 1
+            && cal.component(.day, from: lastDate) == daysInLastMonth
+        if wholeMonths {
+            // Whole calendar-month window (the default month/quarter/half steps): count eligible whole
+            // months for clean integer scaling of the monthly rate.
+            let startMonth = cal.date(from: cal.dateComponents([.year, .month], from: startDate)) ?? startDate
+            let endMonth = cal.date(from: cal.dateComponents([.year, .month], from: lastDate)) ?? lastDate
+            var months = 0
+            var m = startMonth
+            while m <= endMonth {
+                if m >= createdMonth { months += 1 }
+                guard let next = cal.date(byAdding: .month, value: 1, to: m) else { break }
+                m = next
+            }
+            return rate * Decimal(months)
+        }
+        // Partial window: scale by active days over an average month, matching Android's factor.
+        let activeDays = (cal.dateComponents([.day], from: activeStart, to: lastDate).day ?? 0) + 1
+        return rate * Decimal(activeDays) / (Decimal(string: "30.4375") ?? 30)
+    }
 }
