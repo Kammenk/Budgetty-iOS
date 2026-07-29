@@ -745,3 +745,17 @@ so it **auto-resets each cycle with no schema change and no scheduled job**. iOS
 `budget-rollover` → `origin/budget-rollover`; `274519b` + `c8d8863`; phone + tablet emulator-verified) and **#6
 built** (`fcc06ff`, branch `recurring-mark-as-paid`) — **neither merged to Android `main` yet**; #1–#4 are already
 Android's shipped behavior (10.8.0). Android `main`/`009c24d`.*
+
+---
+
+# Category & Insights v2 — NEW batch, add all three to iOS (Android `main` merge `4c764f0`)
+
+Merged to Android `main` (branch `category-insights-v2`; `688f122` + iOS doc `98c0e51`; merge `4c764f0`), emulator-verified. **Full iOS design-request + port brief lives at the Android repo root: `IOS_CATEGORY_INSIGHTS_V2_DESIGN_REQUEST.md`** — its "Design request" sections go to Claude Design for the `iOS *.dc.html` Liquid-Glass mockups; its "Port notes" drive the build. Summary:
+
+***1. Insights pie legend.*** Legend rows gain a colored emoji tile + the category % over the muted amount; the donut centre shows the tapped category's emoji; **keep the on-ring % labels**. No model change. Android ref `PieChart.kt`.
+
+***2. Expanded emoji picker.*** The custom-category icon grid becomes a curated **~220-emoji pool in 9 searchable sections** (pinned search; match is **exact-token-first, else prefix** — "car"→vehicles not "carton"). Port the exact list + keywords from Android `EmojiCatalog.kt`; both platforms share one vocabulary.
+
+***3. Sub-categories (user-defined 2-level).*** Nullable **`parent`** per category (Android DB **v20 / `MIGRATION_19_20`**, additive — existing rows NULL, grouping resolves from code). Effective parent = `row.parent ?? codeDefaultParent(name)`; `groupOf` rolls up to it. **Parents are spendable**; re-home **custom AND built-in**; delete→promote children to top-level, rename→cascade, nesting→release own children; **2 levels only**; **organising is FREE** (no new paywall). Picker shows custom primaries as headers with their effective children + a **Parent selector** + built-in **"Move to group"**. Budget screen rolls up own+children (group total = own + children budgets); Insights grouped mode folds custom children into their custom primary **automatically via `groupOf`**. iOS: add nullable `parent` to the SwiftData category model + a migration, port cascades from `UploadViewModel`/`BudgetViewModel` + `Categories` (`parentOf`/`groupOf`/`defaultParentOf`, `budgetGroups`/`effectiveChildren`). ⚠️ v1 limitation: a built-in re-homes into another group but can't become standalone top-level (NULL falls back to its code default group).
+
+*Status: iOS = all three PENDING. Android = merged to `main` (`4c764f0`), emulator-verified (migration on real data, nested custom-category create, budget roll-up, pie legend).*
