@@ -57,6 +57,8 @@ enum A11y {
         static let recentReceipts = "home_recent_receipts"
         static let seeAllReceipts = "home_see_all_receipts"
         static let seeAllBudgets = "home_see_all_budgets"
+        static let safeToSpend = "home_safe_to_spend"
+        static let setUpIncome = "home_set_up_income"
     }
 
     enum History {
