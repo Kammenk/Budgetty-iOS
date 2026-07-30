@@ -73,6 +73,9 @@ struct BudgettyApp: App {
         // existing row's colour.
         Migrations.splitSubscriptionsAndServices(container.mainContext)
         Seed.categoriesIfNeeded(container.mainContext)
+        // Prime the taxonomy caches (parent overrides + custom colour/emoji) so grouping and custom
+        // rendering are correct from the first render; category mutations refresh it again as they run.
+        Categories.setStored((try? container.mainContext.fetch(FetchDescriptor<Category>())) ?? [])
         #if DEBUG
         SampleData.populateIfEmpty(container.mainContext)
         #endif

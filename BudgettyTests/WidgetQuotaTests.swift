@@ -89,8 +89,9 @@ struct WidgetQuotaTests {
     /// Every shipped widget kind must be ranked, or an unranked one sorts last and is always the
     /// first to lock — a silent bug the moment a fourth widget is added.
     @Test func everyShippedKindIsRanked() {
-        #expect(WidgetQuota.kindOrder.count == 3)
-        for kind in ["BudgettySpending", "BudgettyBudgetRing", "BudgettyRecentReceipts"] {
+        #expect(WidgetQuota.kindOrder.count == 5)
+        for kind in ["BudgettySpending", "BudgettyBudgetRing", "BudgettyRecentReceipts",
+                     "BudgettyThisWeek", "BudgettyTopCategories"] {
             #expect(WidgetQuota.kindOrder.contains(kind))
         }
     }

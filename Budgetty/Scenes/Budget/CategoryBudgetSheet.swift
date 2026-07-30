@@ -27,7 +27,9 @@ struct CategoryBudgetSheet: View {
     @State private var amounts: [String: Decimal] = [:]
     @State private var loaded = false
 
-    private var subcategories: [Categories.Predefined] { Categories.children(of: group) }
+    /// Effective children by name — includes custom sub-categories and re-homed built-ins, not just
+    /// the built-in taxonomy, so a custom primary's sub-budgets show here too.
+    private var subNames: [String] { Categories.childNames(of: group) }
     private var groupKey: String { Budget.categoryKey(group) }
 
     var body: some View {
@@ -36,9 +38,9 @@ struct CategoryBudgetSheet: View {
                 Section("Category budget") {
                     amountRow(title: "Amount", key: groupKey)
                 }
-                if !subcategories.isEmpty {
+                if !subNames.isEmpty {
                     Section("Subcategories") {
-                        ForEach(subcategories, id: \.name) { subRow($0) }
+                        ForEach(subNames, id: \.self) { subRow($0) }
                     }
                 }
             }
@@ -64,13 +66,13 @@ struct CategoryBudgetSheet: View {
         }
     }
 
-    private func subRow(_ sub: Categories.Predefined) -> some View {
-        let key = Budget.categoryKey(sub.name)
-        let sp = spent(sub.name)
+    private func subRow(_ name: String) -> some View {
+        let key = Budget.categoryKey(name)
+        let sp = spent(name)
         let amt = amounts[key] ?? 0
         return VStack(spacing: 6) {
             HStack(spacing: 10) {
-                Text(Categories.displayName(sub.name))
+                Text(Categories.displayName(name))
                 Spacer()
                 Text(sp > 0 ? "\(sp.formatMoney()) spent" : "No spend")
                     .font(.caption).foregroundStyle(.secondary)
@@ -105,8 +107,8 @@ struct CategoryBudgetSheet: View {
         loaded = true
         var m: [String: Decimal] = [:]
         m[groupKey] = budgets.first { $0.key == groupKey }?.amount ?? 0
-        for sub in subcategories {
-            let k = Budget.categoryKey(sub.name)
+        for name in subNames {
+            let k = Budget.categoryKey(name)
             m[k] = budgets.first { $0.key == k }?.amount ?? 0
         }
         amounts = m

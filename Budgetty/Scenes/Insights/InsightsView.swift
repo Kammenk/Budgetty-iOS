@@ -46,6 +46,9 @@ struct InsightsView: View {
     private struct Sel: Identifiable { let id = UUID(); let name: String }
     @State private var categorySel: Sel?
     @State private var storeSel: Sel?
+    /// The breakdown slice/row the user tapped — puts that category's emoji in the donut centre and
+    /// dims the rest. Cleared when the Groups/All toggle flips.
+    @State private var pickedCategory: String?
 
     var body: some View {
         NavigationStack {
@@ -441,6 +444,22 @@ struct InsightsView: View {
         return Color(argb: Categories.color(for: name))
     }
 
+    /// Category emoji: stored rows first (covers custom categories), the predefined glyph otherwise —
+    /// mirrors `categoryColor` so a legend tile matches its slice.
+    private func categoryEmoji(_ name: String) -> String {
+        if let stored = storedCategories.first(where: { $0.name.caseInsensitiveCompare(name) == .orderedSame }),
+           !stored.icon.isEmpty {
+            return stored.icon
+        }
+        return Categories.emoji(for: name)
+    }
+
+    /// Whole-percent share of `total` for a legend row (rounds half away from zero, like Android).
+    private func percentInt(_ value: Decimal, of total: Decimal) -> Int {
+        guard total > 0 else { return 0 }
+        return Int((dbl(value) / dbl(total) * 100).rounded())
+    }
+
     /// Spend rolled up to top-level groups, descending.
     private var groupSlices: [(name: String, value: Decimal)] {
         var sums: [String: Decimal] = [:]
@@ -551,33 +570,78 @@ struct InsightsView: View {
             }
             let slices = breakdownAllCats ? categorySlices : groupSlices
             let netTotal = slices.reduce(Decimal.zero) { $0 + $1.value }
+            let selIndex = pickedCategory.flatMap { pc in slices.firstIndex { $0.name == pc } }
+            let picked = selIndex.map { slices[$0] }
             HStack(spacing: 4) {
                 ZStack {
-                    DonutChart(slices: slices.map { (categoryColor($0.name), dbl($0.value)) })
-                        .frame(width: 150, height: 150)
-                    VStack(spacing: 0) {
-                        Text("Total").font(.caption2).foregroundStyle(Palette.secondaryLabel)
-                        Text(netTotal.formatMoney()).font(.title3).fontWeight(.bold)
-                        Text(period.contextNoun).font(.caption2).foregroundStyle(Palette.secondaryLabel)
+                    DonutChart(slices: slices.map { (categoryColor($0.name), dbl($0.value)) },
+                               selectedIndex: selIndex) { idx in
+                        let name = slices[idx].name
+                        pickedCategory = (pickedCategory == name) ? nil : name
+                    }
+                    .frame(width: 150, height: 150)
+                    if let picked {
+                        VStack(spacing: 1) {
+                            Text(categoryEmoji(picked.name)).font(.system(size: 26))
+                            Text(Categories.displayName(picked.name))
+                                .font(.system(size: 13, weight: .semibold)).foregroundStyle(Palette.label).lineLimit(1)
+                            Text(picked.value.formatMoney()).font(.title3).fontWeight(.bold).foregroundStyle(Palette.label)
+                            Text("\(percentInt(picked.value, of: netTotal))% of total")
+                                .font(.caption2).foregroundStyle(Palette.secondaryLabel)
+                        }
+                        .frame(width: 108).multilineTextAlignment(.center)
+                    } else {
+                        VStack(spacing: 0) {
+                            Text("Total").font(.caption2).foregroundStyle(Palette.secondaryLabel)
+                            Text(netTotal.formatMoney()).font(.title3).fontWeight(.bold)
+                            Text(period.contextNoun).font(.caption2).foregroundStyle(Palette.secondaryLabel)
+                        }
                     }
                 }
                 .frame(maxWidth: .infinity)
             }
-            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 7) {
+            LazyVGrid(columns: [GridItem(.flexible(), spacing: 12), GridItem(.flexible())], spacing: 9) {
                 ForEach(slices, id: \.name) { s in
-                    HStack(spacing: 7) {
-                        Circle().fill(categoryColor(s.name))
-                            .frame(width: 9, height: 9)
-                        Text(Categories.displayName(s.name)).font(.caption).foregroundStyle(Palette.label).lineLimit(1)
-                        Spacer(minLength: 4)
-                        Text(s.value.formatMoney()).font(.caption).fontWeight(.semibold)
+                    let isSel = s.name == pickedCategory
+                    Button {
+                        pickedCategory = isSel ? nil : s.name
+                    } label: {
+                        HStack(spacing: 8) {
+                            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                .fill(categoryColor(s.name))
+                                .frame(width: 36, height: 36)
+                                .overlay(Text(categoryEmoji(s.name)).font(.system(size: 18)))
+                            VStack(alignment: .leading, spacing: 1) {
+                                Text(Categories.displayName(s.name))
+                                    .font(.system(size: 12, weight: .semibold))
+                                    .foregroundStyle(Palette.label)
+                                    .lineLimit(1)
+                                HStack(alignment: .firstTextBaseline, spacing: 5) {
+                                    Text("\(percentInt(s.value, of: netTotal))%")
+                                        .font(.system(size: 12, weight: .heavy))
+                                        .foregroundStyle(Palette.label)
+                                    Text(s.value.formatMoney())
+                                        .font(.system(size: 10.5))
+                                        .foregroundStyle(Palette.secondaryLabel)
+                                }
+                            }
+                            Spacer(minLength: 0)
+                        }
+                        .padding(.vertical, 3).padding(.horizontal, 5)
+                        .background(isSel ? Palette.tintSoft : Color.clear,
+                                    in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                        .opacity(pickedCategory == nil || isSel ? 1 : 0.42)
+                        .contentShape(Rectangle())
                     }
+                    .buttonStyle(.plain)
                 }
             }
+            .animation(.easeInOut(duration: 0.16), value: pickedCategory)
         }
         .padding(18)
         .frame(maxWidth: .infinity, alignment: .leading)
         .contentCard(cornerRadius: 16)
+        .onChange(of: breakdownAllCats) { pickedCategory = nil }
     }
 
     /// Groups ↔ all-categories granularity switch on the Breakdown card (Android parity).

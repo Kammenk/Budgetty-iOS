@@ -29,6 +29,8 @@ struct BudgetView: View {
     @Query private var budgets: [Budget]
     @Query(sort: \Recurring.createdAt) private var recurring: [Recurring]
     @Query private var rollovers: [BudgetRollover]
+    @Query(filter: #Predicate<Category> { $0.isCustom }, sort: \Category.createdAt)
+    private var customCategories: [Category]
 
     @AppStorage(SettingsKey.premium) private var premium = false
     /// The pay day the financial month starts on (1 = calendar month); the monthly budget and the
@@ -434,8 +436,8 @@ struct BudgetView: View {
     }
 
     private func subBudgetCount(_ group: String) -> Int {
-        Categories.children(of: group).filter { child in
-            budgets.contains { $0.key == Budget.categoryKey(child.name) && $0.amount > 0 }
+        Categories.childNames(of: group).filter { child in
+            budgets.contains { $0.key == Budget.categoryKey(child) && $0.amount > 0 }
         }.count
     }
 
@@ -505,16 +507,35 @@ struct BudgetView: View {
             LazyVGrid(columns: adaptiveGridColumns(compact: 2, regular: 3,
                                                    isRegular: hSize == .regular, spacing: 10),
                       spacing: 10) {
-                ForEach(Categories.groups.filter { $0.name != Categories.other }, id: \.name) { g in
-                    categoryCard(g.name)
+                ForEach(budgetGroups, id: \.self) { g in
+                    categoryCard(g)
                 }
             }
         }
     }
 
+    /// Top-level budget cards: the built-in groups (bar "Other"), then any user primary — a top-level
+    /// custom that has children — so its own+children roll-up gets a card too (mockup View G, matching
+    /// Android's `budgetGroups`).
+    private var budgetGroups: [String] {
+        Categories.groups.map(\.name).filter { $0 != Categories.other }
+            + customCategories.filter { $0.parent == nil && !Categories.childNames(of: $0.name).isEmpty }.map(\.name)
+    }
+
+    /// Sum of a group's children's own category budgets — the roll-up half of its displayed total.
+    private func childBudgetSum(_ group: String) -> Decimal {
+        Categories.childNames(of: group).reduce(Decimal.zero) { sum, child in
+            sum + (budgets.first { $0.key == Budget.categoryKey(child) }?.amount ?? 0)
+        }
+    }
+
     private func categoryCard(_ group: String) -> some View {
         let key = Budget.categoryKey(group)
-        let budget = budgets.first { $0.key == key }
+        let own = budgets.first { $0.key == key }?.amount ?? 0
+        let carried = carriedFor(key)
+        // Roll-up display: the card shows the group's own budget plus its children's budgets (spend
+        // is already rolled up via `categorySpent`), so a primary reads as one total (mockup View G).
+        let effective = own + childBudgetSum(group) + carried
         let spent = categorySpent(group)
         let subCount = subBudgetCount(group)
         return Button {
@@ -524,9 +545,7 @@ struct BudgetView: View {
                 Text(Categories.emoji(for: group)).font(.system(size: 22))
                 Text(Categories.displayName(group)).font(.subheadline).fontWeight(.semibold).foregroundStyle(Palette.label)
                     .lineLimit(1)
-                if let b = budget {
-                    let carried = carriedFor(key)
-                    let effective = b.amount + carried
+                if effective > 0 {
                     let frac = HomeView.fraction(spent, of: effective)
                     let color: Color = frac >= 1 ? Palette.bad : (frac >= 0.85 ? Palette.warn : Palette.good)
                     Text("\(spent.formatMoney()) / \(effective.formatMoney())")
