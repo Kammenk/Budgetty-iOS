@@ -166,15 +166,40 @@ enum Categories {
     /// Top-level categories (the groups + Other), in display order.
     static let groups: [Predefined] = predefined.filter { $0.parent == nil }
 
-    /// Sub-categories belonging to `group`, in display order.
+    /// Built-in sub-categories belonging to `group`, in display order. Taxonomy only — does not
+    /// reflect user re-homing or custom children; use `childNames(of:)` for the effective hierarchy.
     static func children(of group: String) -> [Predefined] {
         predefined.filter { $0.parent == group }
     }
 
-    /// The top-level group `name` rolls up into (case-insensitive); groups / Other / custom / unknown
-    /// return `name` unchanged. Collapses the Insights breakdown down to top-level groups.
+    /// Effective children of `group` by name, in display order: every built-in or stored category
+    /// whose *effective* parent is `group` — so custom sub-categories and re-homed built-ins are
+    /// included, and built-ins re-homed elsewhere drop out. Excludes `group` itself. This is the
+    /// hierarchy the picker, budget roll-up and grouped Insights walk.
+    static func childNames(of group: String) -> [String] {
+        var seen = Set<String>()
+        return (predefined.map(\.name) + customNames).filter { name in
+            guard name.caseInsensitiveCompare(group) != .orderedSame,
+                  groupOf(name).caseInsensitiveCompare(group) == .orderedSame else { return false }
+            return seen.insert(name.lowercased()).inserted
+        }
+    }
+
+    /// The code-defined parent of a built-in `name` (nil for a group, "Other", a custom or unknown).
+    static func defaultParentOf(_ name: String) -> String? { find(name)?.parent }
+
+    /// The *effective* parent of `name`: a stored user override wins, else the code default. `nil`
+    /// means top-level. Mirrors Android's `parentOf`.
+    static func parentOf(_ name: String) -> String? {
+        overrideParent(name.lowercased()) ?? defaultParentOf(name)
+    }
+
+    /// The top-level group `name` rolls up into (case-insensitive); a top-level category (a group,
+    /// "Other", or an un-nested custom) returns `name` unchanged. Honours user overrides via
+    /// `parentOf`, so custom children fold into their custom primary. Collapses the Insights
+    /// breakdown down to top-level groups.
     static func groupOf(_ name: String) -> String {
-        predefined.first { $0.name.caseInsensitiveCompare(name) == .orderedSame }?.parent ?? name
+        parentOf(name) ?? name
     }
 
     /// True if `name` is a built-in category (group, sub-category, or "Other"), case-insensitive.
@@ -186,12 +211,75 @@ enum Categories {
         predefined.first { $0.name.caseInsensitiveCompare(name) == .orderedSame }
     }
 
-    /// The canonical packed color for `name` (predefined; falls back to the default custom color).
-    /// Custom categories resolve from the DB's `Category` rows at the call site.
-    static func color(for name: String) -> Int { find(name)?.colorArgb ?? defaultColor }
+    /// The packed color for `name`: a stored custom row wins, else the predefined color, else the
+    /// default custom color. Being DB-aware means custom categories render their real color anywhere
+    /// that calls this (tiles, legend, budget) without each call site re-querying the store.
+    static func color(for name: String) -> Int {
+        overrideColor(name.lowercased()) ?? find(name)?.colorArgb ?? defaultColor
+    }
 
-    /// The emoji for `name` (predefined; generic receipt glyph as fallback).
-    static func emoji(for name: String) -> String { find(name)?.emoji ?? "🧾" }
+    /// The emoji for `name`: a stored custom row wins, else the predefined glyph, else a generic
+    /// receipt glyph.
+    static func emoji(for name: String) -> String {
+        overrideEmoji(name.lowercased()) ?? find(name)?.emoji ?? "🧾"
+    }
+
+    // MARK: - Stored category data (DB-backed overrides)
+
+    /// Live snapshot of the stored `Category` rows, refreshed via `setStored` on launch and after
+    /// every category mutation. Mirrors Android's `Categories.setCategories`: parent overrides make
+    /// `groupOf` honour user nesting/re-homing, and the custom color/emoji let `color(for:)` /
+    /// `emoji(for:)` resolve custom categories without every call site re-querying the DB.
+    /// `groupOf`/`color(for:)`/`emoji(for:)` also run off the main thread (the widget snapshot build,
+    /// and parallel unit tests), so the caches sit behind a lock — reads are cheap and writes rare.
+    private static let cacheLock = NSLock()
+    private static var storedParent: [String: String] = [:]   // lowercased name → parent name
+    private static var storedColor: [String: Int] = [:]        // lowercased name → argb (customs)
+    private static var storedEmoji: [String: String] = [:]     // lowercased name → emoji (customs)
+    private static var storedCustomNames: [String] = []
+
+    /// User-created category names, in the order last supplied to `setStored`.
+    static var customNames: [String] {
+        cacheLock.lock(); defer { cacheLock.unlock() }
+        return storedCustomNames
+    }
+
+    /// Refresh the stored-category caches from the current DB rows. Call after seeding and after any
+    /// create / rename / delete / re-home so grouping and custom rendering stay in sync.
+    static func setStored(_ rows: [Category]) {
+        var parent: [String: String] = [:]
+        var color: [String: Int] = [:]
+        var emoji: [String: String] = [:]
+        var customs: [String] = []
+        for r in rows {
+            let key = r.name.lowercased()
+            if let p = r.parent, !p.isEmpty { parent[key] = p }
+            if r.isCustom {
+                customs.append(r.name)
+                color[key] = r.colorArgb
+                if !r.icon.isEmpty { emoji[key] = r.icon }
+            }
+        }
+        cacheLock.lock()
+        storedParent = parent
+        storedColor = color
+        storedEmoji = emoji
+        storedCustomNames = customs
+        cacheLock.unlock()
+    }
+
+    private static func overrideParent(_ key: String) -> String? {
+        cacheLock.lock(); defer { cacheLock.unlock() }
+        return storedParent[key]
+    }
+    private static func overrideColor(_ key: String) -> Int? {
+        cacheLock.lock(); defer { cacheLock.unlock() }
+        return storedColor[key]
+    }
+    private static func overrideEmoji(_ key: String) -> String? {
+        cacheLock.lock(); defer { cacheLock.unlock() }
+        return storedEmoji[key]
+    }
 
     /// Colors offered when creating a custom category — the app's own muted family.
     static let palette: [Int] = [

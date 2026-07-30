@@ -3,8 +3,10 @@
 //  Budgetty
 //
 //  Full-screen category chooser: a searchable 3-column grid with a "Your Categories" section (＋New
-//  + user categories) followed by the taxonomy grouped by top-level group. Used when editing a line
-//  item's or a bill's category.
+//  + flat user categories), then any user-made primary groups, then the built-in taxonomy grouped by
+//  top-level group. Custom sub-categories and re-homed built-ins fold under their effective parent
+//  via `Categories.childNames`. A long-press context menu manages a category in place — edit, re-home
+//  ("Move to Group…"), set a budget, or delete. Used when editing a line item's or a bill's category.
 //
 
 import SwiftUI
@@ -15,6 +17,7 @@ struct CategoryPickerSheet: View {
     /// Called with the chosen category name (in addition to updating the binding).
     var onPicked: ((String) -> Void)?
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.modelContext) private var context
 
     @Query(filter: #Predicate<Category> { $0.isCustom }, sort: \Category.createdAt)
     private var customCategories: [Category]
@@ -22,15 +25,37 @@ struct CategoryPickerSheet: View {
     @State private var search = ""
     @State private var showCreate = false
 
+    // Context-menu routes.
+    @State private var editTarget: Category?
+    @State private var moveTarget: NameRoute?
+    @State private var budgetTarget: NameRoute?
+    @State private var deleteTarget: Category?
+
     private let columns = Array(repeating: GridItem(.flexible(), spacing: 10), count: 3)
+
+    /// Identifiable wrapper so a category *name* can drive `.sheet(item:)`.
+    private struct NameRoute: Identifiable { let id: String }
+
+    /// Top-level customs with no children of their own — shown as flat tiles in "Your Categories".
+    private var flatCustoms: [Category] {
+        customCategories.filter { $0.parent == nil && Categories.childNames(of: $0.name).isEmpty }
+    }
+    /// Top-level customs that have children — shown as their own group (header + children), like a
+    /// built-in group (mockup Fork 1 Option A: the primary is the section's first, tappable tile).
+    private var primaryCustoms: [Category] {
+        customCategories.filter { $0.parent == nil && !Categories.childNames(of: $0.name).isEmpty }
+    }
 
     var body: some View {
         NavigationStack {
             ScrollView {
                 if search.isEmpty {
                     yourCategoriesSection
+                    ForEach(primaryCustoms, id: \.name) { c in
+                        gridSection(c.name, names: [c.name] + Categories.childNames(of: c.name))
+                    }
                     ForEach(Categories.groups, id: \.name) { group in
-                        gridSection(group.name, names: [group.name] + Categories.children(of: group.name).map(\.name))
+                        gridSection(group.name, names: [group.name] + Categories.childNames(of: group.name))
                     }
                 } else {
                     gridSection(nil, names: filteredNames)
@@ -43,6 +68,32 @@ struct CategoryPickerSheet: View {
             .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
             .sheet(isPresented: $showCreate) {
                 CustomCategorySheet(onSaved: { name in selection = name; dismiss() })
+            }
+            .sheet(item: $editTarget) { cat in
+                CustomCategorySheet(editing: cat)
+            }
+            .sheet(item: $budgetTarget) { route in
+                CategoryBudgetSheet(group: route.id)
+            }
+            .sheet(item: $moveTarget) { route in
+                NavigationStack {
+                    CategoryParentList(current: route.id, selected: Categories.parentOf(route.id)) { newParent in
+                        CategoryOps.setParent(context, name: route.id, to: newParent)
+                    }
+                    .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Cancel") { moveTarget = nil } } }
+                }
+                .presentationDetents([.medium, .large])
+            }
+            .confirmationDialog("Delete this category?",
+                                isPresented: Binding(get: { deleteTarget != nil },
+                                                     set: { if !$0 { deleteTarget = nil } }),
+                                titleVisibility: .visible, presenting: deleteTarget) { cat in
+                Button("Delete", role: .destructive) { CategoryOps.deleteCustom(context, cat); deleteTarget = nil }
+                Button("Cancel", role: .cancel) { deleteTarget = nil }
+            } message: { cat in
+                if !Categories.childNames(of: cat.name).isEmpty {
+                    Text("Its sub-categories are kept and moved to the top level.")
+                }
             }
         }
     }
@@ -57,8 +108,8 @@ struct CategoryPickerSheet: View {
             sectionHeader("Your Categories")
             LazyVGrid(columns: columns, spacing: 10) {
                 Button { showCreate = true } label: { newTile }.buttonStyle(.plain)
-                ForEach(customCategories, id: \.name) { cat in
-                    tile(cat.name, color: Color(argb: cat.colorArgb), emoji: cat.icon)
+                ForEach(flatCustoms, id: \.name) { cat in
+                    tile(cat.name)
                 }
             }
             .padding(.horizontal, 16)
@@ -71,7 +122,7 @@ struct CategoryPickerSheet: View {
             if let title { sectionHeader(title) } else { Color.clear.frame(height: 8) }
             LazyVGrid(columns: columns, spacing: 10) {
                 ForEach(names, id: \.self) { name in
-                    tile(name, color: Color(argb: Categories.color(for: name)), emoji: Categories.emoji(for: name))
+                    tile(name)
                 }
             }
             .padding(.horizontal, 16)
@@ -79,16 +130,17 @@ struct CategoryPickerSheet: View {
         .padding(.top, 12)
     }
 
-    private func tile(_ name: String, color: Color, emoji: String) -> some View {
-        Button {
+    private func tile(_ name: String) -> some View {
+        let custom = customCategories.first { $0.name.caseInsensitiveCompare(name) == .orderedSame }
+        return Button {
             selection = name
             onPicked?(name)
             dismiss()
         } label: {
             VStack(spacing: 8) {
-                RoundedRectangle(cornerRadius: 12, style: .continuous).fill(color)
+                RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Color(argb: Categories.color(for: name)))
                     .frame(width: 44, height: 44)
-                    .overlay(Text(emoji).font(.system(size: 22)))
+                    .overlay(Text(Categories.emoji(for: name)).font(.system(size: 22)))
                 Text(Categories.displayName(name)).font(.caption).fontWeight(.medium).foregroundStyle(Palette.label)
                     .multilineTextAlignment(.center).lineLimit(2)
             }
@@ -101,6 +153,22 @@ struct CategoryPickerSheet: View {
             )
         }
         .buttonStyle(.plain)
+        .contextMenu { menu(for: name, custom: custom) }
+    }
+
+    @ViewBuilder
+    private func menu(for name: String, custom: Category?) -> some View {
+        if let custom {
+            Button { editTarget = custom } label: { Label("Edit", systemImage: "pencil") }
+        }
+        Button { moveTarget = NameRoute(id: name) } label: { Label("Move to Group…", systemImage: "folder") }
+        Button { budgetTarget = NameRoute(id: Categories.groupOf(name)) } label: {
+            Label("Set Budget…", systemImage: "eurosign.circle")
+        }
+        if let custom {
+            Divider()
+            Button(role: .destructive) { deleteTarget = custom } label: { Label("Delete", systemImage: "trash") }
+        }
     }
 
     private var newTile: some View {

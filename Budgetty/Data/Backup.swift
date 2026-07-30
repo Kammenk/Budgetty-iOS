@@ -91,7 +91,10 @@ struct CategoryDTO: Codable {
     var colorArgb: Int
     var icon: String
     var createdAt: Date
-    init(_ c: Category) { name = c.name; colorArgb = c.colorArgb; icon = c.icon; createdAt = c.createdAt }
+    var parent: String?   // optional so older backups (no key) still decode as top-level
+    init(_ c: Category) {
+        name = c.name; colorArgb = c.colorArgb; icon = c.icon; createdAt = c.createdAt; parent = c.parent
+    }
 }
 
 // MARK: - Service
@@ -190,10 +193,10 @@ enum BackupService {
         let cats = try context.fetch(FetchDescriptor<Category>())
         for dto in file.categories {
             if let e = cats.first(where: { $0.name == dto.name }) {
-                e.colorArgb = dto.colorArgb; e.icon = dto.icon; e.isCustom = true
+                e.colorArgb = dto.colorArgb; e.icon = dto.icon; e.isCustom = true; e.parent = dto.parent
             } else {
                 context.insert(Category(name: dto.name, colorArgb: dto.colorArgb, icon: dto.icon,
-                                        isCustom: true, createdAt: dto.createdAt))
+                                        isCustom: true, createdAt: dto.createdAt, parent: dto.parent))
             }
         }
 
