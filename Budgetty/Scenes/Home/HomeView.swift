@@ -170,7 +170,9 @@ struct HomeView: View {
         VStack(spacing: 14) {
             ForEach(visibleSections) { section in
                 switch section {
-                case .totalSpent: heroCard
+                // Current pay-cycle month → the Safe-to-spend hero (which absorbs the spent figure);
+                // every other period keeps the classic Total-spent gradient hero.
+                case .totalSpent: if period == .thisMonth { safeToSpendCard } else { heroCard }
                 case .weekComparison: if lastWeekSpent > 0 { weekCard }
                 // The monthly budget card is a single-month concept — hidden for multi-month / all-time.
                 case .budgets: if hasBudget && period.isMonth { budgetsCard }
@@ -225,9 +227,303 @@ struct HomeView: View {
         .shadow(color: Color(argb: 0xFF6650A4).opacity(0.38), radius: 14, y: 8)
     }
 
-    /// The period selector on the hero card. A native menu (as Insights / History use), so the
-    /// checkmarked list comes for free; "All time" sits below a divider, mirroring the Android filter.
+    // MARK: - Safe to spend (this-month cash flow)
+    //
+    // For the current pay-cycle month the hero becomes "Safe to spend" — one glass card stating what
+    // is free to spend before payday: income this cycle − spent so far − bills still owed. A port of
+    // Android's HomeViewModel cash-flow derivation + SafeToSpendCard. Per the iOS mockup the three
+    // figures the number is derived from read top-to-bottom as an inset grouped list (the native
+    // idiom), and the status colour lives in the amount + a soft wash behind the glass, never a
+    // filled card.
+
+    private enum SafeToSpendStatus { case healthy, low, over, setup }
+
+    /// Recurring income at its flat per-month rate — Android sums `monthlyAmount`, whose iOS twin is
+    /// `monthlyEquivalent` (also what Home's planned-bills total uses, so the parts reconcile).
+    private var cycleIncome: Decimal {
+        recurrings.filter(\.isIncome).reduce(.zero) { $0 + $1.monthlyEquivalent }
+    }
+    /// Spend inside the current pay-cycle month, independent of the selected period.
+    private var cycleSpent: Decimal {
+        let w = PayCycle.monthInterval(startDay: monthStartDay)
+        return receipts.filter { w.contains($0.createdAt) }.reduce(.zero) { $0 + $1.paidTotal }
+    }
+    private var cycleReceiptCount: Int {
+        let w = PayCycle.monthInterval(startDay: monthStartDay)
+        return receipts.filter { w.contains($0.createdAt) }.count
+    }
+    /// Bills already marked paid this cycle: they drop off Safe to spend (not re-subtracted) but are
+    /// surfaced as context under "Bills still due".
+    private var billsPaidThisCycle: Decimal {
+        recurrings.filter { !$0.isIncome && $0.isPaidThisCycle(startDay: monthStartDay) }
+            .reduce(.zero) { $0 + $1.monthlyEquivalent }
+    }
+    /// Bills not yet paid — still owed out of this cycle's income.
+    private var billsStillDue: Decimal {
+        recurrings.filter { !$0.isIncome && !$0.isPaidThisCycle(startDay: monthStartDay) }
+            .reduce(.zero) { $0 + $1.monthlyEquivalent }
+    }
+    /// Income this cycle − spent so far − bills still owed.
+    private var safeToSpend: Decimal { cycleIncome - cycleSpent - billsStillDue }
+
+    /// The next pay-cycle start — the day Safe to spend resets.
+    private var nextPayday: Date { PayCycle.month(.now, startDay: monthStartDay, offset: 1).start }
+    /// Days from today to the next pay-cycle start (min 1), for the per-day figure.
+    private var daysUntilPayday: Int {
+        let cal = Calendar.current
+        let days = cal.dateComponents([.day], from: cal.startOfDay(for: .now),
+                                      to: cal.startOfDay(for: nextPayday)).day ?? 1
+        return max(1, days)
+    }
+
+    private var safeToSpendStatus: SafeToSpendStatus {
+        if cycleIncome <= 0 { return .setup }
+        if safeToSpend < 0 { return .over }
+        // "Getting low" at ≤10% of the cycle's income left (Android's threshold); compare ×10 so it
+        // stays exact in Decimal.
+        if safeToSpend * 10 <= cycleIncome { return .low }
+        return .healthy
+    }
+    private func safeToSpendTone(_ s: SafeToSpendStatus) -> Color {
+        switch s {
+        case .over: Palette.bad
+        case .low: Palette.warn
+        case .setup: Palette.tertiaryLabel
+        case .healthy: Palette.good
+        }
+    }
+
+    /// "25 Jun – 24 Jul" — the current pay-cycle month's day range (subtitle under "Spent this cycle").
+    private var cycleRangeLabel: String {
+        let (start, end) = PayCycle.month(.now, startDay: monthStartDay)
+        let f = DateFormatter(); f.dateFormat = "d MMM"
+        return "\(f.string(from: start)) – \(f.string(from: end))"
+    }
+    /// "25 Jul" — the reset date, for the per-day caption.
+    private var resetDateLabel: String {
+        let f = DateFormatter(); f.dateFormat = "d MMM"; return f.string(from: nextPayday)
+    }
+
+    private var safeToSpendCard: some View {
+        let status = safeToSpendStatus
+        let tone = safeToSpendTone(status)
+        return VStack(alignment: .leading, spacing: 0) {
+            HStack {
+                Text("Safe to spend")
+                    .font(.subheadline).fontWeight(.medium)
+                    .foregroundStyle(Palette.secondaryLabel)
+                Spacer()
+                periodPillGlass
+            }
+            .padding(.bottom, 6)
+
+            // The hero figure — never truncates; a muted placeholder stands in until income is set.
+            if status == .setup {
+                Text(verbatim: "—")
+                    .font(.system(size: 46, weight: .bold))
+                    .foregroundStyle(Palette.tertiaryLabel)
+                    .padding(.vertical, 2)
+            } else {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    Text(safeToSpend.formatMoney())
+                        .font(.system(size: 46, weight: .bold))
+                        .foregroundStyle(tone)
+                }
+                .padding(.vertical, 2)
+            }
+
+            safeToSpendCaption(status)
+                .padding(.top, 4)
+
+            safeToSpendBar(status: status, tone: tone)
+                .frame(height: 6)
+                .padding(.top, 16)
+
+            safeToSpendList(status: status)
+                .padding(.top, 16)
+
+            if status == .setup {
+                Button { selectTab?(.budget) } label: {
+                    Label("Set up income", systemImage: "plus")
+                        .font(.system(size: 15, weight: .semibold))
+                        .ctaPill(height: 48)
+                }
+                .padding(.top, 14)
+                .accessibilityIdentifier(A11y.Home.setUpIncome)
+            }
+
+            safeToSpendFoot(status)
+                .padding(.top, 12)
+        }
+        .padding(20)
+        .contentCard(cornerRadius: 24)
+        // The status wash: a soft colour bloom behind the neutral glass (mockup `f.glow`), plus a
+        // matching lift shadow — the material itself stays system-adaptive.
+        .background(
+            RoundedRectangle(cornerRadius: 30, style: .continuous)
+                .fill(tone)
+                .opacity(status == .setup ? 0 : 0.22)
+                .blur(radius: 26)
+                .padding(.horizontal, 10).padding(.vertical, 4)
+                .allowsHitTesting(false)
+        )
+        .shadow(color: status == .setup ? Palette.cardShadow : tone.opacity(0.22), radius: 16, y: 8)
+        .accessibilityIdentifier(A11y.Home.safeToSpend)
+    }
+
+    /// Per-day + reset date, or plain language for the overspent / setup states.
+    @ViewBuilder
+    private func safeToSpendCaption(_ status: SafeToSpendStatus) -> some View {
+        switch status {
+        case .over:
+            Text("\(abs(safeToSpend).formatMoney()) over — spent more than you have left this cycle.")
+                .font(.footnote).foregroundStyle(Palette.secondaryLabel).fixedSize(horizontal: false, vertical: true)
+        case .setup:
+            Text("Add your income to see what's safe to spend before payday.")
+                .font(.subheadline).foregroundStyle(Palette.label).fixedSize(horizontal: false, vertical: true)
+        case .healthy, .low:
+            let perDay = safeToSpend / Decimal(daysUntilPayday)
+            // Both halves are already localized, so join them verbatim (no "%@ · %@" catalog key).
+            Text(verbatim: "\(perDayLabel(perDay)) · \(String(localized: "resets \(resetDateLabel)"))")
+                .font(.footnote).foregroundStyle(Palette.secondaryLabel).fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    /// "41 €/day for the next 15 days" — plural handled in the string catalog.
+    private func perDayLabel(_ perDay: Decimal) -> String {
+        String(localized: "\(perDay.formatMoney())/day for the next \(daysUntilPayday) days")
+    }
+
+    /// The cycle's income split three ways — spent (tint), bills still due (hatched), and what's left
+    /// (status colour). The middle fills the gap, so the three widths always sum to the bar.
+    @ViewBuilder
+    private func safeToSpendBar(status: SafeToSpendStatus, tone: Color) -> some View {
+        if status == .setup {
+            hatchedCapsule()
+        } else {
+            let denom = max(cycleIncome, cycleSpent + billsStillDue)
+            let spentW = HomeView.fraction(cycleSpent, of: denom)
+            let tailW = HomeView.fraction(safeToSpend, of: denom)
+            GeometryReader { geo in
+                HStack(spacing: 2) {
+                    Capsule().fill(Palette.tint.opacity(0.85))
+                        .frame(width: max(0, geo.size.width * spentW))
+                    hatchedCapsule().frame(maxWidth: .infinity)
+                    if tailW > 0 {
+                        Capsule().fill(tone).frame(width: max(6, geo.size.width * tailW))
+                    }
+                }
+            }
+        }
+    }
+
+    /// The inset grouped list under the bar: the three figures Safe to spend is derived from.
+    private func safeToSpendList(status: SafeToSpendStatus) -> some View {
+        VStack(spacing: 0) {
+            safeToSpendRow(
+                swatch: RoundedRectangle(cornerRadius: 2.5).fill(Palette.tint),
+                title: "Spent this cycle",
+                subtitle: "\(String(localized: "\(cycleReceiptCount) receipts")) · \(cycleRangeLabel)",
+                value: cycleSpent.formatMoney())
+            Divider().overlay(Palette.separator)
+            safeToSpendRow(
+                swatch: hatchSwatch,
+                title: "Bills still due",
+                subtitle: billsPaidThisCycle > 0
+                    ? String(localized: "\(billsPaidThisCycle.formatMoney()) already paid") : nil,
+                value: billsStillDue.formatMoney())
+            Divider().overlay(Palette.separator)
+            safeToSpendRow(
+                swatch: Color.clear,
+                title: "Income this cycle", titleBold: true,
+                subtitle: nil,
+                value: status == .setup ? String(localized: "Not set") : cycleIncome.formatMoney(),
+                valueBold: true,
+                valueColor: status == .setup ? Palette.tint : Palette.label)
+        }
+        .padding(.vertical, 2)
+        .background(Palette.tertiaryBackground, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+    }
+
+    private func safeToSpendRow(
+        swatch: some View, title: LocalizedStringKey, titleBold: Bool = false,
+        subtitle: String? = nil, value: String, valueBold: Bool = false,
+        valueColor: Color = Palette.label
+    ) -> some View {
+        HStack(spacing: 11) {
+            swatch.frame(width: 8, height: 8)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title).font(.system(size: 16, weight: titleBold ? .semibold : .regular))
+                    .foregroundStyle(Palette.label)
+                if let subtitle {
+                    Text(subtitle).font(.system(size: 12)).foregroundStyle(Palette.secondaryLabel)
+                }
+            }
+            Spacer(minLength: 8)
+            Text(value).font(.system(size: 17, weight: valueBold ? .bold : .semibold))
+                .foregroundStyle(valueColor).lineLimit(1)
+        }
+        .padding(.horizontal, 14).padding(.vertical, 12)
+    }
+
+    @ViewBuilder
+    private func safeToSpendFoot(_ status: SafeToSpendStatus) -> some View {
+        if status == .setup {
+            Text("Income lives in the Budget tab · about a minute to add.")
+                .font(.caption).foregroundStyle(Palette.secondaryLabel).fixedSize(horizontal: false, vertical: true)
+        } else if cycleIncome > 0 {
+            Text("Both come out of \(cycleIncome.formatMoney()) income this cycle.")
+                .font(.caption).foregroundStyle(Palette.secondaryLabel).fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    /// A hatched capsule for the bar's "bills still due" segment (mockup `--label3` diagonal stripes).
+    private func hatchedCapsule() -> some View {
+        Capsule().fill(.clear)
+            .overlay(HatchStripes().stroke(Palette.tertiaryLabel, lineWidth: 2).clipShape(Capsule()))
+            .overlay(Capsule().strokeBorder(Palette.tertiaryLabel, lineWidth: 0.5))
+    }
+    /// The 8×8 hatched swatch keying the "Bills still due" list row to the bar segment.
+    private var hatchSwatch: some View {
+        RoundedRectangle(cornerRadius: 2.5).fill(.clear)
+            .overlay(HatchStripes().stroke(Palette.tertiaryLabel, lineWidth: 1.5)
+                .clipShape(RoundedRectangle(cornerRadius: 2.5)))
+            .overlay(RoundedRectangle(cornerRadius: 2.5).strokeBorder(Palette.tertiaryLabel, lineWidth: 0.5))
+    }
+
+    /// The period selector on the gradient hero card: white-on-hero chrome.
     private var periodPill: some View {
+        periodMenu {
+            HStack(spacing: 5) {
+                Text(period.label).font(.caption).fontWeight(.semibold)
+                Image(systemName: "chevron.down").font(.system(size: 9, weight: .bold))
+            }
+            .foregroundStyle(.white)
+            .padding(.horizontal, 11).padding(.vertical, 5)
+            .background(.white.opacity(0.22), in: Capsule())
+            .overlay(Capsule().strokeBorder(.white.opacity(0.4), lineWidth: 0.5))
+        }
+    }
+
+    /// The same period selector styled for the glass Safe-to-spend card: label-coloured text on a
+    /// neutral `--fill` pill (the mockup's treatment), since white-on-glass wouldn't read.
+    private var periodPillGlass: some View {
+        periodMenu {
+            HStack(spacing: 4) {
+                Text(period.label).font(.system(size: 12.5, weight: .semibold))
+                    .foregroundStyle(Palette.label)
+                Image(systemName: "chevron.down").font(.system(size: 9, weight: .bold))
+                    .foregroundStyle(Palette.secondaryLabel)
+            }
+            .padding(.horizontal, 11).padding(.vertical, 5)
+            .background(Palette.fill, in: Capsule())
+        }
+    }
+
+    /// The shared period menu (as Insights / History use): the single-month + multi-month options,
+    /// then "All time" below a divider, mirroring the Android filter. Only the pill chrome differs
+    /// between the gradient hero and the glass Safe-to-spend card.
+    private func periodMenu<Label: View>(@ViewBuilder label: () -> Label) -> some View {
         Menu {
             Picker("Period", selection: $period) {
                 ForEach([HomePeriod.thisMonth, .lastMonth, .last3, .last6]) { Text($0.label).tag($0) }
@@ -239,14 +535,7 @@ struct HomeView: View {
             }
             .pickerStyle(.inline)
         } label: {
-            HStack(spacing: 5) {
-                Text(period.label).font(.caption).fontWeight(.semibold)
-                Image(systemName: "chevron.down").font(.system(size: 9, weight: .bold))
-            }
-            .foregroundStyle(.white)
-            .padding(.horizontal, 11).padding(.vertical, 5)
-            .background(.white.opacity(0.22), in: Capsule())
-            .overlay(Capsule().strokeBorder(.white.opacity(0.4), lineWidth: 0.5))
+            label()
         }
         .accessibilityLabel("Spending period")
     }
