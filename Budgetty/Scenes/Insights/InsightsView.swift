@@ -153,6 +153,7 @@ struct InsightsView: View {
         case .topStores: topStoresCard
         case .biggestPurchases: biggestSection
         case .income: incomeCards
+        case .subscriptions: SubscriptionsCard()
         }
     }
 
@@ -209,6 +210,7 @@ struct InsightsView: View {
                     topCategoriesCard
                 } right: {
                     breakdownCard
+                    SubscriptionsCard()
                     comparisonSection
                     topStoresCard
                     biggestSection
@@ -237,6 +239,7 @@ struct InsightsView: View {
                     topCategoriesCard
                 } third: {
                     topStoresCard
+                    SubscriptionsCard()
                     biggestSection
                     incomeCards
                 }
