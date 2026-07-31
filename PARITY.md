@@ -767,3 +767,112 @@ Merged to Android `main` (branch `category-insights-v2`; `688f122` + iOS doc `98
 - **DB-aware grouping** — `Categories` gained a lock-guarded stored cache (`setStored`, primed in `BudgettyApp.prepare` + after every mutation) so `groupOf`/`parentOf`/`childNames` honour user overrides and `color(for:)`/`emoji(for:)` resolve custom rows. Widget group sums stay correct because they're computed in-app in `WidgetSharing.update` (cache primed) and baked into the snapshot.
 - **Files:** `Category.swift`, `Categories.swift`, `CategoryOps.swift` (new), `EmojiCatalog.swift` (new), `CustomCategorySheet.swift`, `CategoryParentList.swift` (new), `CategoryPickerSheet.swift`, `BudgetView.swift`, `CategoryBudgetSheet.swift`, `DonutChart.swift`, `InsightsView.swift`, `Backup.swift`, `BudgettyApp.swift`, `Localizable.xcstrings` (+17 keys ×15 locales). Tests: `EmojiCatalogTests`, `CategoryHierarchyTests`.
 - **Verified:** Debug build clean; 107/107 unit tests pass; **tap-verified on iPhone 17 Pro (dark)** — F1 slice/row tap-select (centre emoji + dim, Groups/All reset), F2 icon search ("gym"→6, "car"→7 dropping carton/carrot), F3 parent picker + nested-custom create (folds under its group in the picker) + context menu (Edit / Move to Group / Set Budget / Delete) + re-home sheet with the current parent pre-checked. (The MCP sim needed `sudo xcode-select -s /Applications/Xcode.app/Contents/Developer` on this Mac — the earlier stale-block, cleared 2026-07-30.)*
+
+---
+
+# Future-features batch — build on BOTH platforms in parallel (planned 2026-07-30)
+
+**Unlike every section above, these are NOT built on either platform yet.** They came out
+of the 2026-07-25 competitive-gap review and were greenlit 2026-07-30 to be **designed
+first, then built on Android and iOS simultaneously** — not Android-first-then-port. So
+there is **no reference implementation to port from**: the shared spec for each feature is
+its **design-request doc** (written for both platforms 2026-07-30), and both apps build to
+it. Budgeting/saving behavior must stay **identical** per the cross-platform parity
+directive; only platform-native UI (Material 3 ⇄ Liquid Glass) and platform mechanics
+(BiometricPrompt ⇄ LocalAuthentication, `PdfDocument` ⇄ PDFKit) differ.
+
+**Design status 2026-07-30:** design-request docs written for **both** platforms (paths
+below). Build began with **Safe to spend** (now ✅ built + merged on Android — see item 1); the other
+four are next in the order below. Android **and** iOS mockups for all five are in the Claude Design
+project (`5b8c8470-…` — `iOS Safe to Spend` / `iOS Savings Goals` / `iOS Subscriptions` /
+`iOS Data Export` / `iOS App Lock`).
+
+**✅ UPDATE 2026-07-31 — ALL FIVE BUILT + MERGED ON iOS** (native SwiftUI + Liquid Glass, ported from
+the Android impls where they exist + the shared design docs; ViewModels/repos → SwiftUI views &
+SwiftData since iOS has no VM layer; each localized to the 15 non-en locales by mechanical conversion
+from Android's finished strings; sim-verified on iPhone 17 Pro). iOS commits:
+#1 Safe to spend `8e651c1`, #2 Savings goals `3bd8bf3`, #3 Subscription detection `252dc2d`
+(+ 7 ported detector unit tests), #4 CSV & PDF export `33455cf`, #5 App lock `f0344e6`. The
+per-item "iOS port pending" notes below are now superseded by this line.
+
+**Build order & gating (decided 2026-07-30):**
+
+1. **Safe to spend until payday** — **FREE.** A Home hero number = *income (this pay-cycle)
+   − spent so far − bills still unpaid this cycle*; optional per-day; resets each pay-cycle.
+   **No new data model** — a new Home view-model derivation over building blocks that
+   already ship on both platforms: pay-cycle windows (`PayCycle`), recurring **income**
+   (`isIncome`), **unpaid** bills (`RecurringMath`/`isPaidThisCycle`), and spend-so-far.
+   Docs: Android `SAFE_TO_SPEND_DESIGN_REQUEST.md` · iOS `IOS_DESIGN_REQUEST_SAFE_TO_SPEND.md`.
+   **✅ ANDROID BUILT + MERGED** (`4831bd7`, 2026-07-30): phone + tablet, 4 states (healthy / low /
+   over / setup-no-income), 16 locales, Roborazzi goldens. Impl = a new `HomeViewModel` cash-flow
+   derivation (`cycleIncome` / `billsStillDue` / `billsPaid` / `safeToSpend` / `daysUntilPayday`,
+   reusing `PayCycle` + `RecurringMath.isPaidThisCycle`) + an `internal SafeToSpendCard` in
+   `HomeScreen.kt` that replaces the Total-spent card for the current month (period pill suppressed on
+   tablet). Design landed as **Variant D "merged card"** — safe-to-spend hero + a Spent / Bills-still-due
+   stat strip in one card. **⚠️ Modelling note for the iOS port:** `safe = income − spent − bills STILL
+   DUE`; bills already marked paid are NOT re-subtracted (they drop off), and the "getting low" state
+   triggers at ≤10 % of cycle income. **iOS port still pending its Liquid-Glass mockups.**
+
+2. **Savings goals** — **CAPPED-FREE: 1 goal free, unlimited Premium** (same pattern as
+   widgets-2 / custom-cats-3 / recurring-3). New model: `SavingsGoal` + `SavingsContribution`
+   (`saved = Σ contributions`; **manual tracker — no real balance**). Lives as a section on
+   the Budget tab + a goal-detail sheet (ring, contribution history, add/withdraw, edit).
+   Docs: Android `SAVINGS_GOALS_DESIGN_REQUEST.md` · iOS `IOS_DESIGN_REQUEST_SAVINGS_GOALS.md`.
+   **✅ ANDROID BUILT + MERGED** (`2d7d78d`, 2026-07-30): Budget-tab section (ring cards + empty + the
+   1-goal-cap paywall) + a full goal-detail nav screen (`savings_goal/{id}`) — hero ring, Saved/Target/
+   Left, contribution history, Add/Withdraw + edit/delete + reached state. **New Room tables
+   `savings_goals` + `savings_contributions` (DB v21, `MIGRATION_20_21`, cascade-delete)**; `saved = Σ
+   signed contributions`; pace = remaining ÷ whole-months-to-date, "behind" when > recent avg deposit.
+   `SavingsRepository` (`FREE_GOAL_LIMIT=1`), `BudgetViewModel` list+create + a per-goal
+   `SavingsGoalViewModel`. 16 locales + Roborazzi goldens. **iOS port pending its Liquid-Glass mockups.**
+
+3. **Subscription detection** — **PREMIUM** (free = teaser + locked list). On-device
+   clustering over the existing transactions by normalized merchant + cadence; flags price
+   hikes; **"Track as bill"** creates a recurring bill that then feeds Safe to spend. Entry
+   card on Insights → list → detail. Docs: Android `SUBSCRIPTION_DETECTION_DESIGN_REQUEST.md`
+   · iOS `IOS_DESIGN_REQUEST_SUBSCRIPTION_DETECTION.md`.
+   **✅ ANDROID BUILT + MERGED** (`29b88e9`, 2026-07-31): pure `SubscriptionDetector` (cluster receipts
+   per merchant at a regular monthly/yearly cadence, ≤2 distinct amounts, ≥3 charges; unit-tested) +
+   `SubscriptionsViewModel` over transactions+receipts. Insights entry card (new
+   `InsightsSection.SUBSCRIPTIONS`) — Premium summary vs a free teaser (real count/total, redacted rows)
+   → `subscriptions` route (list + detail + a track-as-bill sheet). Price-hike = latest amount > an
+   earlier one (before→after + annual cost). **"Track as bill"** upserts a recurring bill
+   (`isIncome=false`, category "Subscriptions"). **New Room table `ignored_subscriptions` (DB v22,
+   `MIGRATION_21_22`)** for dismiss/restore. 16 locales + Roborazzi goldens. **iOS port pending its mockups.**
+
+4. **CSV & PDF export** — **PREMIUM.** Human-readable export (CSV spreadsheet + a branded
+   one-page PDF statement) beside the existing JSON backup on Account; period/category
+   filter via `DateRangeFilter`; **native only** (`PdfDocument` / PDFKit → system share
+   sheet). Docs: Android `DATA_EXPORT_DESIGN_REQUEST.md` · iOS `IOS_DESIGN_REQUEST_DATA_EXPORT.md`.
+   **✅ ANDROID BUILT + MERGED** (`19128f7`, 2026-07-31): a premium Account row (padlocked for free) →
+   an options sheet (CSV/PDF toggle + period dropdown + live count/total + empty guard). CSV = a row
+   per receipt; PDF = a native `PdfDocument` statement (header, Total/Income/Net tiles, by-category
+   bars, paginated transaction table). Split `ExportBuilder` (pure `buildCore` + CSV, unit-tested) vs
+   `DataExporter` (graphics). Shared via the existing FileProvider + `ACTION_SEND`. **No new table.**
+   16 locales + a Roborazzi golden of the rendered statement. ⚠️ v1 cut the category multi-select +
+   PDF-preview (presets-only period); note for the iOS port. **iOS port pending its mockups.**
+
+5. **App lock — PIN + biometric** — **FREE** (we don't paywall security). Optional PIN +
+   biometric gate on cold start / resume-after-idle; auto-lock Immediately / 1 min / 5 min;
+   forgot-PIN = re-authenticate. Native (BiometricPrompt / LocalAuthentication); PIN stored
+   **hashed** (EncryptedSharedPrefs / Keychain). **⚠️ iOS: evolve the existing Face ID
+   toggle into this Security group — add a PIN fallback + auto-lock, don't add a second
+   biometric toggle.** Docs: Android `APP_LOCK_DESIGN_REQUEST.md` · iOS `IOS_DESIGN_REQUEST_APP_LOCK.md`.
+
+   **✅ ANDROID BUILT + MERGED** (`6d0be9a`, 2026-07-31): `AppLockGate` wraps the whole app —
+   cold start always locks, resume re-locks past the idle delay (lifecycle observer). `LockScreen`
+   (PIN pad, shake-on-wrong-PIN, biometric auto-prompt, Forgot PIN → sign out + clear lock) +
+   `SetPinScreen` (choose → confirm). Salted SHA-256 PIN in `app_settings` prefs (`PinHash`) — no
+   `security-crypto` lib. Biometric via framework `BiometricPrompt` (minSdk 28), **no
+   `androidx.biometric`**; `USE_BIOMETRIC` perm. Account **Security** group: App-lock toggle →
+   set PIN, Change PIN, biometric row (only where hardware enrolled), Auto-lock dropdown. **No new
+   Room table** — prefs only, DB stays **v22**. 22 strings × 16 locales; Roborazzi lock/set-PIN
+   goldens. **iOS port pending its mockup**: evolve the existing Face ID toggle into this group
+   (add a PIN fallback + auto-lock; don't add a second biometric toggle).
+
+*Status (2026-07-31): **all five BUILT + MERGED on Android** — #1 Safe to spend (`4831bd7`), #8
+Savings goals (`2d7d78d`), #9 Subscription detection (`29b88e9`), #5 CSV+PDF export (`19128f7`),
+#3 App lock (`6d0be9a`) — each phone+tablet where relevant, 16 locales, Roborazzi. **iOS ports of
+all five pending their Liquid-Glass mockups.** (This batch supersedes backlog item "Budget rollover",
+already shipped in Android 11.0.0.) Android `main` HEAD = `6d0be9a` (DB **v22**); iOS `main` =
+period-money-flow parity, with `category-insights-v2` ported on a branch, not yet merged.*
