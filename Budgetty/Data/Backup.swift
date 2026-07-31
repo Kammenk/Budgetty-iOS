@@ -23,6 +23,7 @@ struct BackupFile: Codable {
     var recurring: [RecurringDTO] = []
     var rules: [RuleDTO] = []
     var categories: [CategoryDTO] = []   // custom categories only
+    var savingsGoals: [SavingsGoalDTO] = []
 
     var itemCount: Int { receipts.reduce(0) { $0 + $1.items.count } }
 }
@@ -97,6 +98,27 @@ struct CategoryDTO: Codable {
     }
 }
 
+struct SavingsGoalDTO: Codable {
+    var name: String
+    var emoji: String
+    var targetAmount: Decimal
+    var targetDate: Date?
+    var createdAt: Date
+    var contributions: [SavingsContributionDTO]
+    init(_ g: SavingsGoal) {
+        name = g.name; emoji = g.emoji; targetAmount = g.targetAmount
+        targetDate = g.targetDate; createdAt = g.createdAt
+        contributions = g.contributions.map(SavingsContributionDTO.init)
+    }
+}
+
+struct SavingsContributionDTO: Codable {
+    var amount: Decimal
+    var note: String
+    var date: Date
+    init(_ c: SavingsContribution) { amount = c.amount; note = c.note; date = c.date }
+}
+
 // MARK: - Service
 
 enum BackupService {
@@ -130,7 +152,8 @@ enum BackupService {
             budgets: try context.fetch(FetchDescriptor<Budget>()).map(BudgetDTO.init),
             recurring: try context.fetch(FetchDescriptor<Recurring>()).map(RecurringDTO.init),
             rules: try context.fetch(FetchDescriptor<CategoryRule>()).map(RuleDTO.init),
-            categories: try context.fetch(FetchDescriptor<Category>()).filter(\.isCustom).map(CategoryDTO.init)
+            categories: try context.fetch(FetchDescriptor<Category>()).filter(\.isCustom).map(CategoryDTO.init),
+            savingsGoals: try context.fetch(FetchDescriptor<SavingsGoal>()).map(SavingsGoalDTO.init)
         )
         return try encoder().encode(file)
     }
@@ -151,6 +174,7 @@ enum BackupService {
             for r in try context.fetch(FetchDescriptor<Recurring>()) { context.delete(r) }
             for r in try context.fetch(FetchDescriptor<CategoryRule>()) { context.delete(r) }
             for c in try context.fetch(FetchDescriptor<Category>()) where c.isCustom { context.delete(c) }
+            for g in try context.fetch(FetchDescriptor<SavingsGoal>()) { context.delete(g) } // cascades to contributions
             try context.save() // flush deletes before re-inserting unique-keyed rows
         }
 
@@ -197,6 +221,16 @@ enum BackupService {
             } else {
                 context.insert(Category(name: dto.name, colorArgb: dto.colorArgb, icon: dto.icon,
                                         isCustom: true, createdAt: dto.createdAt, parent: dto.parent))
+            }
+        }
+
+        // Savings goals (+ their contributions). Additive; contributions attach to the fresh goal.
+        for dto in file.savingsGoals {
+            let goal = SavingsGoal(name: dto.name, emoji: dto.emoji, targetAmount: dto.targetAmount,
+                                   targetDate: dto.targetDate, createdAt: dto.createdAt)
+            context.insert(goal)
+            for c in dto.contributions {
+                context.insert(SavingsContribution(amount: c.amount, note: c.note, date: c.date, goal: goal))
             }
         }
 
