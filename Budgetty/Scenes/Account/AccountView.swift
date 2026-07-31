@@ -20,6 +20,8 @@ struct AccountView: View {
     @AppStorage(SettingsKey.dateFormat) private var dateFormatRaw = DateFormatOption.system.rawValue
     @AppStorage(SettingsKey.monthStartDay) private var monthStartDay = 1
     @AppStorage(SettingsKey.faceID) private var faceID = false
+    @AppStorage(SettingsKey.appLockEnabled) private var appLockEnabled = false
+    @AppStorage(SettingsKey.autoLockMinutes) private var autoLockMinutes = 0
     @AppStorage(SettingsKey.crashReporting) private var crashReporting = true
     @AppStorage(SettingsKey.premium) private var premium = false
     private let theme = AppTheme.shared
@@ -35,6 +37,7 @@ struct AccountView: View {
     @State private var importChoice = false
     @State private var backupError: String?
     @State private var showExportSheet = false
+    @State private var showSetPin = false
 
     private var appearance: AppearancePref { AppearancePref(rawValue: appearanceRaw) ?? .system }
     private var dateFormat: DateFormatOption { DateFormatOption(rawValue: dateFormatRaw) ?? .system }
@@ -96,6 +99,7 @@ struct AccountView: View {
         .screenCanvas()
         .navigationTitle("Account")
         .sheet(isPresented: $showExportSheet) { ExportSheet() }
+        .sheet(isPresented: $showSetPin) { SetPinView { appLockEnabled = true } }
         .confirmationDialog("Sign out of Budgetty?", isPresented: $confirmSignOut, titleVisibility: .visible) {
             Button("Sign Out", role: .destructive) { try? auth.signOut() }
         }
@@ -254,15 +258,48 @@ struct AccountView: View {
         .contentCard(cornerRadius: 14)
     }
 
-    /// Two real switches. Android deleted its whole Privacy section because every switch in it wrote
-    /// a boolean nothing read; both of these are wired to something — `faceID` to `LockGate` →
-    /// `BiometricLockView` (a platform difference, Android has no biometric lock), and
-    /// `crashReporting` to the Crashlytics SDK.
+    /// Security group: the app-lock PIN gate (with biometrics as an optional shortcut and the
+    /// auto-lock delay), then the crash-reporting opt-out. Turning App lock on sets a PIN first; the
+    /// PIN hash lives in the Keychain (see `PinLock`), while the on/off + delay + biometric flags are
+    /// AppStorage. This absorbs the old Face-ID-only lock — biometrics reuse the same `faceID` flag.
     private var privacyCard: some View {
         VStack(spacing: 0) {
-            Toggle(isOn: $faceID) { label("Face ID", "lock.fill", Color(argb: 0xFF30B0C7)) }
+            Toggle(isOn: $appLockEnabled) { label("App lock", "lock.fill", Color(argb: 0xFF30B0C7)) }
                 .tint(Palette.good)
                 .padding(.vertical, 8).padding(.horizontal, 16)
+                .onChange(of: appLockEnabled) { _, on in
+                    if on && !PinLock.hasPin { showSetPin = true }   // set a PIN before the lock is real
+                    if !on { PinLock.clear() }
+                }
+                .onChange(of: showSetPin) { _, showing in
+                    // Cancelled the set-PIN sheet with no PIN saved → don't leave the lock half-on.
+                    if !showing && appLockEnabled && !PinLock.hasPin { appLockEnabled = false }
+                }
+            if appLockEnabled {
+                divider
+                Button { showSetPin = true } label: {
+                    row("Change PIN", "key.fill", Color(argb: 0xFF5856D6)) { chevron }
+                }
+                .buttonStyle(.plain)
+                if BiometricAuth.isAvailable {
+                    divider
+                    Toggle(isOn: $faceID) { label("Use Face ID / Touch ID", "faceid", Color(argb: 0xFF30B0C7)) }
+                        .tint(Palette.good)
+                        .padding(.vertical, 8).padding(.horizontal, 16)
+                }
+                divider
+                Menu {
+                    Picker("Auto-lock", selection: $autoLockMinutes) {
+                        Text("Immediately").tag(0)
+                        Text("After 1 minute").tag(1)
+                        Text("After 5 minutes").tag(5)
+                    }
+                } label: {
+                    row("Auto-lock", "clock.fill", Color(argb: 0xFFFF9500)) {
+                        value(autoLockLabel); chevron
+                    }
+                }
+            }
             divider
             // Default-on with a real opt-out (Android parity). The stored preference is the source of
             // truth — push every change straight to the SDK so it can't drift from the toggle.
@@ -274,6 +311,14 @@ struct AccountView: View {
             .onChange(of: crashReporting) { _, enabled in CrashReporting.setEnabled(enabled) }
         }
         .contentCard(cornerRadius: 14)
+    }
+
+    private var autoLockLabel: String {
+        switch autoLockMinutes {
+        case 0: String(localized: "Immediately")
+        case 1: String(localized: "After 1 minute")
+        default: String(localized: "After 5 minutes")
+        }
     }
 
     // MARK: - Backup / restore

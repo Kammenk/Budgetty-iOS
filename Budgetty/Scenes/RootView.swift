@@ -283,7 +283,7 @@ struct RootView: View {
         case "review": DebugReviewScreen()
         case "support": NavigationStack { SupportAboutView() }
         case "widgets": NavigationStack { WidgetsView() }
-        case "lock": BiometricLockView(onUnlock: {})
+        case "lock": LockScreenView(onUnlocked: {})
         case "memory": DebugMemorySheet()
         default: EmptyView().hidden()
         }
