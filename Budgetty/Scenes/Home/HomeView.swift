@@ -176,6 +176,8 @@ struct HomeView: View {
                 case .weekComparison: if lastWeekSpent > 0 { weekCard }
                 // The monthly budget card is a single-month concept — hidden for multi-month / all-time.
                 case .budgets: if hasBudget && period.isMonth { budgetsCard }
+                // Recurring bills due soon — date-based, so shown for any period once any is unpaid.
+                case .upcomingBills: if hasUpcomingBills { upcomingBillsCard }
                 case .receipts: recentReceiptsSection
                 }
             }
@@ -779,6 +781,44 @@ struct HomeView: View {
             }
         }
         .padding(.horizontal, 18).padding(.vertical, 16)
+        .contentCard(cornerRadius: 16)
+    }
+
+    // MARK: - Upcoming bills
+
+    /// Any recurring bill not yet marked paid for its current occurrence — gates the card below.
+    private var hasUpcomingBills: Bool {
+        recurrings.contains { !$0.isIncome && !$0.isPaidThisCycle(startDay: monthStartDay) }
+    }
+
+    /// Recurring bills due soon (moved here from Insights): each unpaid bill, soonest due-day first,
+    /// with its own amount — date-based, independent of the Home period filter. Matches Android's Home
+    /// Upcoming bills section, which sits directly below the budget card.
+    private var upcomingBillsCard: some View {
+        let sorted = recurrings
+            .filter { !$0.isIncome && !$0.isPaidThisCycle(startDay: monthStartDay) }
+            .sorted { $0.dueDay < $1.dueDay }
+        return VStack(alignment: .leading, spacing: 14) {
+            Text("Upcoming bills").font(.headline)
+            VStack(spacing: 0) {
+                ForEach(Array(sorted.enumerated()), id: \.element.persistentModelID) { idx, b in
+                    HStack(spacing: 12) {
+                        CategoryTile(category: b.category.isEmpty ? Categories.defaultName : b.category, size: 30)
+                        VStack(alignment: .leading, spacing: 1) {
+                            Text(b.label).font(.subheadline)
+                            Text(BudgetView.cadenceSubtitle(b)).font(.caption2).foregroundStyle(Palette.secondaryLabel)
+                        }
+                        Spacer()
+                        Text("−\(b.amount.formatMoney())").font(.subheadline).fontWeight(.semibold)
+                            .foregroundStyle(Palette.bad)
+                    }
+                    .padding(.vertical, 8)
+                    if idx < sorted.count - 1 { Divider() }
+                }
+            }
+        }
+        .padding(18)
+        .frame(maxWidth: .infinity, alignment: .leading)
         .contentCard(cornerRadius: 16)
     }
 

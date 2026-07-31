@@ -151,7 +151,6 @@ enum InsightsQuiz {
     static func hiddenSections(_ answers: [String: String]) -> Set<InsightSection> {
         var hidden = Set<InsightSection>()
         if answers[income] == "no" { hidden.insert(.income) }
-        if answers[budget] == "no" { hidden.insert(.budget) }
         if answers[detail] == "big" {
             hidden.formUnion([.topStores, .biggestPurchases, .comparison])
         }
@@ -163,7 +162,9 @@ enum InsightsQuiz {
     static func sectionOrder(_ answers: [String: String]) -> [InsightSection] {
         let boosted: [InsightSection]
         switch answers[goal] {
-        case "budget": boosted = [.budget, .comparison]
+        // Budget is no longer an Insights section (it lives on the Budget screen); boost the
+        // remaining budget-adjacent insight instead.
+        case "budget": boosted = [.comparison]
         case "bills": boosted = [.income]
         case "savings": boosted = [.income]
         default: return []

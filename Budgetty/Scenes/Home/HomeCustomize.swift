@@ -10,7 +10,7 @@
 import SwiftUI
 
 enum HomeSection: String, CaseIterable, Identifiable {
-    case totalSpent, weekComparison, budgets, receipts
+    case totalSpent, weekComparison, budgets, upcomingBills, receipts
     var id: String { rawValue }
 
     var title: LocalizedStringKey {
@@ -18,6 +18,7 @@ enum HomeSection: String, CaseIterable, Identifiable {
         case .totalSpent: "Total spent"
         case .weekComparison: "Week comparison"
         case .budgets: "Budgets"
+        case .upcomingBills: "Upcoming bills"
         case .receipts: "Receipts"
         }
     }
@@ -27,6 +28,7 @@ enum HomeSection: String, CaseIterable, Identifiable {
         case .totalSpent: "creditcard.fill"
         case .weekComparison: "calendar"
         case .budgets: "chart.bar.fill"
+        case .upcomingBills: "calendar.badge.clock"
         case .receipts: "receipt"
         }
     }

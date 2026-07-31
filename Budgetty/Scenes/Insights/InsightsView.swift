@@ -18,14 +18,11 @@ struct InsightsView: View {
     @State private var showCustomize = false
     @Query(sort: \Receipt.createdAt, order: .reverse) private var receipts: [Receipt]
     @Query(sort: \Recurring.createdAt) private var recurring: [Recurring]
-    @Query private var budgets: [Budget]
-    @Query private var rollovers: [BudgetRollover]
     @Query private var storedCategories: [Category]
     @AppStorage("insights.breakdownAllCats") private var breakdownAllCats = false
     /// The pay-cycle start day; the money-flow snapshot and the MONTH period follow it (re-read here
     /// so the screen re-renders when "Month starts on" changes).
     @AppStorage(SettingsKey.monthStartDay) private var monthStartDay = 1
-    @AppStorage(SettingsKey.budgetRolloverEnabled) private var rolloverEnabled = false
 
     /// The window the whole screen is scoped to; the stepper walks it one unit at a time.
     @State private var period: InsightsPeriod = {
@@ -148,7 +145,6 @@ struct InsightsView: View {
         case .stats: statGrid
         case .highlights: highlightsSection
         case .comparison: comparisonSection
-        case .budget: budgetSection
         case .topCategories: topCategoriesCard
         case .topStores: topStoresCard
         case .biggestPurchases: biggestSection
@@ -181,13 +177,6 @@ struct InsightsView: View {
     }
 
     @ViewBuilder
-    private var budgetSection: some View {
-        if let budget = periodBudget, budget > 0 {
-            BudgetVsActualCard(spent: totalSpent, budget: budget, daysLeft: daysLeftInPeriod, carried: periodCarried)
-        }
-    }
-
-    @ViewBuilder
     private var biggestSection: some View {
         let purchases = biggestPurchases
         if !purchases.isEmpty {
@@ -206,7 +195,6 @@ struct InsightsView: View {
                     trendCard
                     statGrid
                     highlightsSection
-                    budgetSection
                     topCategoriesCard
                 } right: {
                     breakdownCard
@@ -235,7 +223,6 @@ struct InsightsView: View {
                 } second: {
                     breakdownCard
                     comparisonSection
-                    budgetSection
                     topCategoriesCard
                 } third: {
                     topStoresCard
@@ -379,32 +366,6 @@ struct InsightsView: View {
     private var previousPeriodLabel: String {
         let stripped = period.compareNoun.replacingOccurrences(of: "vs ", with: "")
         return stripped.prefix(1).capitalized + stripped.dropFirst()
-    }
-
-    /// The budget matching the period unit: monthly budget on month periods, weekly on week
-    /// periods. Quarter/half scaling is deferred on Android too.
-    private var periodBudget: Decimal? {
-        guard case .stepped(let unit, _) = period else { return nil }
-        switch unit {
-        case .month: return budgets.first { $0.key == Budget.monthlyKey }?.amount
-        case .week: return budgets.first { $0.key == Budget.weeklyKey }?.amount
-        default: return nil
-        }
-    }
-
-    /// Carry-over on the overall monthly budget — only for the CURRENT pay-cycle month (offset 0);
-    /// other periods and non-month units show the base budget, and weekly never carries.
-    private var periodCarried: Decimal {
-        guard rolloverEnabled, case .stepped(.month, 0) = period else { return 0 }
-        return rollovers.first { $0.key == Budget.monthlyKey }?.carried ?? 0
-    }
-
-    /// Remaining days of the in-progress period (nil for past/future/custom windows).
-    private var daysLeftInPeriod: Int? {
-        guard case .stepped(_, 0) = period else { return nil }
-        let cal = Calendar.current
-        let days = cal.dateComponents([.day], from: cal.startOfDay(for: .now), to: period.interval.end).day ?? 0
-        return max(0, days - 1)
     }
 
     /// Days of the period elapsed so far (a past period counts in full), at least 1.

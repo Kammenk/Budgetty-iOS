@@ -3,9 +3,9 @@
 //  Budgetty
 //
 //  The income/recurring Insights cards (shown when there's income or bills): Income vs Spending,
-//  Savings rate, Fixed vs Flexible, Upcoming bills, Income by source. Income & bills scale to the
-//  SELECTED period via `Recurring.windowAmount` (Android parity) and pair with that period's actual
-//  spend; Net = income − bills − spend. Upcoming bills stays date-based (each bill's own amount).
+//  Savings rate, Fixed vs Flexible, Income by source. Income & bills scale to the SELECTED period
+//  via `Recurring.windowAmount` (Android parity) and pair with that period's actual spend;
+//  Net = income − bills − spend. (Upcoming bills moved to the Home screen.)
 //
 
 import SwiftUI
@@ -20,8 +20,6 @@ struct IncomeInsightsCards: View {
 
     private var periodIncome: Decimal { income.reduce(.zero) { $0 + $1.windowAmount(window) } }
     private var periodBills: Decimal { bills.reduce(.zero) { $0 + $1.windowAmount(window) } }
-    /// Bills not yet marked paid for their current occurrence — the only ones shown as "upcoming".
-    private var unpaidBills: [Recurring] { bills.filter { !$0.isPaidThisCycle() } }
     private var net: Decimal { periodIncome - periodBills - periodSpent }
     private func dbl(_ d: Decimal) -> Double { (d as NSDecimalNumber).doubleValue }
 
@@ -30,7 +28,6 @@ struct IncomeInsightsCards: View {
             VStack(spacing: 14) {
                 if periodIncome > 0 { incomeVsSpending; savingsRate }
                 if periodBills > 0 || periodSpent > 0 { fixedVsFlexible }
-                if !unpaidBills.isEmpty { upcomingBills }
                 if !income.isEmpty { incomeBySource }
             }
         }
@@ -117,29 +114,6 @@ struct IncomeInsightsCards: View {
             VStack(alignment: .leading, spacing: 1) {
                 Text(title).font(.caption2).foregroundStyle(Palette.secondaryLabel)
                 Text(value.formatMoney()).font(.caption).fontWeight(.semibold)
-            }
-        }
-    }
-
-    /// Date-based (each bill's own amount), independent of the period scaling — matches Android.
-    private var upcomingBills: some View {
-        card("Upcoming bills") {
-            VStack(spacing: 0) {
-                let sorted = unpaidBills.sorted { $0.dueDay < $1.dueDay }
-                ForEach(Array(sorted.enumerated()), id: \.element.persistentModelID) { idx, b in
-                    HStack(spacing: 12) {
-                        CategoryTile(category: b.category.isEmpty ? Categories.defaultName : b.category, size: 30)
-                        VStack(alignment: .leading, spacing: 1) {
-                            Text(b.label).font(.subheadline)
-                            Text(BudgetView.cadenceSubtitle(b)).font(.caption2).foregroundStyle(Palette.secondaryLabel)
-                        }
-                        Spacer()
-                        Text("−\(b.amount.formatMoney())").font(.subheadline).fontWeight(.semibold)
-                            .foregroundStyle(Palette.bad)
-                    }
-                    .padding(.vertical, 8)
-                    if idx < sorted.count - 1 { Divider() }
-                }
             }
         }
     }
