@@ -19,6 +19,10 @@ enum SettingsKey {
     static let budgetRolloverEnabled = "pref.budgetRolloverEnabled"
     static let accent = "pref.accent"             // Premium accent theme (see AccentOption/AppTheme)
     static let faceID = "pref.faceID"
+    /// App lock (PIN gate) on/off; the PIN hash itself lives in the Keychain (see `PinLock`).
+    static let appLockEnabled = "pref.appLockEnabled"
+    /// Auto-lock delay in minutes: 0 = immediately, 1, or 5.
+    static let autoLockMinutes = "pref.autoLockMinutes"
     /// Crashlytics collection — default-ON with an opt-out toggle (see `CrashReporting`).
     /// Unlike the `analytics` and `notifications` keys deleted alongside the trim, this one is read.
     static let crashReporting = "pref.crashReporting"

@@ -92,7 +92,7 @@ struct BudgettyApp: App {
                 } else if showQuiz {
                     InsightsQuizView(onComplete: { quizPending = false })
                 } else {
-                    LockGate { RootView() }
+                    AppLockGate { RootView() }
                 }
             }
             .environment(auth)
