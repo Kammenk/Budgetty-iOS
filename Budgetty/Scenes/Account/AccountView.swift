@@ -34,6 +34,7 @@ struct AccountView: View {
     @State private var pendingImport: BackupFile?
     @State private var importChoice = false
     @State private var backupError: String?
+    @State private var showExportSheet = false
 
     private var appearance: AppearancePref { AppearancePref(rawValue: appearanceRaw) ?? .system }
     private var dateFormat: DateFormatOption { DateFormatOption(rawValue: dateFormatRaw) ?? .system }
@@ -94,6 +95,7 @@ struct AccountView: View {
         .underFloatingDock(reportingScroll: false)
         .screenCanvas()
         .navigationTitle("Account")
+        .sheet(isPresented: $showExportSheet) { ExportSheet() }
         .confirmationDialog("Sign out of Budgetty?", isPresented: $confirmSignOut, titleVisibility: .visible) {
             Button("Sign Out", role: .destructive) { try? auth.signOut() }
         }
@@ -163,6 +165,23 @@ struct AccountView: View {
                 row("Export data", "square.and.arrow.up", Color(argb: 0xFF007AFF)) { chevron }
             }
             .buttonStyle(.plain)
+            divider
+            // Human-readable CSV / PDF export (Premium), distinct from the JSON backup above.
+            if premium {
+                Button { showExportSheet = true } label: {
+                    row("Export CSV or PDF", "tablecells", Color(argb: 0xFF34C759)) { chevron }
+                }
+                .buttonStyle(.plain)
+            } else {
+                NavigationLink { PaywallView() } label: {
+                    row("Export CSV or PDF", "tablecells", Color(argb: 0xFF34C759)) {
+                        Image(systemName: "lock.fill").font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(Palette.tertiaryLabel)
+                        chevron
+                    }
+                }
+                .buttonStyle(.plain)
+            }
             divider
             Button { showImporter = true } label: {
                 row("Import data", "square.and.arrow.down", Color(argb: 0xFF30B0C7)) { chevron }
