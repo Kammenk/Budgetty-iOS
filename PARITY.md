@@ -793,7 +793,7 @@ SwiftData since iOS has no VM layer; each localized to the 15 non-en locales by 
 from Android's finished strings; sim-verified on iPhone 17 Pro). iOS commits:
 #1 Safe to spend `8e651c1`, #2 Savings goals `3bd8bf3`, #3 Subscription detection `252dc2d`
 (+ 7 ported detector unit tests), #4 CSV & PDF export `33455cf`, #5 App lock `f0344e6`. The
-per-item "iOS port pending" notes below are now superseded by this line.
+each item's iOS commit + impl notes are now filled in inline below.
 
 **Build order & gating (decided 2026-07-30):**
 
@@ -811,7 +811,11 @@ per-item "iOS port pending" notes below are now superseded by this line.
    tablet). Design landed as **Variant D "merged card"** — safe-to-spend hero + a Spent / Bills-still-due
    stat strip in one card. **⚠️ Modelling note for the iOS port:** `safe = income − spent − bills STILL
    DUE`; bills already marked paid are NOT re-subtracted (they drop off), and the "getting low" state
-   triggers at ≤10 % of cycle income. **iOS port still pending its Liquid-Glass mockups.**
+   triggers at ≤10 % of cycle income. **✅ iOS BUILT + MERGED** (`8e651c1`): a computed-property
+   derivation on `HomeView` (iOS has no VM layer) + a glass `safeToSpendCard` — status wash behind the
+   material, an inset Spent/Bills-due/Income list — replacing the Total-spent hero for the current
+   pay-cycle month. Income/bills summed via `monthlyEquivalent` (= Android's flat `monthlyAmount`, **not**
+   the createdAt-clipped `windowAmount`). Sim-verified light / dark / de.
 
 2. **Savings goals** — **CAPPED-FREE: 1 goal free, unlimited Premium** (same pattern as
    widgets-2 / custom-cats-3 / recurring-3). New model: `SavingsGoal` + `SavingsContribution`
@@ -824,7 +828,12 @@ per-item "iOS port pending" notes below are now superseded by this line.
    `savings_goals` + `savings_contributions` (DB v21, `MIGRATION_20_21`, cascade-delete)**; `saved = Σ
    signed contributions`; pace = remaining ÷ whole-months-to-date, "behind" when > recent avg deposit.
    `SavingsRepository` (`FREE_GOAL_LIMIT=1`), `BudgetViewModel` list+create + a per-goal
-   `SavingsGoalViewModel`. 16 locales + Roborazzi goldens. **iOS port pending its Liquid-Glass mockups.**
+   `SavingsGoalViewModel`. 16 locales + Roborazzi goldens. **✅ iOS BUILT + MERGED** (`3bd8bf3`):
+   SwiftData `SavingsGoal` + `SavingsContribution` (registered in `UserStore.models` **and** the
+   `Backup.swift` export/import DTOs), `SavingsMath`, a Budget-tab section + goal-detail **sheet** (iOS
+   uses a sheet, not a nav screen) + add/withdraw/create sheets + a searchable emoji picker over
+   `EmojiCatalog`; the 1-goal cap gates on the same `isPremium` check. Sim-verified: create → cap-lock +
+   unlock nudge → contribution updates the ring 0→25%.
 
 3. **Subscription detection** — **PREMIUM** (free = teaser + locked list). On-device
    clustering over the existing transactions by normalized merchant + cadence; flags price
@@ -838,7 +847,12 @@ per-item "iOS port pending" notes below are now superseded by this line.
    → `subscriptions` route (list + detail + a track-as-bill sheet). Price-hike = latest amount > an
    earlier one (before→after + annual cost). **"Track as bill"** upserts a recurring bill
    (`isIncome=false`, category "Subscriptions"). **New Room table `ignored_subscriptions` (DB v22,
-   `MIGRATION_21_22`)** for dismiss/restore. 16 locales + Roborazzi goldens. **iOS port pending its mockups.**
+   `MIGRATION_21_22`)** for dismiss/restore. 16 locales + Roborazzi goldens. **✅ iOS BUILT + MERGED**
+   (`252dc2d`): `SubscriptionDetector` + `SubscriptionScan` (+ **7 ported detector unit tests**),
+   `StoreNormalizer`, a SwiftData `IgnoredSubscription`; Insights entry card (`InsightSection.subscriptions`
+   — Premium summary / free teaser) → pushed list → detail (charge history + price-hike) → track-as-bill
+   sheet. Sim-verified (needed 3× monthly Netflix receipts seeded to surface it — empty ⇒ card hidden,
+   same as Android).
 
 4. **CSV & PDF export** — **PREMIUM.** Human-readable export (CSV spreadsheet + a branded
    one-page PDF statement) beside the existing JSON backup on Account; period/category
@@ -850,7 +864,11 @@ per-item "iOS port pending" notes below are now superseded by this line.
    bars, paginated transaction table). Split `ExportBuilder` (pure `buildCore` + CSV, unit-tested) vs
    `DataExporter` (graphics). Shared via the existing FileProvider + `ACTION_SEND`. **No new table.**
    16 locales + a Roborazzi golden of the rendered statement. ⚠️ v1 cut the category multi-select +
-   PDF-preview (presets-only period); note for the iOS port. **iOS port pending its mockups.**
+   PDF-preview (presets-only period); note for the iOS port. **✅ iOS BUILT + MERGED** (`33455cf`):
+   `ExportBuilder` (period aggregation + CSV, mirrors Android's `buildCore`) + `DataExporter`
+   (`UIGraphicsPDFRenderer` statement — header, Total/Income/Net tiles, by-category bars, paginated
+   transaction table) + an options sheet + a premium-gated Account row (padlocked for free); shared via
+   `UIActivityViewController`. Same presets-only cut as Android. Sim-verified (real branded PDF → share sheet).
 
 5. **App lock — PIN + biometric** — **FREE** (we don't paywall security). Optional PIN +
    biometric gate on cold start / resume-after-idle; auto-lock Immediately / 1 min / 5 min;
@@ -867,12 +885,21 @@ per-item "iOS port pending" notes below are now superseded by this line.
    `androidx.biometric`**; `USE_BIOMETRIC` perm. Account **Security** group: App-lock toggle →
    set PIN, Change PIN, biometric row (only where hardware enrolled), Auto-lock dropdown. **No new
    Room table** — prefs only, DB stays **v22**. 22 strings × 16 locales; Roborazzi lock/set-PIN
-   goldens. **iOS port pending its mockup**: evolve the existing Face ID toggle into this group
-   (add a PIN fallback + auto-lock; don't add a second biometric toggle).
+   goldens. **✅ iOS BUILT + MERGED** (`f0344e6`): `PinLock` (salted SHA-256 in the **Keychain** via
+   CryptoKit + `SecItem`), `AppLockGate` (cold-start + resume-after-idle via `scenePhase`),
+   `LockScreenView` + `SetPinView` over a shared PIN scaffold (shake-on-wrong-PIN, optional biometric
+   key), `BiometricAuth` (LocalAuthentication). **Evolved the old Face-ID toggle into an Account Security
+   group** (App-lock toggle → set PIN, Change PIN, Use Face ID/Touch ID, Auto-lock) and deleted the old
+   `BiometricLockView.swift`. Lock screen sim-verified via the `SHOW_SCREEN=lock` hook (keypad fills the
+   dots, wrong PIN rejected). ⚠️ iOS-sim harness quirk: SwiftUI Toggles don't flip via raw simctl taps
+   (hits even pre-existing toggles) — verify toggle flows via the debug hook, the binding is standard.
 
 *Status (2026-07-31): **all five BUILT + MERGED on Android** — #1 Safe to spend (`4831bd7`), #8
 Savings goals (`2d7d78d`), #9 Subscription detection (`29b88e9`), #5 CSV+PDF export (`19128f7`),
-#3 App lock (`6d0be9a`) — each phone+tablet where relevant, 16 locales, Roborazzi. **iOS ports of
-all five pending their Liquid-Glass mockups.** (This batch supersedes backlog item "Budget rollover",
-already shipped in Android 11.0.0.) Android `main` HEAD = `6d0be9a` (DB **v22**); iOS `main` =
-period-money-flow parity, with `category-insights-v2` ported on a branch, not yet merged.*
+#3 App lock (`6d0be9a`) — each phone+tablet where relevant, 16 locales, Roborazzi. **✅ AND all five
+BUILT + MERGED + PUSHED on iOS (2026-07-31)** — native SwiftUI / Liquid Glass, each localized (15
+non-en locales, mechanically converted from Android's strings) + iPhone-17-Pro sim-verified: #1
+`8e651c1`, #2 `3bd8bf3`, #3 `252dc2d`, #4 `33455cf`, #5 `f0344e6`. **The competitive-features batch is
+now CLOSED on both platforms.** (This batch supersedes backlog item "Budget rollover", already shipped
+in Android 11.0.0.) Android `main` HEAD = `6d0be9a` (DB **v22**); iOS `main` HEAD = `4f68005` on
+`github.com/Kammenk/Budgetty-iOS` (`category-insights-v2` since merged).*
