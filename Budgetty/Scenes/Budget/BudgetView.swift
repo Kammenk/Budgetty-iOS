@@ -42,6 +42,8 @@ struct BudgetView: View {
 
     @State private var period: BudgetPeriod = .monthly
     @State private var showPaywall = false
+    @State private var savingsDetail: SavingsGoal?
+    @State private var showNewGoal = false
 
     // Sheet routing
     private struct RecurringEditor: Identifiable { let id = UUID(); let isIncome: Bool; let existing: Recurring? }
@@ -81,6 +83,8 @@ struct BudgetView: View {
             }
             .sheet(item: $categoryRoute) { CategoryBudgetSheet(group: $0.id) }
             .sheet(isPresented: $showPaywall) { NavigationStack { PaywallView() } }
+            .sheet(item: $savingsDetail) { SavingsGoalDetailView(goal: $0) }
+            .sheet(isPresented: $showNewGoal) { SavingsGoalEditSheet(existing: nil) }
         }
     }
 
@@ -110,6 +114,7 @@ struct BudgetView: View {
             rolloverToggle
             incomeSection
             recurringSection
+            savingsSection
             activeSubBudgetsSection
             categorySection
         }
@@ -419,6 +424,19 @@ struct BudgetView: View {
             .padding(.horizontal, 16).padding(.vertical, 12)
         }
         .buttonStyle(.plain)
+    }
+
+    // MARK: - Savings goals
+
+    /// The savings-goals section (its own SwiftData queries); the tab owns the detail / create sheets
+    /// and the paywall it routes to at the free-tier cap.
+    private var savingsSection: some View {
+        SavingsSectionView(
+            isPremium: premium,
+            onGoalTap: { savingsDetail = $0 },
+            onNewGoal: { showNewGoal = true },
+            onUpgrade: { showPaywall = true }
+        )
     }
 
     // MARK: - Active sub-budgets
