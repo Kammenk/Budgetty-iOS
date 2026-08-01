@@ -903,3 +903,30 @@ non-en locales, mechanically converted from Android's strings) + iPhone-17-Pro s
 now CLOSED on both platforms.** (This batch supersedes backlog item "Budget rollover", already shipped
 in Android 11.0.0.) Android `main` HEAD = `6d0be9a` (DB **v22**); iOS `main` HEAD = `4f68005` on
 `github.com/Kammenk/Budgetty-iOS` (`category-insights-v2` since merged).*
+
+---
+
+## Section refresh — Account toggle chevrons · move Upcoming bills to Home · drop Insights Budget (2026-08-01)
+
+A pre-release UI cleanup, kept in parity where it applies to both platforms:
+
+- **Account toggle rows (Android only):** settings rows with a switch (App lock, Crash reporting) no
+  longer render a trailing chevron — the arrow is only for rows that navigate (`SettingRow`, chevron
+  gated on `trailing == null`). iOS never had a toggle+chevron row, so no iOS change.
+- **Home "this week vs last week" strip (Android only):** removed — `HomeSection.WEEK_COMPARISON` +
+  `QuickStatsStrip`/`WeekDeltaLabel` and the backing `lastWeekSpent`/`topCategory` state. iOS keeps its
+  `weekComparison` section (hidden by default), unchanged.
+- **Insights "Budget" section (both):** removed entirely — gone from the customize menu, no longer
+  rendered. Android: `InsightsSection.BUDGET` + `BudgetSectionCard` + helpers; iOS: `InsightSection.budget`
+  + `budgetSection` + `BudgetVsActualCard`. Onboarding quiz updated on both (the "budget" goal now boosts
+  period-comparison only; the budget-amount seed stays). Budget still lives on the Budget screen.
+- **Upcoming bills → Home (both):** moved from Insights to a new Home section directly below the budget
+  card. Android: new `HomeSection.UPCOMING_BILLS` (phone + portrait tablet); `UpcomingBill` +
+  `nextOccurrenceDays` + `upcomingBills()` extracted to `RecurringMath`, computed in `HomeViewModel`'s
+  existing recurring combine. iOS: new `HomeSection.upcomingBills`; the card lifted out of
+  `IncomeInsightsCards` into `HomeView` (`recurrings.filter { !isIncome && !isPaidThisCycle }`, due-day
+  sorted). Date-based, shown for any period once a bill is unpaid.
+
+**Status (2026-08-01):** BUILT + verified on both — Android on Pixel 6 (branch
+`home-insights-section-refresh`, `df7f27b`), iOS on iPhone 17 Pro (branch `home-insights-section-refresh`).
+Not yet merged to `main` on either repo (awaiting review).*
