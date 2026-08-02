@@ -42,6 +42,10 @@ struct HistoryView: View {
     @State private var showCategory = false
     /// Selected receipt in the iPad-landscape two-pane detail view.
     @State private var selectedID: PersistentIdentifier?
+    // Rows tapped open in single-column mode (keyed by SwiftData id): receipts reveal their top items,
+    // items reveal that product's price history.
+    @State private var expandedReceipts: Set<PersistentIdentifier> = []
+    @State private var expandedItems: Set<PersistentIdentifier> = []
 
     var body: some View {
         GeometryReader { geo in
@@ -296,13 +300,22 @@ struct HistoryView: View {
             if filteredReceipts.isEmpty {
                 HistoryEmpty(symbol: "receipt", text: hasActiveFilters ? "No matching receipts" : "No receipts yet")
             } else {
+                let maxByMonth = monthMax(filteredReceipts, date: \.createdAt) { $0.paidTotal }
                 LazyVStack(spacing: 0) {
+                    if let summary = monthSummary(filteredReceipts, date: \.createdAt, amount: { $0.paidTotal }) {
+                        summaryStrip(summary, countText: receiptCountLabel(summary.count))
+                    }
                     ForEach(dayGroups(of: filteredReceipts, date: \.createdAt), id: \.date) { group in
                         sectionHeader(DayFormat.label(group.date, dateFormat),
                                       trailing: group.items.reduce(Decimal.zero) { $0 + $1.paidTotal }.formatMoney())
                         card {
                             ForEach(Array(group.items.enumerated()), id: \.element.persistentModelID) { idx, r in
-                                receiptRow(r, selecting: selecting)
+                                let open = !selecting && expandedReceipts.contains(r.persistentModelID)
+                                VStack(spacing: 0) {
+                                    receiptRow(r, selecting: selecting, expanded: open,
+                                               fraction: fraction(r.paidTotal, maxByMonth[monthKey(r.createdAt)]))
+                                    if open { receiptExpansion(r) }
+                                }
                                 if idx < group.items.count - 1 { Divider().padding(.leading, 64) }
                             }
                         }
@@ -314,17 +327,26 @@ struct HistoryView: View {
         }
     }
 
-    /// A receipt row: pushes detail in single-column mode, or selects the two-pane detail (with a
-    /// tint-wash highlight) in two-pane mode.
+    /// A receipt row. Two-pane mode selects the detail pane (tint-wash highlight). Single-column mode
+    /// expands the receipt's top items in place — an "Open receipt" link still pushes the full detail —
+    /// with a magnitude bar underneath showing the receipt's share of the month's biggest.
     @ViewBuilder
-    private func receiptRow(_ r: Receipt, selecting: Bool) -> some View {
-        if selecting {
-            Button { selectedID = r.persistentModelID } label: { ReceiptRowView(receipt: r) }
-                .buttonStyle(.plain)
-                .background(selectedID == r.persistentModelID ? Palette.tintSoft : Color.clear)
-        } else {
-            NavigationLink { ReceiptDetailView(receipt: r) } label: { ReceiptRowView(receipt: r) }
-                .buttonStyle(.plain)
+    private func receiptRow(_ r: Receipt, selecting: Bool, expanded: Bool, fraction: Double) -> some View {
+        VStack(spacing: 0) {
+            if selecting {
+                Button { selectedID = r.persistentModelID } label: { ReceiptRowView(receipt: r) }
+                    .buttonStyle(.plain)
+                    .background(selectedID == r.persistentModelID ? Palette.tintSoft : Color.clear)
+            } else {
+                Button {
+                    withAnimation(.snappy(duration: 0.22)) {
+                        if expandedReceipts.contains(r.persistentModelID) { expandedReceipts.remove(r.persistentModelID) }
+                        else { expandedReceipts.insert(r.persistentModelID) }
+                    }
+                } label: { ReceiptRowView(receipt: r, expandable: true, expanded: expanded) }
+                    .buttonStyle(.plain)
+            }
+            magnitudeBar(fraction, leading: 64)
         }
     }
 
@@ -337,18 +359,24 @@ struct HistoryView: View {
             if filteredItems.isEmpty {
                 HistoryEmpty(symbol: "list.bullet", text: hasActiveFilters ? "No matching items" : "No items yet")
             } else {
+                let maxByMonth = monthMax(filteredItems, date: \.createdAt) { $0.lineTotal }
+                let stats = productStats
                 LazyVStack(spacing: 0) {
+                    if let summary = monthSummary(filteredItems, date: \.createdAt, amount: { $0.lineTotal }) {
+                        summaryStrip(summary, countText: itemCountLabel(summary.count))
+                    }
                     ForEach(dayGroups(of: filteredItems, date: \.createdAt), id: \.date) { group in
                         sectionHeader(DayFormat.label(group.date, dateFormat),
                                       trailing: group.items.reduce(Decimal.zero) { $0 + $1.lineTotal }.formatMoney())
                         card {
                             ForEach(Array(group.items.enumerated()), id: \.element.persistentModelID) { idx, item in
-                                if selecting {
-                                    // Tapping an item opens its parent receipt in the detail pane.
-                                    Button { selectedID = item.receipt?.persistentModelID } label: { itemRow(item) }
-                                        .buttonStyle(.plain)
-                                } else {
-                                    itemRow(item)
+                                let stat = stats[productKey(item.name)]
+                                let expandable = (stat?.count ?? 0) >= 2
+                                let open = !selecting && expandable && expandedItems.contains(item.persistentModelID)
+                                VStack(spacing: 0) {
+                                    itemRow(item, selecting: selecting, expandable: expandable, expanded: open,
+                                            fraction: fraction(item.lineTotal, maxByMonth[monthKey(item.createdAt)]))
+                                    if open, let stat { itemPriceHistory(stat) }
                                 }
                                 if idx < group.items.count - 1 { Divider().padding(.leading, 58) }
                             }
@@ -360,7 +388,30 @@ struct HistoryView: View {
         }
     }
 
-    private func itemRow(_ item: LineItem) -> some View {
+    /// An item row + magnitude bar. Two-pane mode selects the parent receipt; single-column mode
+    /// expands the product's price history in place when it's been bought more than once.
+    @ViewBuilder
+    private func itemRow(_ item: LineItem, selecting: Bool, expandable: Bool, expanded: Bool, fraction: Double) -> some View {
+        VStack(spacing: 0) {
+            if selecting {
+                Button { selectedID = item.receipt?.persistentModelID } label: { itemRowLabel(item, expandable: false, expanded: false) }
+                    .buttonStyle(.plain)
+            } else if expandable {
+                Button {
+                    withAnimation(.snappy(duration: 0.22)) {
+                        if expandedItems.contains(item.persistentModelID) { expandedItems.remove(item.persistentModelID) }
+                        else { expandedItems.insert(item.persistentModelID) }
+                    }
+                } label: { itemRowLabel(item, expandable: true, expanded: expanded) }
+                    .buttonStyle(.plain)
+            } else {
+                itemRowLabel(item, expandable: false, expanded: false)
+            }
+            magnitudeBar(fraction, leading: 58)
+        }
+    }
+
+    private func itemRowLabel(_ item: LineItem, expandable: Bool, expanded: Bool) -> some View {
         HStack(spacing: 12) {
             CategoryTile(category: item.category)
             VStack(alignment: .leading, spacing: 1) {
@@ -371,6 +422,10 @@ struct HistoryView: View {
             Spacer(minLength: 8)
             Text(item.lineTotal.formatMoney()).font(.subheadline).fontWeight(.semibold)
                 .foregroundStyle(Palette.label)
+            if expandable {
+                Image(systemName: expanded ? "chevron.up" : "chevron.down")
+                    .font(.system(size: 13, weight: .semibold)).foregroundStyle(Palette.tertiaryLabel)
+            }
         }
         .padding(.horizontal, 16).padding(.vertical, 11)
     }
@@ -539,6 +594,229 @@ struct HistoryView: View {
         let grouped = Dictionary(grouping: source) { cal.startOfDay(for: $0[keyPath: date]) }
         return grouped.keys.sorted(by: >).map { DayGroup(date: $0, items: grouped[$0]!) }
     }
+
+    // MARK: - Summary strip
+
+    /// The tab's focal point: the current month's total, its count, the change vs last month, and a
+    /// six-month sparkline (last bar = current month). Replaces the plain first section header.
+    @ViewBuilder
+    private func summaryStrip(_ s: MonthSummary, countText: String) -> some View {
+        HStack(alignment: .top) {
+            VStack(alignment: .leading, spacing: 3) {
+                Text(monthLabel(s.monthStart)).font(.caption2).fontWeight(.semibold).textCase(.uppercase)
+                    .tracking(0.5).foregroundStyle(Palette.secondaryLabel)
+                Text(s.total.formatMoney()).font(.title).fontWeight(.bold).foregroundStyle(Palette.label)
+                Text(summaryCaption(total: s.total, prev: s.prevTotal, countText: countText))
+                    .font(.caption).foregroundStyle(Palette.secondaryLabel).lineLimit(1)
+            }
+            Spacer(minLength: 8)
+            if s.spark.contains(where: { $0 > 0 }) { sparkline(s.spark) }
+        }
+        .padding(14)
+        .contentCard(cornerRadius: 16)
+        .padding(.horizontal, 20).padding(.top, 12).padding(.bottom, 4)
+    }
+
+    @ViewBuilder
+    private func sparkline(_ values: [Decimal]) -> some View {
+        let peak = values.max() ?? .zero
+        HStack(alignment: .bottom, spacing: 3) {
+            ForEach(Array(values.enumerated()), id: \.offset) { i, v in
+                RoundedRectangle(cornerRadius: 2)
+                    .fill(i == values.count - 1 ? Palette.tint : Palette.tertiaryLabel)
+                    .frame(width: 6, height: max(4, 40 * barFraction(v, peak)))
+            }
+        }
+        .frame(height: 40)
+    }
+
+    /// A hairline under a row: its amount as a share of the month's biggest row (1c's magnitude idea).
+    @ViewBuilder
+    private func magnitudeBar(_ fraction: Double, leading: CGFloat) -> some View {
+        GeometryReader { geo in
+            ZStack(alignment: .leading) {
+                Capsule().fill(Palette.fill)
+                Capsule().fill(Palette.tint.opacity(0.55))
+                    .frame(width: max(0, geo.size.width * fraction))
+            }
+        }
+        .frame(height: 3)
+        .padding(.leading, leading).padding(.trailing, 16).padding(.top, 6).padding(.bottom, 8)
+    }
+
+    // MARK: - Expansions
+
+    /// Receipt payload: its top items inline, with an "Open receipt" link into the full detail.
+    @ViewBuilder
+    private func receiptExpansion(_ r: Receipt) -> some View {
+        let top = Array(r.items.prefix(3))
+        let more = r.items.count - top.count
+        VStack(spacing: 6) {
+            ForEach(top, id: \.persistentModelID) { it in
+                HStack(spacing: 8) {
+                    Text("\(Categories.emoji(for: it.category)) \(it.name)")
+                        .font(.footnote).foregroundStyle(Palette.label).lineLimit(1)
+                    Spacer(minLength: 8)
+                    Text(it.lineTotal.formatMoney()).font(.footnote).fontWeight(.semibold).foregroundStyle(Palette.label)
+                }
+            }
+            Divider()
+            HStack {
+                if more > 0 {
+                    Text("+\(more) more items").font(.caption).foregroundStyle(Palette.secondaryLabel)
+                }
+                Spacer()
+                NavigationLink { ReceiptDetailView(receipt: r) } label: {
+                    HStack(spacing: 3) {
+                        Text("Open receipt").font(.caption).fontWeight(.semibold)
+                        Image(systemName: "chevron.right").font(.system(size: 10, weight: .bold))
+                    }
+                    .foregroundStyle(Palette.tint)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(12)
+        .background(Palette.fill, in: RoundedRectangle(cornerRadius: 12))
+        .padding(.leading, 64).padding(.trailing, 16).padding(.bottom, 12)
+    }
+
+    /// Item payload: how often the product was bought, its average, a mini price chart of recent buys,
+    /// and where it was cheapest — the question a flat item list can't answer.
+    @ViewBuilder
+    private func itemPriceHistory(_ stat: ProductStat) -> some View {
+        let peak = stat.recent.map(\.unit).max() ?? .zero
+        VStack(alignment: .leading, spacing: 0) {
+            HStack {
+                Text("Bought this \(stat.count)×").font(.caption2).fontWeight(.semibold).textCase(.uppercase)
+                    .tracking(0.4).foregroundStyle(Palette.secondaryLabel)
+                Spacer()
+                Text("avg \(stat.avgUnit.formatMoney())").font(.caption).foregroundStyle(Palette.secondaryLabel)
+            }
+            HStack(alignment: .bottom, spacing: 7) {
+                ForEach(Array(stat.recent.enumerated()), id: \.offset) { _, p in
+                    VStack(spacing: 3) {
+                        RoundedRectangle(cornerRadius: 3)
+                            .fill(p.isCheapest ? Palette.tint : Palette.tertiaryLabel)
+                            .frame(height: max(4, 30 * barFraction(p.unit, peak)))
+                        Text(shortMonth(p.date)).font(.system(size: 10)).foregroundStyle(Palette.secondaryLabel)
+                    }
+                    .frame(maxWidth: .infinity)
+                }
+            }
+            .frame(height: 44).padding(.top, 10)
+            Text("Cheapest at \(stat.minStore) · \(stat.minUnit.formatMoney()) on \(shortDate(stat.minDate))")
+                .font(.caption).foregroundStyle(Palette.secondaryLabel).padding(.top, 9)
+        }
+        .padding(12)
+        .background(Palette.fill, in: RoundedRectangle(cornerRadius: 12))
+        .padding(.leading, 58).padding(.trailing, 16).padding(.bottom, 12)
+    }
+
+    // MARK: - Aggregation
+
+    /// The biggest amount in each month, so a row's magnitude bar reads as its share of that month.
+    private func monthMax<T>(_ items: [T], date: KeyPath<T, Date>, _ amount: (T) -> Decimal) -> [Date: Decimal] {
+        var m: [Date: Decimal] = [:]
+        for it in items {
+            let k = monthKey(it[keyPath: date])
+            m[k] = Swift.max(m[k] ?? .zero, amount(it))
+        }
+        return m
+    }
+
+    /// Summary of the most recent month present (matches the top of the list), with the prior month's
+    /// total and a six-month trailing sparkline.
+    private func monthSummary<T>(_ items: [T], date: KeyPath<T, Date>, amount: (T) -> Decimal) -> MonthSummary? {
+        guard !items.isEmpty else { return nil }
+        let cal = Calendar.current
+        var totalByMonth: [Date: Decimal] = [:]
+        var countByMonth: [Date: Int] = [:]
+        for it in items {
+            let k = monthKey(it[keyPath: date])
+            totalByMonth[k, default: .zero] += amount(it)
+            countByMonth[k, default: 0] += 1
+        }
+        guard let current = totalByMonth.keys.max() else { return nil }
+        let prev = cal.date(byAdding: .month, value: -1, to: current).flatMap { totalByMonth[$0] }
+        var spark: [Decimal] = []
+        for offset in stride(from: 5, through: 0, by: -1) {
+            if let m = cal.date(byAdding: .month, value: -offset, to: current) {
+                spark.append(totalByMonth[m] ?? .zero)
+            }
+        }
+        return MonthSummary(monthStart: current, total: totalByMonth[current] ?? .zero,
+                            count: countByMonth[current] ?? 0, prevTotal: prev, spark: spark)
+    }
+
+    /// Price history per product across the whole (unfiltered) ledger, keyed by normalized name.
+    private var productStats: [String: ProductStat] {
+        var byKey: [String: [LineItem]] = [:]
+        for it in allItems {
+            let key = productKey(it.name)
+            guard !key.isEmpty else { continue }
+            byKey[key, default: []].append(it)
+        }
+        var out: [String: ProductStat] = [:]
+        for (key, list) in byKey {
+            let sorted = list.sorted { $0.createdAt < $1.createdAt }
+            let minUnit = sorted.map(\.price).min() ?? .zero
+            let cheapest = sorted.first { $0.price == minUnit } ?? sorted[0]
+            let sum = sorted.reduce(Decimal.zero) { $0 + $1.price }
+            let avg = sum / Decimal(sorted.count)
+            let recent = sorted.suffix(6).map { PurchasePoint(date: $0.createdAt, unit: $0.price, isCheapest: $0.price == minUnit) }
+            out[key] = ProductStat(count: sorted.count, avgUnit: avg, minUnit: minUnit,
+                                   minStore: cheapest.receipt?.store ?? "", minDate: cheapest.createdAt, recent: Array(recent))
+        }
+        return out
+    }
+
+    private func productKey(_ name: String) -> String {
+        name.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+    }
+
+    private func monthKey(_ d: Date) -> Date {
+        Calendar.current.dateInterval(of: .month, for: d)?.start ?? Calendar.current.startOfDay(for: d)
+    }
+
+    private func fraction(_ v: Decimal, _ maxV: Decimal?) -> Double {
+        guard let maxV, maxV > 0, v > 0 else { return 0 }
+        let f = NSDecimalNumber(decimal: v).doubleValue / NSDecimalNumber(decimal: maxV).doubleValue
+        return min(1, max(0.04, f))
+    }
+
+    private func barFraction(_ v: Decimal, _ peak: Decimal) -> CGFloat {
+        guard peak > 0 else { return 0 }
+        let f = NSDecimalNumber(decimal: v).doubleValue / NSDecimalNumber(decimal: peak).doubleValue
+        return CGFloat(min(1, max(0.12, f)))
+    }
+
+    /// "18 receipts · ▲ 6% vs last month" — a "×N" multiplier past 5× so a near-empty prior month
+    /// doesn't read as "+1602%". Drops the delta when there's no comparable prior month.
+    private func summaryCaption(total: Decimal, prev: Decimal?, countText: String) -> String {
+        guard let prev, prev > 0 else { return countText }
+        let ratio = NSDecimalNumber(decimal: total).doubleValue / NSDecimalNumber(decimal: prev).doubleValue
+        let magnitude: String
+        if ratio >= 5 {
+            magnitude = "\(Int(ratio.rounded()))×"
+        } else {
+            let pct = Int(((ratio - 1) * 100).rounded())
+            if pct == 0 { return countText }
+            magnitude = "\(abs(pct))%"
+        }
+        let arrow = ratio >= 1 ? "▲" : "▼"
+        return "\(countText) · \(arrow) \(magnitude) \(String(localized: "vs last month"))"
+    }
+
+    private func monthLabel(_ d: Date) -> String {
+        let f = DateFormatter(); f.dateFormat = "LLLL yyyy"; return f.string(from: d)
+    }
+    private func shortMonth(_ d: Date) -> String {
+        let f = DateFormatter(); f.dateFormat = "MMM"; return f.string(from: d)
+    }
+    private func shortDate(_ d: Date) -> String {
+        let f = DateFormatter(); f.setLocalizedDateFormatFromTemplate("d MMM"); return f.string(from: d)
+    }
 }
 
 /// Relative day-section label: "Today · 5 Jul", "Yesterday · 4 Jul", "Wed · 2 Jul".
@@ -551,6 +829,33 @@ enum DayFormat {
         let wd = DateFormatter(); wd.dateFormat = "EEE"
         return "\(wd.string(from: date)) · \(short)"
     }
+}
+
+/// The most-recent month's roll-up for the History summary strip.
+struct MonthSummary {
+    let monthStart: Date
+    let total: Decimal
+    let count: Int
+    let prevTotal: Decimal?
+    /// Up to six trailing monthly totals, oldest→newest; the last is the current month.
+    let spark: [Decimal]
+}
+
+/// Aggregated price history for one product (all purchases sharing a normalized name).
+struct ProductStat {
+    let count: Int
+    let avgUnit: Decimal
+    let minUnit: Decimal
+    let minStore: String
+    let minDate: Date
+    /// Up to the last six purchases, oldest-first, for the mini chart.
+    let recent: [PurchasePoint]
+}
+
+struct PurchasePoint {
+    let date: Date
+    let unit: Decimal
+    let isCheapest: Bool
 }
 
 private struct HistoryEmpty: View {

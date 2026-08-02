@@ -38,3 +38,6 @@ extension Decimal {
 /// "N items" with locale-correct pluralization (the "%lld items" catalog key carries the
 /// plural variations converted from Android's `item_count` plurals).
 func itemCountLabel(_ n: Int) -> String { String(localized: "\(n) items") }
+
+/// "N receipts" with locale-correct pluralization (History summary strip).
+func receiptCountLabel(_ n: Int) -> String { String(localized: "\(n) receipts") }

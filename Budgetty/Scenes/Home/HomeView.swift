@@ -975,6 +975,10 @@ struct AvatarView: View {
 /// One receipt row: store avatar, name + date/items, amount + discount, chevron.
 struct ReceiptRowView: View {
     let receipt: Receipt
+    /// When true the trailing glyph is a disclosure chevron (down/up) for History's expand-in-place,
+    /// instead of the default navigate-forward chevron used on Home.
+    var expandable = false
+    var expanded = false
     @AppStorage(SettingsKey.dateFormat) private var dateFormatRaw = DateFormatOption.system.rawValue
 
     var body: some View {
@@ -994,7 +998,7 @@ struct ReceiptRowView: View {
                         .font(.caption).foregroundStyle(Palette.good)
                 }
             }
-            Image(systemName: "chevron.right")
+            Image(systemName: expandable ? (expanded ? "chevron.up" : "chevron.down") : "chevron.right")
                 .font(.system(size: 13, weight: .semibold))
                 .foregroundStyle(Palette.tertiaryLabel)
         }

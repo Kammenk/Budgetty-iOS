@@ -930,3 +930,28 @@ A pre-release UI cleanup, kept in parity where it applies to both platforms:
 **Status (2026-08-01):** BUILT + verified on both — Android on Pixel 6 (branch
 `home-insights-section-refresh`, `df7f27b`), iOS on iPhone 17 Pro (branch `home-insights-section-refresh`).
 Not yet merged to `main` on either repo (awaiting review).*
+
+## History composite refresh (both) — 2026-08-02
+
+The "dull History" fix, from the composite mockups `History Recommended.dc.html` +
+`iOS History Refresh.dc.html` (Liquid Glass). Four additions to the History Receipts/Items tabs:
+
+- **Summary strip** atop each tab: the current month's total, count, delta vs last month (a `×N`
+  multiplier past 5× so a near-empty prior month doesn't read as "+1602%"), and a 6-month sparkline
+  (last bar = current month). Android `HistorySummaryStrip` in `HistoryScreen.kt`; iOS `summaryStrip`
+  + `monthSummary` in `HistoryView.swift`.
+- **Magnitude bar** under every row = its share of the month's biggest. Android `MagnitudeBar`; iOS
+  `magnitudeBar`.
+- **Receipt expand-in-place:** tap reveals top items inline + "Open receipt" (pushes detail). Two-pane
+  iPad / landscape tablet still selects the detail pane. Android `ReceiptExpandedPanel`; iOS
+  `receiptExpansion` + shared `ReceiptRowView` gains `expandable`/`expanded`.
+- **Item price-history:** tap a product bought ≥2× → times bought, average, mini chart of recent buys,
+  and where it was cheapest. Per-product aggregation over the unfiltered ledger — Android `productStats`
+  in `HistoryViewModel`; iOS `productStats` computed in `HistoryView`. Also dropped Android's dead
+  multi-column Items grid. 5 new strings both platforms (reusing vs-last-month / +N-more / item-count),
+  all locales.
+
+**Status (2026-08-02):** Android — branch `history-composite-refresh` (`483ac43`), Pixel 6 verified,
+pushed. iOS — branch `history-composite-refresh`, build green + iPhone 17 Pro verified (summary strip,
+magnitude bars, receipt expand; item price-history correctly gated to ≥2×, not shown on the sparse seed
+but the aggregation mirrors the device-verified Android one). Not yet merged on either.*
