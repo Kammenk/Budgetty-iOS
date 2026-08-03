@@ -43,6 +43,10 @@ struct HomeView: View {
     @Query private var budgets: [Budget]
     @Query private var recurrings: [Recurring]
     @Query private var rollovers: [BudgetRollover]
+    // Wellbeing banner inputs (the score derives on-device from these + receipts/budgets/recurrings).
+    @Query(sort: \SavingsGoal.createdAt) private var goals: [SavingsGoal]
+    @Query private var contributions: [SavingsContribution]
+    @Query private var ignoredRows: [IgnoredSubscription]
 
     @AppStorage(HomeLayoutStore.orderKey) private var orderRaw = ""
     @AppStorage(HomeLayoutStore.hiddenKey) private var hiddenRaw = HomeLayoutStore.defaultHidden
@@ -67,6 +71,13 @@ struct HomeView: View {
 
     private var hasBudget: Bool {
         budget(Budget.monthlyKey) != nil || budget(Budget.weeklyKey) != nil
+    }
+
+    /// The Wellbeing snapshot feeding the Home banner (Android parity: the banner is a live teaser).
+    private var wellbeingSummary: WellbeingSummary {
+        WellbeingScan.run(receipts: receipts, budgets: budgets, recurring: recurrings, goals: goals,
+                          contributions: contributions, ignoredSubs: Set(ignoredRows.map(\.merchant)),
+                          monthStartDay: monthStartDay)
     }
 
     /// The window for the selected [period]: a pay-cycle month (this / last), the last N whole cycles,
@@ -178,6 +189,10 @@ struct HomeView: View {
                 case .budgets: if hasBudget && period.isMonth { budgetsCard }
                 // Recurring bills due soon — date-based, so shown for any period once any is unpaid.
                 case .upcomingBills: if hasUpcomingBills { upcomingBillsCard }
+                // A live teaser into the dedicated Wellbeing screen (first-run state before there's a score).
+                case .wellbeing:
+                    NavigationLink { WellbeingView() } label: { WellbeingBanner(summary: wellbeingSummary) }
+                        .buttonStyle(.plain)
                 case .receipts: recentReceiptsSection
                 }
             }
