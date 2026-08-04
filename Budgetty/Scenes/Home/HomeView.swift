@@ -43,6 +43,10 @@ struct HomeView: View {
     @Query private var budgets: [Budget]
     @Query private var recurrings: [Recurring]
     @Query private var rollovers: [BudgetRollover]
+    // Wellbeing banner inputs (the score derives on-device from these + receipts/budgets/recurrings).
+    @Query(sort: \SavingsGoal.createdAt) private var goals: [SavingsGoal]
+    @Query private var contributions: [SavingsContribution]
+    @Query private var ignoredRows: [IgnoredSubscription]
 
     @AppStorage(HomeLayoutStore.orderKey) private var orderRaw = ""
     @AppStorage(HomeLayoutStore.hiddenKey) private var hiddenRaw = HomeLayoutStore.defaultHidden
@@ -67,6 +71,13 @@ struct HomeView: View {
 
     private var hasBudget: Bool {
         budget(Budget.monthlyKey) != nil || budget(Budget.weeklyKey) != nil
+    }
+
+    /// The Wellbeing snapshot feeding the Home banner (Android parity: the banner is a live teaser).
+    private var wellbeingSummary: WellbeingSummary {
+        WellbeingScan.run(receipts: receipts, budgets: budgets, recurring: recurrings, goals: goals,
+                          contributions: contributions, ignoredSubs: Set(ignoredRows.map(\.merchant)),
+                          monthStartDay: monthStartDay)
     }
 
     /// The window for the selected [period]: a pay-cycle month (this / last), the last N whole cycles,
@@ -175,9 +186,13 @@ struct HomeView: View {
                 case .totalSpent: if period == .thisMonth { safeToSpendCard } else { heroCard }
                 case .weekComparison: if lastWeekSpent > 0 { weekCard }
                 // The monthly budget card is a single-month concept — hidden for multi-month / all-time.
-                case .budgets: if hasBudget && period.isMonth { budgetsCard }
+                case .budgets: if period.isMonth { if hasBudget { budgetsCard } else { budgetsEmptyCard } }
                 // Recurring bills due soon — date-based, so shown for any period once any is unpaid.
                 case .upcomingBills: if hasUpcomingBills { upcomingBillsCard }
+                // A live teaser into the dedicated Wellbeing screen (first-run state before there's a score).
+                case .wellbeing:
+                    NavigationLink { WellbeingView() } label: { WellbeingBanner(summary: wellbeingSummary) }
+                        .buttonStyle(.plain)
                 case .receipts: recentReceiptsSection
                 }
             }
@@ -782,6 +797,32 @@ struct HomeView: View {
         }
         .padding(.horizontal, 18).padding(.vertical, 16)
         .contentCard(cornerRadius: 16)
+    }
+
+    /// First-run Budgets card: names the empty state and invites setting the first budget (Android parity).
+    private var budgetsEmptyCard: some View {
+        Button { selectTab?(.budget) } label: {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Budgets").font(.headline)
+                Text("No budgets yet").font(.subheadline).fontWeight(.semibold)
+                Text("Set one and Budgetty can tell you how you're pacing.")
+                    .font(.caption).foregroundStyle(Palette.secondaryLabel)
+                Capsule()
+                    .strokeBorder(Palette.separator, style: StrokeStyle(lineWidth: 1.5, dash: [4, 4]))
+                    .frame(height: 8)
+                    .padding(.top, 2)
+                HStack(spacing: 4) {
+                    Text("Set a budget").font(.subheadline).fontWeight(.semibold)
+                    Image(systemName: "chevron.right").font(.caption2.weight(.semibold))
+                }
+                .foregroundStyle(Palette.tint)
+                .padding(.top, 2)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 18).padding(.vertical, 16)
+            .contentCard(cornerRadius: 16)
+        }
+        .buttonStyle(.plain)
     }
 
     // MARK: - Upcoming bills

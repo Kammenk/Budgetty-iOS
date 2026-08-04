@@ -31,6 +31,8 @@ enum SettingsKey {
     static let onboarded = "pref.onboarded"
     static let quizPending = "pref.quizPending"   // armed at sign-up; gates the one-time Insights setup quiz
     static let scanQuotaUsed = "quota.scansUsed"  // lifetime finalized AI scans (see ScanQuota)
+    /// Dismissed Wellbeing tips, as newline-separated "periodId|tipId" entries (see WellbeingTipsStore).
+    static let dismissedWellbeingTips = "wellbeing.dismissedTips"
 }
 
 /// The free tier's receipt-scan allowance (Android parity). The count is a **lifetime** total with

@@ -19,6 +19,11 @@ struct InsightsView: View {
     @Query(sort: \Receipt.createdAt, order: .reverse) private var receipts: [Receipt]
     @Query(sort: \Recurring.createdAt) private var recurring: [Recurring]
     @Query private var storedCategories: [Category]
+    // Wellbeing entry-row inputs (the pinned door into the Wellbeing screen, above Breakdown).
+    @Query private var budgets: [Budget]
+    @Query(sort: \SavingsGoal.createdAt) private var goals: [SavingsGoal]
+    @Query private var contributions: [SavingsContribution]
+    @Query private var ignoredRows: [IgnoredSubscription]
     @AppStorage("insights.breakdownAllCats") private var breakdownAllCats = false
     /// The pay-cycle start day; the money-flow snapshot and the MONTH period follow it (re-read here
     /// so the screen re-renders when "Month starts on" changes).
@@ -124,12 +129,26 @@ struct InsightsView: View {
     private var compactStack: some View {
         VStack(spacing: 14) {
             stepper
+            wellbeingEntry
             if periodReceipts.isEmpty {
                 emptyState
             } else {
                 ForEach(visibleSections) { sectionView($0) }
             }
         }
+    }
+
+    /// The Wellbeing score's door — pinned directly under the stepper, above Breakdown, in every
+    /// layout. A fixed link, not a reorderable InsightSection (it costs the tab one row, not a block).
+    private var wellbeingEntry: some View {
+        NavigationLink { WellbeingView() } label: { WellbeingEntryRow(summary: wellbeingSummary) }
+            .buttonStyle(.plain)
+    }
+
+    private var wellbeingSummary: WellbeingSummary {
+        WellbeingScan.run(receipts: receipts, budgets: budgets, recurring: recurring, goals: goals,
+                          contributions: contributions, ignoredSubs: Set(ignoredRows.map(\.merchant)),
+                          monthStartDay: monthStartDay)
     }
 
     private var visibleSections: [InsightSection] {
@@ -188,6 +207,7 @@ struct InsightsView: View {
     private var regularStack: some View {
         VStack(spacing: Dimens.regularColumnSpacing) {
             stepper
+            wellbeingEntry
             if periodReceipts.isEmpty {
                 emptyState
             } else {
@@ -213,6 +233,7 @@ struct InsightsView: View {
     private var wideStack: some View {
         VStack(spacing: Dimens.regularColumnSpacing) {
             stepper
+            wellbeingEntry
             if periodReceipts.isEmpty {
                 emptyState
             } else {
