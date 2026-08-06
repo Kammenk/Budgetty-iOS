@@ -452,7 +452,7 @@ unit-tested) and the saving is dropped rather than invented when it can't be com
     data. A widget can be asked for a timeline before the system registers it, and locking someone
     out on a half-known state is the worse failure.
   - Entitlement reaches the extension through `WidgetQuota.premiumKey` in the App Group, written by
-    `WidgetSharing.publishPremium()`; `StoreManager` and the 11-tap tester unlock both call
+    `WidgetSharing.publishPremium()`; `StoreManager` calls
     `premiumDidChange()` so a purchase re-renders locked widgets immediately instead of hours later.
 
   **Locked-card copy differs from Android on purpose.** Android says "Tap to upgrade" because it
@@ -502,9 +502,10 @@ NB: Android's 4 options (DAY_MONTH_YEAR / DMY_SLASH / MDY_SLASH / ISO) differ fr
   `ReceiptViewerScreen` (app stores no receipt images) — mockup-only, no parity action.
 - **Trend 7-bar padding / donut leader-line % labels** — Android Material visual choices;
   iOS follows its own Liquid Glass mockups.
-- **Category rules, custom date range sheet, History tabs+sort+price-range, tester premium
-  unlock (11-tap), Insights customize sheet, income/recurring, period stepper** — spot-checked
-  2026-07-14, all present on iOS ✓.
+- **Category rules, custom date range sheet, History tabs+sort+price-range, Insights customize
+  sheet, income/recurring, period stepper** — spot-checked 2026-07-14, all present on iOS ✓.
+  (The tester-Premium 11-tap unlock that was listed here was REMOVED from both platforms
+  2026-08-06 — see the final section.)
 
 ---
 
@@ -955,3 +956,47 @@ The "dull History" fix, from the composite mockups `History Recommended.dc.html`
 pushed. iOS — branch `history-composite-refresh`, build green + iPhone 17 Pro verified (summary strip,
 magnitude bars, receipt expand; item price-history correctly gated to ≥2×, not shown on the sparse seed
 but the aggregation mirrors the device-verified Android one). Not yet merged on either.*
+
+## Wellbeing coach — score + weekly/monthly coaching (both) — 2026-08-04
+
+A new free feature: a 0–100 financial Wellbeing score with weekly/monthly coaching tips, on a dedicated
+full-screen destination (bottom-nav/dock hidden) reached from a live Home banner + a slim Insights row —
+deliberately NOT an Insights block. Rule-based, on-device; no new data model beyond dismissed-tip ids.
+
+- **Engine (spec):** Android `WellbeingEngine`/`WellbeingProvider` (`ui/wellbeing/`) — score from ~5
+  renormalizing sub-scores (savings 25%, budget adherence 25%, spending trend 15%, subscriptions 15%,
+  goals 20%), bands Needs-work/Getting-there/Healthy/Thriving; weekly = a "this week" pace card + tactical
+  tips, monthly = the graded score + tips. iOS `Support/WellbeingEngine.swift` + `Support/WellbeingSummary.swift`
+  (`WellbeingScan.run` mirrors `WellbeingProvider.build`), reusing existing compute (savings-rate math,
+  trend via `InsightsPeriod.previous()`, `SubscriptionScan`, `SavingsMath`, `PayCycle`, `Recurring.windowAmount`).
+  17 unit tests each side.
+- **UI:** Android `WellbeingScreen`/`WellbeingBanner`/`WellbeingInsightsRow` + `ScoreRing` (phone + tablet:
+  capped column + two-up score card — NOT a landscape two-pane). iOS `Scenes/Wellbeing/WellbeingView.swift`
+  + `Scenes/Home/WellbeingBanner.swift` — native Liquid Glass (no Wellbeing mockup existed; adapted from
+  tokens). New `HomeSection.wellbeing` (between upcomingBills/receipts) + slim Insights row; dismissed-tip
+  ids in `@AppStorage`/prefs. 15 locales both sides.
+
+**Status (2026-08-04):** PORTED — both merged to `main`. Android `f65c661` → **11.2.0 / vc1120** (tag
+`v11.2.0`, Pixel 6 + Pixel_Tablet verified). iOS `b2a9943` → **build 10** (iPhone 17 Pro sim-verified,
+BUILD SUCCEEDED). Neither uploaded to a store yet.
+
+## Removed the 11-tap tester-Premium backdoor (both) + Play language-split fix (Android-only) — 2026-08-06
+
+- **11-tap tester-Premium unlock — REMOVED on both.** The hidden gesture (11 taps on the Account version
+  label → grant Premium, added for internal testers) is gone. Android: dropped the gesture +
+  `unlockTesterPremium` + `BillingManager.TESTER_PREMIUM_ENABLED`/`KEY_TESTER_PREMIUM` + the `testerPremium`
+  OR in `isPremium` + the toast strings ×16 locales (`00000eb` → **11.2.1 / vc1121**, tag `v11.2.1`; signed
+  AAB verified tester-free — 0 dex refs / 0 string keys). iOS: dropped the tap gesture in `SupportAboutView`
+  + `SettingsKey.testerPremium`; `StoreManager.syncPremiumFlag` now mirrors only the real StoreKit
+  entitlement (`10fd81a`, **build 10**, sim BUILD SUCCEEDED). Supersedes the "tester premium unlock (11-tap)
+  … present on iOS ✓" note above. ⚠️ Still live in the shipped Android **vc1120** until users update, so the
+  removal's store notes were kept generic.
+- **Play App Bundle language-split fix — Android-only, NO iOS action.** In-app language switching (Account →
+  Language) did nothing on Play (App Bundle) installs because Play delivered only the device-locale strings;
+  fixed with `bundle { language { enableSplit = false } }` so every locale ships in the base install (Android
+  `0cf2d8d` → 11.1.2/vc1112, carried into 11.2.0+). iOS ships every `.lproj` in the app bundle (the App Store
+  doesn't split localizations by device language) and the in-app switch uses an `AppleLanguages` override —
+  so there is **no iOS equivalent bug and nothing to port.**
+
+**Status (2026-08-06):** 11-tap removal DONE + pushed on both (`00000eb` / `10fd81a`); Play language fix is
+Android-only. Neither the 11.2.1 AAB nor iOS build 10 uploaded yet.
