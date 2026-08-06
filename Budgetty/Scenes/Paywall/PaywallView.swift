@@ -4,7 +4,7 @@
 //
 //  Budgetty Premium paywall from the mockup: violet hero, feature list, Yearly/Monthly plan cards,
 //  and a subscribe CTA. Purchases run through StoreManager (StoreKit 2); prices come from the loaded
-//  products with a static fallback. The hidden 11-tap tester unlock stays as a separate path.
+//  products with a static fallback.
 //
 
 import SwiftUI

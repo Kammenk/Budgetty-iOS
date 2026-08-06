@@ -5,8 +5,7 @@
 //  StoreKit 2 subscription handling. Loads the Premium products, runs purchases/restores, and
 //  listens for transaction updates. The single source of truth for entitlement is StoreKit
 //  (`Transaction.currentEntitlements`); we mirror the result into the `pref.premium` UserDefaults
-//  flag that the rest of the app already reads via @AppStorage, OR'd with the tester unlock so the
-//  hidden 11-tap tester path keeps working.
+//  flag that the rest of the app already reads via @AppStorage.
 //
 //  App Store Connect setup (done separately, by the account owner): a subscription group with two
 //  auto-renewing products whose IDs match `productIDs` below.
@@ -85,10 +84,9 @@ final class StoreManager {
         syncPremiumFlag()
     }
 
-    /// Mirror entitlement into the app-wide `premium` flag, preserving the tester unlock.
+    /// Mirror StoreKit entitlement into the app-wide `premium` flag.
     private func syncPremiumFlag() {
-        let tester = UserDefaults.standard.bool(forKey: SettingsKey.testerPremium)
-        UserDefaults.standard.set(isSubscribed || tester, forKey: SettingsKey.premium)
+        UserDefaults.standard.set(isSubscribed, forKey: SettingsKey.premium)
         // Widgets live in another process and enforce their own cap, so they need telling.
         WidgetSharing.premiumDidChange()
     }
