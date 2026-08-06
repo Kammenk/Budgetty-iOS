@@ -3,16 +3,12 @@
 //  Budgetty
 //
 //  Help, legal, and about — Liquid Glass v2 (iOS Support & About.dc.html): glass section cards over
-//  the ambient canvas, plus the brand logo footer. Keeps the hidden tester-premium gesture (tap the
-//  version row 11×), same as Android.
+//  the ambient canvas, plus the brand logo footer.
 //
 
 import SwiftUI
 
 struct SupportAboutView: View {
-    @AppStorage(SettingsKey.premium) private var premium = false
-    @AppStorage(SettingsKey.testerPremium) private var testerUnlocked = false
-    @State private var versionTaps = 0
     @Environment(\.openURL) private var openURL
 
     var body: some View {
@@ -57,8 +53,7 @@ struct SupportAboutView: View {
                 .contentCard(cornerRadius: 14)
                 .padding(.bottom, 36)
 
-                // Brand footer (mockup: logo tile + name + tagline); the version line doubles as the
-                // hidden tester-premium unlock.
+                // Brand footer (mockup: logo tile + name + tagline).
                 RoundedRectangle(cornerRadius: 22, style: .continuous)
                     .fill(Palette.heroGradient)
                     .frame(width: 72, height: 72)
@@ -66,21 +61,9 @@ struct SupportAboutView: View {
                     .shadow(color: Palette.tint.opacity(0.35), radius: 12, y: 6)
                     .padding(.bottom, 12)
                 Text("Budgetty").font(.headline).foregroundStyle(Palette.label)
-                Button {
-                    versionTaps += 1
-                    if versionTaps >= 11 {
-                        premium = true
-                        testerUnlocked = true
-                        // Widgets enforce their own cap in another process — tell them too, or a
-                        // tester's locked widgets would stay locked.
-                        WidgetSharing.premiumDidChange()
-                    }
-                } label: {
-                    Text(testerUnlocked ? "Budgetty 1.0 · Premium unlocked ✓" : "Budgetty 1.0 · Made with 💜")
-                        .font(.caption).foregroundStyle(Palette.secondaryLabel)
-                        .padding(.top, 4)
-                }
-                .buttonStyle(.plain)
+                Text("Budgetty 1.0 · Made with 💜")
+                    .font(.caption).foregroundStyle(Palette.secondaryLabel)
+                    .padding(.top, 4)
             }
             .padding(.horizontal, 20).padding(.top, 6).padding(.bottom, 40)
             .adaptiveReadableWidth()
