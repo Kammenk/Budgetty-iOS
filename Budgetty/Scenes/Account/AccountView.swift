@@ -196,6 +196,11 @@ struct AccountView: View {
                 row("Widgets", "square.grid.2x2.fill", Color(argb: 0xFF5856D6)) { chevron }
             }
             .buttonStyle(.plain)
+            divider
+            NavigationLink { ManageCategoriesView() } label: {
+                row("Manage categories", "square.grid.3x3.fill", Color(argb: 0xFFFF9F0A)) { chevron }
+            }
+            .buttonStyle(.plain)
         }
         .contentCard(cornerRadius: 14)
     }
