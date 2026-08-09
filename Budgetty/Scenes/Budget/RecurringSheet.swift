@@ -31,6 +31,7 @@ struct RecurringSheet: View {
             Form {
                 Section {
                     TextField(isIncome ? "Source (e.g. Salary)" : "Name (e.g. Netflix)", text: $label)
+                        .textInputAutocapitalization(.sentences)
                     HStack {
                         Text(isIncome ? "Amount" : "Amount")
                         Spacer()
@@ -51,8 +52,21 @@ struct RecurringSheet: View {
                             ForEach(1...7, id: \.self) { Text(Self.weekdayName($0)).tag($0) }
                         }
                     } else if cadence == .monthly || cadence == .yearly {
-                        Picker("Day of month", selection: $dueDay) {
-                            ForEach(1...31, id: \.self) { Text(Self.ordinal($0)).tag($0) }
+                        // Typable day-of-month (parity with Android): type 1–31 directly, clamped live,
+                        // with a stepper for ±1. The weekly case above stays a weekday picker.
+                        HStack {
+                            Text("Day of month")
+                            Spacer()
+                            TextField("1", value: $dueDay, format: .number)
+                                .keyboardType(.numberPad)
+                                .multilineTextAlignment(.trailing)
+                                .frame(maxWidth: 48)
+                                .onChange(of: dueDay) { _, newValue in
+                                    let clamped = min(max(newValue, 1), 31)
+                                    if clamped != newValue { dueDay = clamped }
+                                }
+                            Stepper("", value: $dueDay, in: 1...31)
+                                .labelsHidden()
                         }
                     }
                 }

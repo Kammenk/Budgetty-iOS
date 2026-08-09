@@ -79,7 +79,7 @@ struct CustomCategorySheet: View {
                 Text("Name").font(.caption2).fontWeight(.semibold).textCase(.uppercase)
                     .foregroundStyle(Palette.secondaryLabel)
                 TextField("Category name", text: $name)
-                    .textInputAutocapitalization(.words)
+                    .textInputAutocapitalization(.sentences)
                     .padding(.horizontal, 14).frame(height: 40)
                     .inputField(cornerRadius: 11)
             }

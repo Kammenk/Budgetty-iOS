@@ -170,7 +170,7 @@ struct ReviewView: View {
                 VStack(alignment: .leading, spacing: 2) {
                     fieldLabel("Store", color: Palette.tint)
                     TextField("Store", text: $draft.store)
-                        .font(.system(size: 14)).textInputAutocapitalization(.words)
+                        .font(.system(size: 14)).textInputAutocapitalization(.sentences)
                         .accessibilityIdentifier(A11y.Review.store)
                 }
                 Image(systemName: "square.and.pencil")
@@ -310,6 +310,7 @@ private struct ItemCard: View {
                 VStack(alignment: .leading, spacing: 3) {
                     label("Product")
                     TextField("Item name", text: $item.name).font(.system(size: 15))
+                        .textInputAutocapitalization(.sentences)
                 }
                 Spacer(minLength: 8)
                 Button(action: onDelete) {
