@@ -269,8 +269,8 @@ struct HomeView: View {
         let w = PayCycle.monthInterval(startDay: monthStartDay)
         return receipts.filter { w.contains($0.createdAt) }.count
     }
-    /// Bills already marked paid this cycle: they drop off Safe to spend (not re-subtracted) but are
-    /// surfaced as context under "Bills still due".
+    /// Bills already marked paid this cycle. They're spent money, so they stay subtracted from Safe to
+    /// spend (like receipts) — surfaced under "Bills still due" and folded into "Total spent this cycle".
     private var billsPaidThisCycle: Decimal {
         recurrings.filter { !$0.isIncome && $0.isPaidThisCycle(startDay: monthStartDay) }
             .reduce(.zero) { $0 + $1.monthlyEquivalent }
@@ -280,8 +280,9 @@ struct HomeView: View {
         recurrings.filter { !$0.isIncome && !$0.isPaidThisCycle(startDay: monthStartDay) }
             .reduce(.zero) { $0 + $1.monthlyEquivalent }
     }
-    /// Income this cycle − spent so far − bills still owed.
-    private var safeToSpend: Decimal { cycleIncome - cycleSpent - billsStillDue }
+    /// Income this cycle − spent so far − every recurring bill this cycle (still due + already paid).
+    /// Paying a bill is net-neutral here: it was already reserved while it was due, so the figure holds.
+    private var safeToSpend: Decimal { cycleIncome - cycleSpent - billsStillDue - billsPaidThisCycle }
 
     /// The next pay-cycle start — the day Safe to spend resets.
     private var nextPayday: Date { PayCycle.month(.now, startDay: monthStartDay, offset: 1).start }
@@ -418,8 +419,10 @@ struct HomeView: View {
         if status == .setup {
             hatchedCapsule()
         } else {
-            let denom = max(cycleIncome, cycleSpent + billsStillDue)
-            let spentW = HomeView.fraction(cycleSpent, of: denom)
+            // Paid bills are spent money, so they join receipts in the solid segment; the hatched middle
+            // is then only what's still due, and paying a bill leaves the safe (tone) tail unchanged.
+            let denom = max(cycleIncome, cycleSpent + billsPaidThisCycle + billsStillDue)
+            let spentW = HomeView.fraction(cycleSpent + billsPaidThisCycle, of: denom)
             let tailW = HomeView.fraction(safeToSpend, of: denom)
             GeometryReader { geo in
                 HStack(spacing: 2) {
@@ -449,6 +452,16 @@ struct HomeView: View {
                 subtitle: billsPaidThisCycle > 0
                     ? String(localized: "\(billsPaidThisCycle.formatMoney()) already paid") : nil,
                 value: billsStillDue.formatMoney())
+            if billsPaidThisCycle > 0 {
+                // What's actually left your pocket this cycle = receipts + bills marked paid. Only shown
+                // once a bill is paid; until then it equals "Spent this cycle" above.
+                Divider().overlay(Palette.separator)
+                safeToSpendRow(
+                    swatch: Color.clear,
+                    title: "Total spent this cycle",
+                    subtitle: nil,
+                    value: (cycleSpent + billsPaidThisCycle).formatMoney())
+            }
             Divider().overlay(Palette.separator)
             safeToSpendRow(
                 swatch: Color.clear,
