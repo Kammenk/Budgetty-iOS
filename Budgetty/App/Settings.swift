@@ -26,7 +26,10 @@ enum SettingsKey {
     /// Crashlytics collection — default-ON with an opt-out toggle (see `CrashReporting`).
     /// Unlike the `analytics` and `notifications` keys deleted alongside the trim, this one is read.
     static let crashReporting = "pref.crashReporting"
-    static let premium = "pref.premium"           // effective Premium flag (from the subscription)
+    static let premium = "pref.premium"           // effective Premium flag (subscription OR comped account)
+    /// Account-comp entitlement cache: the server-granted `premium` auth claim (see `CompEntitlement`,
+    /// set by functions/tools/comp.js). Cached so a comped account shows Premium instantly on launch.
+    static let comp = "pref.comp"
     static let onboarded = "pref.onboarded"
     static let quizPending = "pref.quizPending"   // armed at sign-up; gates the one-time Insights setup quiz
     static let scanQuotaUsed = "quota.scansUsed"  // lifetime finalized AI scans (see ScanQuota)
