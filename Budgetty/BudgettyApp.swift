@@ -72,6 +72,7 @@ struct BudgettyApp: App {
         // otherwise insert the new one first, forcing the collision branch and discarding the
         // existing row's colour.
         Migrations.splitSubscriptionsAndServices(container.mainContext)
+        Migrations.splitInsuranceAndUtilities(container.mainContext)
         Seed.categoriesIfNeeded(container.mainContext)
         // Prime the taxonomy caches (parent overrides + custom colour/emoji) so grouping and custom
         // rendering are correct from the first render; category mutations refresh it again as they run.

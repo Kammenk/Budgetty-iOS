@@ -84,7 +84,10 @@ enum Categories {
         Def(name: "Subscriptions", emoji: "🔁", parent: "Services & Subscriptions"),
         Def(name: "Education", emoji: "🎓", parent: "Services & Subscriptions"),
         Def(name: "Travel & Accommodation", emoji: "🧳", parent: "Services & Subscriptions"),
-        Def(name: "Insurance & Utilities", emoji: "🛡️", parent: "Services & Subscriptions"),
+        // Was "Insurance & Utilities"; split three ways (2026-08). Survivor "Utilities" reuses this slot
+        // to keep its colour; "Insurance" and "Phone & Internet" are appended below. The migration
+        // repoints old data onto "Utilities".
+        Def(name: "Utilities", emoji: "⚡", parent: "Services & Subscriptions"),
         Def(name: "Rent", emoji: "🔑", parent: "Services & Subscriptions"),
         Def(name: "Office & Work Supplies", emoji: "🗂️", parent: "Services & Subscriptions"),
         Def(name: "Gifts & Charitable Donations", emoji: "🎁", parent: "Services & Subscriptions"),
@@ -93,15 +96,34 @@ enum Categories {
         // mid-list would recolor every sub after them. Appending leaves all existing colors untouched;
         // `children()` filters by parent, so they still render inside their own group.
         Def(name: "Video Games", emoji: "🎮", parent: "Dining & Entertainment"),
-        Def(name: "Investments", emoji: "📈", parent: "Services & Subscriptions"),
+        Def(name: "Investments", emoji: "📈", parent: "Bills & Finance"), // re-homed from Services (2026-08)
         // The non-subscription half of the old "Subscriptions & Services" (repairs, haircuts,
-        // cleaning — one-off paid-for work). Appended for the same reason as the two above: a
-        // mid-list insert would recolour every sub-category after it.
+        // cleaning — one-off paid-for work).
         Def(name: "Services", emoji: "🧰", parent: "Services & Subscriptions"),
         // 🪙 Gratuity on a delivery/restaurant order — its own line, kept apart from the food.
         Def(name: "Tips", emoji: "🪙", parent: "Dining & Entertainment"),
         // 🛵 Combined delivery + service + bag/booking fees on a delivery-app order.
         Def(name: "Delivery", emoji: "🛵", parent: "Other"),
+        // ── Taxonomy expansion 2026-08 (mirror of Android) ──────────────────────────────────────
+        // 💳 Bills & Finance — new top-level group for money/bills the scanner never sees; all subs
+        // are excluded from the scan enum. Colours/emojis are placeholders pending a design pass.
+        Def(name: "Bills & Finance", emoji: "💳", parent: nil),
+        Def(name: "Loan Repayment", emoji: "🏦", parent: "Bills & Finance"),
+        Def(name: "Taxes", emoji: "🧾", parent: "Bills & Finance"),
+        Def(name: "Bank & Fees", emoji: "🏧", parent: "Bills & Finance"),
+        Def(name: "Savings", emoji: "🐷", parent: "Bills & Finance"),
+        Def(name: "Public Transport", emoji: "🚆", parent: "Transportation"),
+        Def(name: "Taxi & Rideshare", emoji: "🚕", parent: "Transportation"),
+        Def(name: "Parking", emoji: "🅿️", parent: "Transportation"),
+        Def(name: "Tolls & Vignette", emoji: "🛣️", parent: "Transportation"),
+        Def(name: "Dental", emoji: "🦷", parent: "Health & Wellness"),
+        Def(name: "Optical", emoji: "👓", parent: "Health & Wellness"),
+        Def(name: "Coffee & Cafés", emoji: "☕", parent: "Dining & Entertainment"),
+        Def(name: "Bars & Nightlife", emoji: "🍸", parent: "Dining & Entertainment"),
+        Def(name: "Childcare", emoji: "🧸", parent: "Services & Subscriptions"),
+        Def(name: "Mortgage", emoji: "🏡", parent: "Services & Subscriptions"),
+        Def(name: "Insurance", emoji: "🛡️", parent: "Services & Subscriptions"),
+        Def(name: "Phone & Internet", emoji: "📱", parent: "Services & Subscriptions"),
         // 📦 Catch-all
         Def(name: "Other", emoji: "📦", parent: nil),
     ]
@@ -121,6 +143,10 @@ enum Categories {
         ("Shopping & Lifestyle", 0xFFAE72CC),
         ("Transportation", 0xFFD08A4A),
         ("Services & Subscriptions", 0xFF588AC7),
+        // Indigo, filling the gap between the Services blue and Shopping violet — placeholder pending a
+        // design pass. Adding an 8th group hue reseeds the generated sub-category hues once (the pinned
+        // group anchors are unaffected); keep this list identical to Android's.
+        ("Bills & Finance", 0xFF6E6AC4),
     ]
     private static let groupColor: [String: Int] = Dictionary(uniqueKeysWithValues: groupColorOrdered)
 
@@ -345,11 +371,28 @@ enum Categories {
         "Investments": "cat_investments",
         "Education": "cat_education",
         "Travel & Accommodation": "cat_travel_accommodation",
-        "Insurance & Utilities": "cat_insurance_utilities",
+        "Utilities": "cat_utilities",
         "Rent": "cat_rent",
         "Office & Work Supplies": "cat_office_work_supplies",
         "Gifts & Charitable Donations": "cat_gifts_donations",
         "Delivery": "cat_delivery",
+        "Bills & Finance": "cat_bills_finance",
+        "Loan Repayment": "cat_loan_repayment",
+        "Taxes": "cat_taxes",
+        "Bank & Fees": "cat_bank_fees",
+        "Savings": "cat_savings",
+        "Public Transport": "cat_public_transport",
+        "Taxi & Rideshare": "cat_taxi_rideshare",
+        "Parking": "cat_parking",
+        "Tolls & Vignette": "cat_tolls_vignette",
+        "Dental": "cat_dental",
+        "Optical": "cat_optical",
+        "Coffee & Cafés": "cat_coffee_cafes",
+        "Bars & Nightlife": "cat_bars_nightlife",
+        "Childcare": "cat_childcare",
+        "Mortgage": "cat_mortgage",
+        "Insurance": "cat_insurance",
+        "Phone & Internet": "cat_phone_internet",
         "Other": "cat_other",
     ]
 
