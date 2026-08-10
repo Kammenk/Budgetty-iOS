@@ -244,14 +244,14 @@ struct HomeView: View {
         .shadow(color: Color(argb: 0xFF6650A4).opacity(0.38), radius: 14, y: 8)
     }
 
-    // MARK: - Safe to spend (this-month cash flow)
+    // MARK: - Total spent / Safe to spend (this-month cash flow)
     //
-    // For the current pay-cycle month the hero becomes "Safe to spend" — one glass card stating what
-    // is free to spend before payday: income this cycle − spent so far − bills still owed. A port of
-    // Android's HomeViewModel cash-flow derivation + SafeToSpendCard. Per the iOS mockup the three
-    // figures the number is derived from read top-to-bottom as an inset grouped list (the native
-    // idiom), and the status colour lives in the amount + a soft wash behind the glass, never a
-    // filled card.
+    // For the current pay-cycle month this glass card leads spent-first (Direction C): the hero is
+    // "Total spent this cycle" (discretionary spend + bills already paid) in neutral label colour, with
+    // the composition as its caption. Safe to spend demotes to the first inset-list row, keeping its
+    // status colour + per-day figure, over Bills still due and Income this cycle. A port of Android's
+    // HomeViewModel cash-flow derivation + SafeToSpendCard; the status colour lives in the Safe row + a
+    // soft wash behind the glass, never a filled card.
 
     private enum SafeToSpendStatus { case healthy, low, over, setup }
 
@@ -280,6 +280,12 @@ struct HomeView: View {
         recurrings.filter { !$0.isIncome && !$0.isEffectivelyPaidThisCycle(startDay: monthStartDay) }
             .reduce(.zero) { $0 + $1.monthlyEquivalent }
     }
+    /// How many recurring bills are still unpaid this cycle — the "N bills" sub on the Bills row.
+    private var billsStillDueCount: Int {
+        recurrings.filter { !$0.isIncome && !$0.isEffectivelyPaidThisCycle(startDay: monthStartDay) }.count
+    }
+    /// What has actually left the account this cycle = discretionary spend + bills already paid.
+    private var totalSpentThisCycle: Decimal { cycleSpent + billsPaidThisCycle }
     /// Income this cycle − spent so far − every recurring bill this cycle (still due + already paid).
     /// Paying a bill is net-neutral here: it was already reserved while it was due, so the figure holds.
     private var safeToSpend: Decimal { cycleIncome - cycleSpent - billsStillDue - billsPaidThisCycle }
@@ -311,56 +317,40 @@ struct HomeView: View {
         }
     }
 
-    /// "25 Jun – 24 Jul" — the current pay-cycle month's day range (subtitle under "Spent this cycle").
-    private var cycleRangeLabel: String {
-        let (start, end) = PayCycle.month(.now, startDay: monthStartDay)
-        let f = DateFormatter(); f.dateFormat = "d MMM"
-        return "\(f.string(from: start)) – \(f.string(from: end))"
-    }
-    /// "25 Jul" — the reset date, for the per-day caption.
-    private var resetDateLabel: String {
-        let f = DateFormatter(); f.dateFormat = "d MMM"; return f.string(from: nextPayday)
-    }
 
     private var safeToSpendCard: some View {
         let status = safeToSpendStatus
         let tone = safeToSpendTone(status)
         return VStack(alignment: .leading, spacing: 0) {
-            HStack {
-                Text("Safe to spend")
+            HStack(spacing: 6) {
+                totalSpentSwatch.frame(width: 8, height: 8)
+                Text("Total spent this cycle")
                     .font(.subheadline).fontWeight(.medium)
                     .foregroundStyle(Palette.secondaryLabel)
+                    .lineLimit(1)
                 Spacer()
                 periodPillGlass
             }
             .padding(.bottom, 6)
 
-            // The hero figure — never truncates; a muted placeholder stands in until income is set.
-            if status == .setup {
-                Text(verbatim: "—")
+            // Spent-first hero: the money already out this cycle, in neutral label colour — never
+            // truncates, and it's a real figure even before income is set (no placeholder needed).
+            ScrollView(.horizontal, showsIndicators: false) {
+                Text(totalSpentThisCycle.formatMoney())
                     .font(.system(size: 46, weight: .bold))
-                    .foregroundStyle(Palette.tertiaryLabel)
-                    .padding(.vertical, 2)
-            } else {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    Text(safeToSpend.formatMoney())
-                        .font(.system(size: 46, weight: .bold))
-                        .foregroundStyle(tone)
-                }
-                .padding(.vertical, 2)
+                    .foregroundStyle(Palette.label)
             }
+            .padding(.vertical, 2)
 
-            safeToSpendCaption(status)
+            safeToSpendComposition
                 .padding(.top, 4)
 
-            safeToSpendBar(status: status, tone: tone)
-                .frame(height: 6)
-                .padding(.top, 16)
-
-            safeToSpendList(status: status)
-                .padding(.top, 16)
-
             if status == .setup {
+                // No income to reserve against, so skip the bar/list; prompt to add it.
+                Text("Add your income to see what's safe to spend before payday.")
+                    .font(.subheadline).foregroundStyle(Palette.label)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.top, 12)
                 Button { selectTab?(.budget) } label: {
                     Label("Set up income", systemImage: "plus")
                         .font(.system(size: 15, weight: .semibold))
@@ -368,10 +358,27 @@ struct HomeView: View {
                 }
                 .padding(.top, 14)
                 .accessibilityIdentifier(A11y.Home.setUpIncome)
-            }
+                Text("Income lives in the Budget tab · about a minute to add.")
+                    .font(.caption).foregroundStyle(Palette.secondaryLabel)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.top, 12)
+            } else {
+                safeToSpendBar(status: status, tone: tone)
+                    .frame(height: 6)
+                    .padding(.top, 16)
 
-            safeToSpendFoot(status)
-                .padding(.top, 12)
+                safeToSpendList(status: status, tone: tone)
+                    .padding(.top, 16)
+
+                // Overspent keeps a one-line warning; healthy/low stay compact (no income − spent − bills
+                // formula spelled out to the user), so the card takes less vertical space.
+                if status == .over {
+                    Text("\(abs(safeToSpend).formatMoney()) over — spent more than you have left this cycle.")
+                        .font(.footnote).foregroundStyle(Palette.secondaryLabel)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .padding(.top, 12)
+                }
+            }
         }
         .padding(20)
         .contentCard(cornerRadius: 24)
@@ -389,21 +396,22 @@ struct HomeView: View {
         .accessibilityIdentifier(A11y.Home.safeToSpend)
     }
 
-    /// Per-day + reset date, or plain language for the overspent / setup states.
+    /// The composition under the "Total spent" hero: split into spend + paid bills when a bill's been
+    /// paid (the confusing case), else the receipt count, else the zero state.
     @ViewBuilder
-    private func safeToSpendCaption(_ status: SafeToSpendStatus) -> some View {
-        switch status {
-        case .over:
-            Text("\(abs(safeToSpend).formatMoney()) over — spent more than you have left this cycle.")
-                .font(.footnote).foregroundStyle(Palette.secondaryLabel).fixedSize(horizontal: false, vertical: true)
-        case .setup:
-            Text("Add your income to see what's safe to spend before payday.")
-                .font(.subheadline).foregroundStyle(Palette.label).fixedSize(horizontal: false, vertical: true)
-        case .healthy, .low:
-            let perDay = safeToSpend / Decimal(daysUntilPayday)
-            // Both halves are already localized, so join them verbatim (no "%@ · %@" catalog key).
-            Text(verbatim: "\(perDayLabel(perDay)) · \(String(localized: "resets \(resetDateLabel)"))")
-                .font(.footnote).foregroundStyle(Palette.secondaryLabel).fixedSize(horizontal: false, vertical: true)
+    private var safeToSpendComposition: some View {
+        let text: String? = {
+            if totalSpentThisCycle == 0 { return String(localized: "Nothing spent yet this cycle") }
+            if billsPaidThisCycle > 0 {
+                return String(localized: "\(cycleSpent.formatMoney()) spending + \(billsPaidThisCycle.formatMoney()) bills paid")
+            }
+            if cycleReceiptCount > 0 { return String(localized: "\(cycleReceiptCount) receipts") }
+            return nil
+        }()
+        if let text {
+            Text(text)
+                .font(.footnote).foregroundStyle(Palette.secondaryLabel)
+                .fixedSize(horizontal: false, vertical: true)
         }
     }
 
@@ -412,64 +420,61 @@ struct HomeView: View {
         String(localized: "\(perDay.formatMoney())/day for the next \(daysUntilPayday) days")
     }
 
-    /// The cycle's income split three ways — spent (tint), bills still due (hatched), and what's left
-    /// (status colour). The middle fills the gap, so the three widths always sum to the bar.
+    /// The cycle's income split into four gapped capsules, left → right: discretionary spending (tint),
+    /// bills already paid (secondary), bills still due (hatched, fills the gap), and what's safe to spend
+    /// (status tone). Paying a bill turns a hatched share solid without moving the safe tail.
     @ViewBuilder
     private func safeToSpendBar(status: SafeToSpendStatus, tone: Color) -> some View {
         if status == .setup {
             hatchedCapsule()
         } else {
-            // Paid bills are spent money, so they join receipts in the solid segment; the hatched middle
-            // is then only what's still due, and paying a bill leaves the safe (tone) tail unchanged.
             let denom = max(cycleIncome, cycleSpent + billsPaidThisCycle + billsStillDue)
-            let spentW = HomeView.fraction(cycleSpent + billsPaidThisCycle, of: denom)
-            let tailW = HomeView.fraction(safeToSpend, of: denom)
+            let spendW = HomeView.fraction(cycleSpent, of: denom)
+            let paidW = HomeView.fraction(billsPaidThisCycle, of: denom)
+            let safeW = HomeView.fraction(max(0, safeToSpend), of: denom)
             GeometryReader { geo in
                 HStack(spacing: 2) {
-                    Capsule().fill(Palette.tint.opacity(0.85))
-                        .frame(width: max(0, geo.size.width * spentW))
+                    if cycleSpent > 0 {
+                        Capsule().fill(Palette.tint.opacity(0.85))
+                            .frame(width: max(6, geo.size.width * spendW))
+                    }
+                    if billsPaidThisCycle > 0 {
+                        Capsule().fill(Palette.secondaryLabel)
+                            .frame(width: max(6, geo.size.width * paidW))
+                    }
                     hatchedCapsule().frame(maxWidth: .infinity)
-                    if tailW > 0 {
-                        Capsule().fill(tone).frame(width: max(6, geo.size.width * tailW))
+                    if safeW > 0 {
+                        Capsule().fill(tone).frame(width: max(6, geo.size.width * safeW))
                     }
                 }
             }
         }
     }
 
-    /// The inset grouped list under the bar: the three figures Safe to spend is derived from.
-    private func safeToSpendList(status: SafeToSpendStatus) -> some View {
-        VStack(spacing: 0) {
+    /// The inset grouped list under the bar — spent-first: Safe to spend leads (status tone + per-day),
+    /// then Bills still due, then Income this cycle.
+    private func safeToSpendList(status: SafeToSpendStatus, tone: Color) -> some View {
+        let perDay = safeToSpend / Decimal(daysUntilPayday)
+        return VStack(spacing: 0) {
             safeToSpendRow(
-                swatch: RoundedRectangle(cornerRadius: 2.5).fill(Palette.tint),
-                title: "Spent this cycle",
-                subtitle: "\(String(localized: "\(cycleReceiptCount) receipts")) · \(cycleRangeLabel)",
-                value: cycleSpent.formatMoney())
+                swatch: RoundedRectangle(cornerRadius: 2.5).fill(tone),
+                title: "Safe to spend",
+                subtitle: status == .over ? nil : perDayLabel(perDay),
+                value: safeToSpend.formatMoney(),
+                valueColor: tone)
             Divider().overlay(Palette.separator)
             safeToSpendRow(
                 swatch: hatchSwatch,
                 title: "Bills still due",
-                subtitle: billsPaidThisCycle > 0
-                    ? String(localized: "\(billsPaidThisCycle.formatMoney()) already paid") : nil,
+                subtitle: billsStillDueCount > 0 ? String(localized: "\(billsStillDueCount) bills") : nil,
                 value: billsStillDue.formatMoney())
-            if billsPaidThisCycle > 0 {
-                // What's actually left your pocket this cycle = receipts + bills marked paid. Only shown
-                // once a bill is paid; until then it equals "Spent this cycle" above.
-                Divider().overlay(Palette.separator)
-                safeToSpendRow(
-                    swatch: Color.clear,
-                    title: "Total spent this cycle",
-                    subtitle: nil,
-                    value: (cycleSpent + billsPaidThisCycle).formatMoney())
-            }
             Divider().overlay(Palette.separator)
             safeToSpendRow(
                 swatch: Color.clear,
                 title: "Income this cycle", titleBold: true,
                 subtitle: nil,
-                value: status == .setup ? String(localized: "Not set") : cycleIncome.formatMoney(),
-                valueBold: true,
-                valueColor: status == .setup ? Palette.tint : Palette.label)
+                value: cycleIncome.formatMoney(),
+                valueBold: true)
         }
         .padding(.vertical, 2)
         .background(Palette.tertiaryBackground, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
@@ -496,15 +501,14 @@ struct HomeView: View {
         .padding(.horizontal, 14).padding(.vertical, 12)
     }
 
-    @ViewBuilder
-    private func safeToSpendFoot(_ status: SafeToSpendStatus) -> some View {
-        if status == .setup {
-            Text("Income lives in the Budget tab · about a minute to add.")
-                .font(.caption).foregroundStyle(Palette.secondaryLabel).fixedSize(horizontal: false, vertical: true)
-        } else if cycleIncome > 0 {
-            Text("Both come out of \(cycleIncome.formatMoney()) income this cycle.")
-                .font(.caption).foregroundStyle(Palette.secondaryLabel).fixedSize(horizontal: false, vertical: true)
-        }
+    /// A split key — half tint (spending), half secondary (paid bills) — marking the "Total spent"
+    /// roll-up, so the label reads as the sum of those two shares.
+    private var totalSpentSwatch: some View {
+        RoundedRectangle(cornerRadius: 2.5)
+            .fill(LinearGradient(
+                stops: [.init(color: Palette.tint, location: 0.5),
+                        .init(color: Palette.secondaryLabel, location: 0.5)],
+                startPoint: .leading, endPoint: .trailing))
     }
 
     /// A hatched capsule for the bar's "bills still due" segment (mockup `--label3` diagonal stripes).
