@@ -37,6 +37,35 @@ enum SettingsKey {
     static let dismissedWellbeingTips = "wellbeing.dismissedTips"
 }
 
+/// Wipes every setting tied to the signed-in account — the app-lock PIN + biometric, the one-time
+/// setup quiz, dismissed Wellbeing tips, and personal Home/Insights layout — while leaving
+/// device/app display preferences (appearance, currency, language, date format, pay day) intact.
+///
+/// UserDefaults is a single device-global store, so anything left here leaks to the next account on
+/// a shared device. (Identity comes from Firebase on iOS, so there's no local display name or search
+/// history to clear — unlike Android.) Every sign-out and account-deletion path must call this; both
+/// real sign-out paths (the Account button and Forgot-PIN) route through `AuthModel.signOut()`.
+/// Android parity: `SettingsStore.clearUserState`.
+enum UserState {
+    static func clear() {
+        let defaults = UserDefaults.standard
+        for key in [
+            SettingsKey.quizPending,
+            SettingsKey.dismissedWellbeingTips,
+            SettingsKey.appLockEnabled,
+            SettingsKey.faceID,
+            HomeLayoutStore.orderKey,
+            HomeLayoutStore.hiddenKey,
+            InsightsLayoutStore.orderKey,
+            InsightsLayoutStore.hiddenKey,
+        ] {
+            defaults.removeObject(forKey: key)
+        }
+        // The app-lock PIN hash lives in the Keychain, not UserDefaults.
+        PinLock.clear()
+    }
+}
+
 /// The free tier's receipt-scan allowance (Android parity). The count is a **lifetime** total with
 /// no monthly reset: a scan is consumed only when a scanned receipt is actually finalized/saved —
 /// failed reads and abandoned reviews never burn one — and it clears only on account deletion.
