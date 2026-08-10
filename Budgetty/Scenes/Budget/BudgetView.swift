@@ -282,12 +282,12 @@ struct BudgetView: View {
     /// upgrade row replacing the Add row), mirroring Android's Payments section counter.
     private var recurringBadge: String? {
         guard !bills.isEmpty else { return nil }
-        let paid = bills.filter { $0.isPaidThisCycle() }.count
+        let paid = bills.filter { $0.isEffectivelyPaidThisCycle() }.count
         return String(localized: "\(paid) of \(bills.count) paid")
     }
 
     /// True when at least one bill is paid this cycle — greens the section's "N of M paid" counter.
-    private var anyBillPaid: Bool { bills.contains { $0.isPaidThisCycle() } }
+    private var anyBillPaid: Bool { bills.contains { $0.isEffectivelyPaidThisCycle() } }
 
     private var recurringSection: some View {
         VStack(spacing: 0) {
@@ -356,7 +356,7 @@ struct BudgetView: View {
     /// amount) plus the same tap-to-edit body as an income row. Paid-state is derived, so it clears
     /// itself when the next occurrence begins.
     private func billRow(_ r: Recurring) -> some View {
-        let paid = r.isPaidThisCycle()
+        let paid = r.isEffectivelyPaidThisCycle()
         return HStack(spacing: 12) {
             Button {
                 recurringEditor = RecurringEditor(isIncome: false, existing: r)
@@ -376,19 +376,33 @@ struct BudgetView: View {
                 }
             }
             .buttonStyle(.plain)
-            // Trailing paid toggle: hollow circle → filled green check for the current cycle.
-            Button {
-                setPaid(r, !paid)
-            } label: {
-                Image(systemName: paid ? "checkmark.circle.fill" : "circle")
-                    .font(.system(size: 22))
-                    .foregroundStyle(paid ? Palette.good : Palette.tertiaryLabel)
-                    .frame(width: 30, height: 44)
-                    .contentShape(Rectangle())
+            if r.autoPay {
+                // Autopay bills manage their own paid-state from the due date, so there's no manual
+                // toggle — just a static "Auto" chip that greens once the day has passed.
+                HStack(spacing: 3) {
+                    Image(systemName: "arrow.triangle.2.circlepath")
+                        .font(.system(size: 11, weight: .semibold))
+                    Text("Auto").font(.caption2).fontWeight(.semibold)
+                }
+                .foregroundStyle(paid ? Palette.good : Palette.secondaryLabel)
+                .padding(.horizontal, 8).padding(.vertical, 4)
+                .background(Palette.fill, in: Capsule())
+                .accessibilityLabel(paid ? Text("Autopay · paid") : Text("Autopay"))
+            } else {
+                // Trailing paid toggle: hollow circle → filled green check for the current cycle.
+                Button {
+                    setPaid(r, !paid)
+                } label: {
+                    Image(systemName: paid ? "checkmark.circle.fill" : "circle")
+                        .font(.system(size: 22))
+                        .foregroundStyle(paid ? Palette.good : Palette.tertiaryLabel)
+                        .frame(width: 30, height: 44)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(paid ? Text("Paid") : Text("Mark as paid"))
+                .accessibilityAddTraits(paid ? [.isSelected] : [])
             }
-            .buttonStyle(.plain)
-            .accessibilityLabel(paid ? Text("Paid") : Text("Mark as paid"))
-            .accessibilityAddTraits(paid ? [.isSelected] : [])
         }
         .padding(.horizontal, 16).padding(.vertical, 6)
     }

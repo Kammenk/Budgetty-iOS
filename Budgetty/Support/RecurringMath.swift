@@ -46,4 +46,53 @@ extension Recurring {
         }
         return lastPosted >= start && lastPosted < endExclusive
     }
+
+    /// Whether this bill's due date within its current occurrence has already arrived (today on/after
+    /// it): the `dueDay`-th of the pay-cycle month for a monthly bill, the `dueDay` weekday of this
+    /// Mon–Sun week for a weekly one. Yearly (no stored month) and one-offs return false — they have no
+    /// computable due date to auto-mark against. Mirrors Android's `isDuePassedThisCycle`.
+    func isDuePassedThisCycle(_ today: Date = .now,
+                              startDay: Int = PayCycle.startDay,
+                              calendar cal: Calendar = .current) -> Bool {
+        let todayStart = cal.startOfDay(for: today)
+        switch cadence {
+        case .monthly:
+            let iv = PayCycle.monthInterval(today, startDay: startDay, calendar: cal)
+            return todayStart >= Self.dueDate(inCycle: iv, day: dueDay, calendar: cal)
+        case .weekly:
+            var weekCal = cal
+            weekCal.firstWeekday = 2 // Monday
+            let weekStart = weekCal.dateInterval(of: .weekOfYear, for: today)?.start ?? todayStart
+            let offset = min(max(dueDay, 1), 7) - 1
+            let due = weekCal.date(byAdding: .day, value: offset, to: weekStart) ?? weekStart
+            return todayStart >= cal.startOfDay(for: due)
+        default: // yearly / once — no computable due date
+            return false
+        }
+    }
+
+    /// Whether a bill counts as paid for this cycle: manually marked (`isPaidThisCycle`) or, when
+    /// `autoPay` is on, its due date has already passed (`isDuePassedThisCycle`). Auto-pay only fills
+    /// paid in once the day arrives; it never clears a manual payment. Mirrors Android.
+    func isEffectivelyPaidThisCycle(_ today: Date = .now,
+                                    startDay: Int = PayCycle.startDay,
+                                    calendar cal: Calendar = .current) -> Bool {
+        isPaidThisCycle(today, startDay: startDay, calendar: cal)
+            || (autoPay && isDuePassedThisCycle(today, startDay: startDay, calendar: cal))
+    }
+
+    /// The date inside pay-cycle interval `iv` whose day-of-month is `day` (clamped to the month). The
+    /// cycle can span two calendar months (a non-1 start day), so fall back to the later month's day.
+    private static func dueDate(inCycle iv: DateInterval, day: Int, calendar cal: Calendar) -> Date {
+        func dayInMonth(of ref: Date) -> Date {
+            let len = cal.range(of: .day, in: .month, for: ref)?.count ?? 28
+            var c = cal.dateComponents([.year, .month], from: ref)
+            c.day = min(max(day, 1), len)
+            return cal.date(from: c) ?? ref
+        }
+        let candidate = dayInMonth(of: iv.start)
+        if candidate >= iv.start && candidate < iv.end { return candidate }
+        let lastDay = cal.date(byAdding: .day, value: -1, to: iv.end) ?? iv.start
+        return dayInMonth(of: lastDay)
+    }
 }
