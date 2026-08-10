@@ -41,6 +41,13 @@ final class ReceiptDraft: Identifiable {
     /// When set, saving updates this existing receipt in place instead of inserting a new one.
     private var editing: Receipt?
 
+    /// Re-entrancy latch: a draft is persisted exactly once. Once `persist` runs this stays true, so a
+    /// second Save tap — in the beat after the first save completes but before the sheet finishes
+    /// dismissing — can't insert a whole duplicate receipt (a new save mints a fresh `Date()` stamp
+    /// below). Also drives the Save buttons' disabled state. Mirrors Android's `stage != REVIEW` guard
+    /// in `UploadViewModel.finalizeUpload`.
+    private(set) var hasSaved = false
+
     /// Seed from a saved receipt to edit it.
     init(editing receipt: Receipt) {
         editing = receipt
@@ -86,6 +93,10 @@ final class ReceiptDraft: Identifiable {
     /// otherwise insert a new receipt with `createdAt` = now.
     @MainActor
     func persist(into context: ModelContext, isManual: Bool = false) {
+        // Latch against a re-entrant save (see `hasSaved`): the edit path calls this directly, so the
+        // guard lives here as well as in `ScanFlowView.save()`.
+        guard !hasSaved else { return }
+        hasSaved = true
         let cleanStore = store.isEmpty ? "Unknown" : store
         let receipt: Receipt
         let stamp: Date

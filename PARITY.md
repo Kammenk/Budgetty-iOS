@@ -1042,3 +1042,26 @@ bills as paid on their due date (per-bill "Autopay", compute-on-read) — not ye
 **Status (2026-08-10):** DONE both, on branch `recurring-bill-autopay` (stacked on
 `safe-to-spend-reserve-paid-bills` — merge that first). Android `ea4e044` (compile + detekt + full unit
 tests green). iOS committed on-branch (sim BUILD SUCCEEDED + RecurringPaidTests 12/12 pass). Unpushed.
+
+## Duplicate-receipt save guard: block double-tapping Save (both) — 2026-08-10
+
+- **Tester bug (both platforms):** double-tapping the Save/Finalize button on the receipt review
+  screen could create a duplicate receipt (and duplicate line items). The save minted a fresh receipt
+  id per call (`System.currentTimeMillis()` on Android, `Date()` on iOS) and only the *edit* path
+  deleted old rows first, so a second invocation inserted a whole second receipt. The re-entry window
+  is a fast double-tap before the screen switches away, plus the beat after save completes but before
+  navigation/dismiss finishes.
+- **Fix — re-entrancy guard + disabled button (both):**
+  - Android (`UploadViewModel.finalizeUpload`): bail out unless `stage == UploadStage.REVIEW`
+    (covers the SAVING and DONE re-entry windows; handlers run sequentially on the main thread and
+    `stage` flips synchronously). Save button `enabled = stage == REVIEW`.
+  - iOS: `ReceiptDraft.hasSaved` latch — `persist()` guards `!hasSaved` then latches (covers the
+    edit path too); `ScanFlowView.save()` also guards `!draft.hasSaved` so the scan-quota increment
+    can't double-count; both Save buttons in `ReviewView` get `.disabled(draft.hasSaved)`. A latch,
+    not a transient `isSaving`, because the save is synchronous `@MainActor` and the realistic second
+    tap lands *after* it completes.
+- **No behaviour change** on the happy path — a single Save still writes exactly one receipt.
+
+**Status (2026-08-10):** DONE both. Android on branch `duplicate-receipt-save-guard` (`47f4e7b`,
+compile + detekt green), unmerged/unpushed. iOS committed on-branch `duplicate-receipt-save-guard`
+(sim BUILD SUCCEEDED), unpushed. Neither merged. LEFT: device check + push/merge.

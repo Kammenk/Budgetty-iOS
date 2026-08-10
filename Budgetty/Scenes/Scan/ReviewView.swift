@@ -135,6 +135,7 @@ struct ReviewView: View {
             Button("Save", action: attemptSave)
                 .font(.system(size: 15, weight: .semibold)).foregroundStyle(Palette.tint)
                 .accessibilityIdentifier(A11y.Review.saveHeader)
+                .disabled(draft.hasSaved)
         }
         .padding(.horizontal, 20).padding(.top, 14).padding(.bottom, 12)
         .overlay(alignment: .bottom) {
@@ -275,6 +276,7 @@ struct ReviewView: View {
                     .ctaPill()
             }
             .accessibilityIdentifier(A11y.Scan.save)
+            .disabled(draft.hasSaved)
             .padding(.top, 4)
         }
         .padding(.horizontal, 20).padding(.top, 12).padding(.bottom, 8)

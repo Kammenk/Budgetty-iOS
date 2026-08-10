@@ -298,6 +298,10 @@ struct ScanFlowView: View {
     }
 
     private func save() {
+        // Re-entrancy guard: a finalized draft saves exactly once. Without it a second tap in the beat
+        // before `dismiss()` tears the sheet down would run the whole save again — minting a fresh
+        // receipt (a duplicate) and double-counting the scan quota. Mirrors Android's finalize guard.
+        guard !draft.hasSaved else { return }
         draft.persist(into: context, isManual: isManual)
         // Only a successful, finalized scan counts against the free quota — failed reads and
         // abandoned reviews never got here, and manual entry is always free. The rating gate rides
