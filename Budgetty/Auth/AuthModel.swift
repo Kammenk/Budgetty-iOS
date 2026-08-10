@@ -149,7 +149,14 @@ final class AuthModel {
     func deleteAccount() async throws {
         // Captured first: once the Firebase user is gone there is no uid left to find its store by.
         let uid = user?.uid
-        try await user?.delete()
+        guard let user else { return }
+        // Sign in with Apple accounts must have their Apple token revoked on deletion (App Review
+        // 5.1.1(v)) — Firebase's `user.delete()` alone leaves Budgetty listed under the user's Apple
+        // ID. This re-authorizes (which also satisfies delete's recent-login requirement) and revokes.
+        if user.providerData.contains(where: { $0.providerID == "apple.com" }) {
+            try await revokeAppleToken(for: user)
+        }
+        try await user.delete()
         // The lifetime free-scan counter and the rating-prompt history clear only on account
         // deletion (Android parity).
         ScanQuota.reset()
@@ -157,6 +164,27 @@ final class AuthModel {
         // Wipe this account's local receipts too — the store outlives the Firebase user otherwise,
         // and a later account could adopt the file (Android `deleteDataFor`).
         if let uid { UserStore.deleteData(for: uid) }
+    }
+
+    /// Re-authorizes with Apple to obtain a fresh authorization code, reauthenticates the Firebase
+    /// user (delete needs a recent login), then revokes the Apple token. Revocation is best-effort:
+    /// a backend/config hiccup must not trap the user in an account they can't delete — but the call
+    /// is always attempted, which is what 5.1.1(v) requires. (Firebase's Apple provider must carry the
+    /// Sign in with Apple service key for the revoke to actually land server-side.)
+    private func revokeAppleToken(for user: User) async throws {
+        let rawNonce = Self.randomNonce()
+        let credential = try await AppleReauthenticator().authorize(nonceSHA256: Self.sha256(rawNonce))
+        guard let tokenData = credential.identityToken,
+              let idToken = String(data: tokenData, encoding: .utf8)
+        else { throw AppleSignInError.missingIdentityToken }
+        let firebaseCredential = OAuthProvider.appleCredential(
+            withIDToken: idToken, rawNonce: rawNonce, fullName: credential.fullName
+        )
+        try await user.reauthenticate(with: firebaseCredential)
+        if let codeData = credential.authorizationCode,
+           let code = String(data: codeData, encoding: .utf8) {
+            try? await Auth.auth().revokeToken(withAuthorizationCode: code)
+        }
     }
 }
 

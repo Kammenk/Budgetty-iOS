@@ -105,6 +105,8 @@ struct AccountView: View {
         }
         .confirmationDialog("Delete your account? This can't be undone.", isPresented: $confirmDelete, titleVisibility: .visible) {
             Button("Delete Account", role: .destructive) { Task { try? await auth.deleteAccount() } }
+        } message: {
+            Text("This permanently deletes your account and its data. Deleting your account doesn't cancel a Premium subscription — you can manage or cancel it in your Apple subscription settings.")
         }
         .fileExporter(isPresented: $showExporter, document: exportDoc, contentType: .json,
                       defaultFilename: Self.backupFilename()) { result in

@@ -30,10 +30,22 @@ struct ScanFlowView: View {
     @AppStorage(SettingsKey.premium) private var premium = false
     @AppStorage(SettingsKey.scanQuotaUsed) private var scansUsed = 0
     @State private var showPaywall = false
+    /// First-scan consent gate (App Review 5.1.2(i)); see `ScanConsentSheet`. A pending capture is
+    /// stashed until the sheet is dismissed, so the picker is never presented over the sheet.
+    @AppStorage(SettingsKey.scanAIConsent) private var scanAIConsent = false
+    @State private var showScanConsent = false
+    @State private var pendingCapture: (() -> Void)?
 
     /// Free scans remaining; AI capture is gated on it (manual entry never is).
     private var scansLeft: Int { max(0, ScanQuota.freeLimit - scansUsed) }
     private var quotaExhausted: Bool { !premium && scansLeft == 0 }
+
+    /// Gate a cloud-scan capture behind the one-time AI disclosure. Runs `action` immediately once
+    /// consent is on file; otherwise stashes it and shows the sheet (which runs it on accept).
+    private func capture(_ action: @escaping () -> Void) {
+        if scanAIConsent { action() }
+        else { pendingCapture = action; showScanConsent = true }
+    }
 
     var body: some View {
         content
@@ -46,6 +58,15 @@ struct ScanFlowView: View {
             }
             .photosPicker(isPresented: $showLibrary, selection: $pickedItem, matching: .images)
             .sheet(isPresented: $showPaywall) { NavigationStack { PaywallView() } }
+            .sheet(isPresented: $showScanConsent, onDismiss: {
+                // Run the stashed capture only after the sheet is gone (two sheets can't coexist),
+                // and only if consent was actually granted.
+                let action = pendingCapture
+                pendingCapture = nil
+                if scanAIConsent { action?() }
+            }) {
+                ScanConsentSheet(onAccept: { scanAIConsent = true }, onCancel: {})
+            }
             .onChange(of: pickedItem) { _, item in
                 guard let item else { return }
                 Task {
@@ -114,7 +135,7 @@ struct ScanFlowView: View {
                 // rounded glass bar), not separate floating buttons.
                 HStack {
                     // Gallery
-                    Button { showLibrary = true } label: {
+                    Button { capture { showLibrary = true } } label: {
                         Image(systemName: "photo.on.rectangle")
                             .font(.system(size: 20)).foregroundStyle(.white.opacity(0.9))
                             .frame(width: 52, height: 52)
@@ -128,9 +149,11 @@ struct ScanFlowView: View {
                     // Guided document scanner first (edge-detect/deskew/de-glare + retake); plain
                     // camera where VisionKit is unsupported; photo picker on the Simulator.
                     Button {
-                        if DocumentScannerPicker.isAvailable { showDocScanner = true }
-                        else if CameraPicker.isAvailable { showCamera = true }
-                        else { showLibrary = true }
+                        capture {
+                            if DocumentScannerPicker.isAvailable { showDocScanner = true }
+                            else if CameraPicker.isAvailable { showCamera = true }
+                            else { showLibrary = true }
+                        }
                     } label: {
                         Circle().strokeBorder(.white, lineWidth: 4).frame(width: 72, height: 72)
                             .overlay(Circle().fill(.white).frame(width: 56, height: 56))
