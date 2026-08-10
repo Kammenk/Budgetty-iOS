@@ -42,6 +42,7 @@ struct SavingsContributionSheet: View {
                             .keyboardType(.decimalPad).multilineTextAlignment(.trailing)
                     }
                     TextField("What was it for?", text: $note)
+                        .textInputAutocapitalization(.sentences)
                     DatePicker("Date", selection: $date, displayedComponents: .date)
                 }
                 if amount > 0 {
@@ -115,6 +116,7 @@ struct SavingsGoalEditSheet: View {
                         }
                     }
                     TextField("Japan trip", text: $name)
+                        .textInputAutocapitalization(.sentences)
                     HStack {
                         Text("Target amount")
                         Spacer()
