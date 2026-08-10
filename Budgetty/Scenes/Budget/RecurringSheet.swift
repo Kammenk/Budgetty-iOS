@@ -25,7 +25,15 @@ struct RecurringSheet: View {
     @State private var category = Categories.defaultName
     @State private var showCategory = false
 
-    private var title: LocalizedStringKey { isIncome ? "Income" : "Recurring Payment" }
+    /// A fully-localized nav title. (Interpolating a `LocalizedStringKey` into a `String` — the old
+    /// `"Edit \(title)"` — produced its debug description, so the bar read "Edit LocalizedStringKey(…)".)
+    private var navTitle: LocalizedStringKey {
+        if existing == nil {
+            return isIncome ? "Add income source" : "Add recurring payment"
+        } else {
+            return isIncome ? "Edit income source" : "Edit recurring payment"
+        }
+    }
 
     var body: some View {
         NavigationStack {
@@ -103,7 +111,7 @@ struct RecurringSheet: View {
                     }
                 }
             }
-            .navigationTitle(existing == nil ? "Add \(title)" : "Edit \(title)")
+            .navigationTitle(navTitle)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
