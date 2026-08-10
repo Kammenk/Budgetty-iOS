@@ -1062,6 +1062,8 @@ tests green). iOS committed on-branch (sim BUILD SUCCEEDED + RecurringPaidTests 
     tap lands *after* it completes.
 - **No behaviour change** on the happy path — a single Save still writes exactly one receipt.
 
-**Status (2026-08-10):** DONE both. Android on branch `duplicate-receipt-save-guard` (`47f4e7b`,
-compile + detekt green), unmerged/unpushed. iOS committed on-branch `duplicate-receipt-save-guard`
-(sim BUILD SUCCEEDED), unpushed. Neither merged. LEFT: device check + push/merge.
+**Status (2026-08-10):** DONE both, **PUSHED** (unmerged — user opens the PRs). Android
+`duplicate-receipt-save-guard` → `origin/Budgetty-Android` (`47f4e7b` fix + `9e7cedc` JVM regression
+test, proven to fail without the guard; compile + detekt green; emulator-verified "2.50 € across 1
+receipt"). iOS `duplicate-receipt-save-guard` → `origin/Budgetty-iOS` (`53892a6`, sim BUILD SUCCEEDED).
+LEFT: open PRs + merge both.
