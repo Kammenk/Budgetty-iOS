@@ -1,6 +1,288 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "Receipt scanning & privacy" : {
+      "localizations" : {
+        "bg" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Сканиране на бележки и поверителност"
+          }
+        },
+        "cs" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Skenování účtenek a soukromí"
+          }
+        },
+        "da" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kvitteringsscanning og privatliv"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Belegscan & Datenschutz"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Escaneo de recibos y privacidad"
+          }
+        },
+        "fi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kuittien skannaus ja yksityisyys"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Numérisation des reçus et confidentialité"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Scansione degli scontrini e privacy"
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kvitteringsskanning og personvern"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bonnen scannen en privacy"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Skanowanie paragonów i prywatność"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Digitalização de recibos e privacidade"
+          }
+        },
+        "ro" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Scanarea bonurilor și confidențialitatea"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Сканирование чеков и конфиденциальность"
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kvittoskanning och integritet"
+          }
+        }
+      }
+    },
+    "To read a receipt, Budgetty sends the photo to its secure cloud, where a third-party AI service extracts the store, items and totals. Photos aren't stored after processing. Manual entry stays on your device." : {
+      "localizations" : {
+        "bg" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "За да разчете бележка, Budgetty изпраща снимката към защитения си облак, където услуга за изкуствен интелект от трета страна извлича магазина, артикулите и сумите. Снимките не се съхраняват след обработката. Ръчното въвеждане остава на устройството ви."
+          }
+        },
+        "cs" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aby Budgetty přečetl účtenku, odešle fotku do svého zabezpečeného cloudu, kde služba umělé inteligence třetí strany z ní získá obchod, položky a částky. Fotky se po zpracování neukládají. Ruční zadávání zůstává ve vašem zařízení."
+          }
+        },
+        "da" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "For at læse en kvittering sender Budgetty billedet til sin sikre sky, hvor en tredjeparts-AI-tjeneste udtrækker butik, varer og totaler. Billeder gemmes ikke efter behandling. Manuel indtastning bliver på din enhed."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Um einen Beleg zu lesen, sendet Budgetty das Foto an seine sichere Cloud, wo ein KI-Dienst eines Drittanbieters Geschäft, Artikel und Beträge ausliest. Fotos werden nach der Verarbeitung nicht gespeichert. Die manuelle Eingabe bleibt auf deinem Gerät."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Para leer un recibo, Budgetty envía la foto a su nube segura, donde un servicio de IA de terceros extrae la tienda, los artículos y los totales. Las fotos no se almacenan tras el procesamiento. La entrada manual permanece en tu dispositivo."
+          }
+        },
+        "fi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lukeakseen kuitin Budgetty lähettää kuvan turvalliseen pilveensä, jossa kolmannen osapuolen tekoälypalvelu poimii kaupan, tuotteet ja summat. Kuvia ei tallenneta käsittelyn jälkeen. Manuaalinen syöttö pysyy laitteessasi."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pour lire un reçu, Budgetty envoie la photo vers son cloud sécurisé, où un service d'IA tiers en extrait le magasin, les articles et les totaux. Les photos ne sont pas conservées après le traitement. La saisie manuelle reste sur votre appareil."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Per leggere uno scontrino, Budgetty invia la foto al suo cloud sicuro, dove un servizio di IA di terze parti ne estrae negozio, articoli e totali. Le foto non vengono conservate dopo l'elaborazione. L'inserimento manuale resta sul tuo dispositivo."
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "For å lese en kvittering sender Budgetty bildet til sin sikre sky, der en KI-tjeneste fra en tredjepart henter ut butikk, varer og summer. Bilder lagres ikke etter behandling. Manuell registrering blir på enheten din."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Om een bon te lezen, stuurt Budgetty de foto naar zijn beveiligde cloud, waar een AI-dienst van derden de winkel, artikelen en totalen eruit haalt. Foto's worden na verwerking niet bewaard. Handmatige invoer blijft op je apparaat."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aby odczytać paragon, Budgetty wysyła zdjęcie do swojej bezpiecznej chmury, gdzie zewnętrzna usługa AI wyodrębnia sklep, produkty i sumy. Zdjęcia nie są przechowywane po przetworzeniu. Wprowadzanie ręczne pozostaje na Twoim urządzeniu."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Para ler um recibo, o Budgetty envia a foto para a sua nuvem segura, onde um serviço de IA de terceiros extrai a loja, os artigos e os totais. As fotos não são armazenadas após o processamento. A introdução manual permanece no seu dispositivo."
+          }
+        },
+        "ro" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pentru a citi un bon, Budgetty trimite fotografia în cloudul său securizat, unde un serviciu AI terț extrage magazinul, produsele și totalurile. Fotografiile nu sunt stocate după procesare. Introducerea manuală rămâne pe dispozitivul tău."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Чтобы распознать чек, Budgetty отправляет фото в своё защищённое облако, где сторонний сервис ИИ извлекает магазин, товары и суммы. Фотографии не хранятся после обработки. Ручной ввод остаётся на вашем устройстве."
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "För att läsa ett kvitto skickar Budgetty fotot till sitt säkra moln, där en AI-tjänst från tredje part hämtar butik, varor och summor. Foton sparas inte efter bearbetning. Manuell inmatning stannar på din enhet."
+          }
+        }
+      }
+    },
+    "This permanently deletes your account and its data. Deleting your account doesn't cancel a Premium subscription — you can manage or cancel it in your Apple subscription settings." : {
+      "localizations" : {
+        "bg" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Това изтрива за постоянно акаунта ви и данните му. Изтриването на акаунта не отменя Premium абонамент — можете да го управлявате или отмените в настройките за абонаменти на Apple."
+          }
+        },
+        "cs" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tímto trvale odstraníte svůj účet a jeho data. Odstranění účtu nezruší předplatné Premium — můžete ho spravovat nebo zrušit v nastavení předplatných Apple."
+          }
+        },
+        "da" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dette sletter din konto og dens data permanent. Sletning af din konto opsiger ikke et Premium-abonnement — du kan administrere eller opsige det i dine Apple-abonnementsindstillinger."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dadurch werden dein Konto und seine Daten dauerhaft gelöscht. Das Löschen deines Kontos kündigt ein Premium-Abo nicht — du kannst es in deinen Apple-Abo-Einstellungen verwalten oder kündigen."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Esto elimina permanentemente tu cuenta y sus datos. Eliminar tu cuenta no cancela una suscripción Premium: puedes gestionarla o cancelarla en los ajustes de suscripciones de Apple."
+          }
+        },
+        "fi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tämä poistaa tilisi ja sen tiedot pysyvästi. Tilin poistaminen ei peruuta Premium-tilausta — voit hallita tai peruuttaa sen Applen tilausasetuksissa."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cela supprime définitivement votre compte et ses données. Supprimer votre compte n'annule pas un abonnement Premium — vous pouvez le gérer ou l'annuler dans les réglages d'abonnement Apple."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Questa operazione elimina definitivamente il tuo account e i suoi dati. Eliminare l'account non annulla un abbonamento Premium — puoi gestirlo o annullarlo nelle impostazioni degli abbonamenti Apple."
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dette sletter kontoen din og dataene dens permanent. Å slette kontoen sier ikke opp et Premium-abonnement — du kan administrere eller si det opp i Apple-abonnementsinnstillingene dine."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hiermee worden je account en gegevens permanent verwijderd. Je account verwijderen zegt een Premium-abonnement niet op — je kunt het beheren of opzeggen in je Apple-abonnementsinstellingen."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Spowoduje to trwałe usunięcie Twojego konta i jego danych. Usunięcie konta nie anuluje subskrypcji Premium — możesz nią zarządzać lub anulować ją w ustawieniach subskrypcji Apple."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Isto elimina permanentemente a tua conta e os seus dados. Eliminar a conta não cancela uma subscrição Premium — podes geri-la ou cancelá-la nas definições de subscrições da Apple."
+          }
+        },
+        "ro" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aceasta îți șterge definitiv contul și datele sale. Ștergerea contului nu anulează un abonament Premium — îl poți gestiona sau anula în setările de abonamente Apple."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Это навсегда удалит вашу учётную запись и её данные. Удаление учётной записи не отменяет подписку Premium — вы можете управлять ею или отменить её в настройках подписок Apple."
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Detta raderar ditt konto och dess data permanent. Att radera kontot avslutar inte en Premium-prenumeration — du kan hantera eller avsluta den i dina Apple-prenumerationsinställningar."
+          }
+        }
+      }
+    },
     "%@ spending + %@ bills paid" : {
       "localizations" : {
         "bg" : {
