@@ -21,6 +21,7 @@ struct RecurringSheet: View {
     @State private var amount: Decimal = 0
     @State private var cadence: Cadence = .monthly
     @State private var dueDay = 1
+    @State private var autoPay = false
     @State private var category = Categories.defaultName
     @State private var showCategory = false
 
@@ -71,6 +72,14 @@ struct RecurringSheet: View {
                     }
                 }
 
+                if !isIncome && (cadence == .monthly || cadence == .weekly) {
+                    Section {
+                        Toggle("Autopay", isOn: $autoPay)
+                    } footer: {
+                        Text("Mark as paid automatically on its due day")
+                    }
+                }
+
                 if !isIncome {
                     Section("Category") {
                         Button {
@@ -111,6 +120,7 @@ struct RecurringSheet: View {
         guard let e = existing else { return }
         label = e.label; amount = e.amount; cadence = e.cadence
         dueDay = e.dueDay; category = e.category.isEmpty ? Categories.defaultName : e.category
+        autoPay = e.autoPay
     }
 
     private func save() {
@@ -124,6 +134,7 @@ struct RecurringSheet: View {
         entry.cadence = cadence
         entry.dueDay = dueDay
         entry.category = isIncome ? "" : category
+        entry.autoPay = !isIncome && autoPay
         try? context.save()
         dismiss()
     }

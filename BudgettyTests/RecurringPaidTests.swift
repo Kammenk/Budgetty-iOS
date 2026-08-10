@@ -64,4 +64,43 @@ struct RecurringPaidTests {
         let b = bill(.once, paidOn: at(2020, 1, 1))
         #expect(b.isPaidThisCycle(todayDate, startDay: 1, calendar: cal))
     }
+
+    // MARK: - Autopay: derived "effectively paid" once the due day passes (no lastPosted stamp)
+
+    private func autoBill(_ cadence: Cadence, dueDay: Int, autoPay: Bool = true) -> Recurring {
+        let r = Recurring(label: "Rent", amount: 800, isIncome: false, cadence: cadence, dueDay: dueDay)
+        r.autoPay = autoPay
+        return r
+    }
+
+    @Test func monthlyDueDayPassedThisCycleUpcomingNotYet() {
+        // today = Jul 25; the Jul 10 due day has passed, the Jul 28 one has not.
+        #expect(autoBill(.monthly, dueDay: 10).isDuePassedThisCycle(todayDate, startDay: 1, calendar: cal))
+        #expect(!autoBill(.monthly, dueDay: 28).isDuePassedThisCycle(todayDate, startDay: 1, calendar: cal))
+    }
+
+    @Test func weeklyMondayHasPassedByAnyLaterDayOfItsWeek() {
+        #expect(autoBill(.weekly, dueDay: 1).isDuePassedThisCycle(todayDate, startDay: 1, calendar: cal))
+    }
+
+    @Test func yearlyAndOnceNeverAutoMark() {
+        #expect(!autoBill(.yearly, dueDay: 1).isDuePassedThisCycle(todayDate, startDay: 1, calendar: cal))
+        #expect(!autoBill(.once, dueDay: 1).isDuePassedThisCycle(todayDate, startDay: 1, calendar: cal))
+    }
+
+    @Test func autopayFillsPaidOnceTheDueDayPasses() {
+        #expect(autoBill(.monthly, dueDay: 10).isEffectivelyPaidThisCycle(todayDate, startDay: 1, calendar: cal))
+        #expect(!autoBill(.monthly, dueDay: 28).isEffectivelyPaidThisCycle(todayDate, startDay: 1, calendar: cal))
+    }
+
+    @Test func autopayOffLeavesItToTheManualStamp() {
+        let b = autoBill(.monthly, dueDay: 10, autoPay: false)
+        #expect(!b.isEffectivelyPaidThisCycle(todayDate, startDay: 1, calendar: cal))
+    }
+
+    @Test func aManualPaymentCountsEvenBeforeTheAutopayDueDay() {
+        let b = autoBill(.monthly, dueDay: 28)
+        b.lastPosted = at(2026, 7, 10)
+        #expect(b.isEffectivelyPaidThisCycle(todayDate, startDay: 1, calendar: cal))
+    }
 }

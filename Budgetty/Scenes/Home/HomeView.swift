@@ -272,12 +272,12 @@ struct HomeView: View {
     /// Bills already marked paid this cycle. They're spent money, so they stay subtracted from Safe to
     /// spend (like receipts) — surfaced under "Bills still due" and folded into "Total spent this cycle".
     private var billsPaidThisCycle: Decimal {
-        recurrings.filter { !$0.isIncome && $0.isPaidThisCycle(startDay: monthStartDay) }
+        recurrings.filter { !$0.isIncome && $0.isEffectivelyPaidThisCycle(startDay: monthStartDay) }
             .reduce(.zero) { $0 + $1.monthlyEquivalent }
     }
     /// Bills not yet paid — still owed out of this cycle's income.
     private var billsStillDue: Decimal {
-        recurrings.filter { !$0.isIncome && !$0.isPaidThisCycle(startDay: monthStartDay) }
+        recurrings.filter { !$0.isIncome && !$0.isEffectivelyPaidThisCycle(startDay: monthStartDay) }
             .reduce(.zero) { $0 + $1.monthlyEquivalent }
     }
     /// Income this cycle − spent so far − every recurring bill this cycle (still due + already paid).
@@ -842,7 +842,7 @@ struct HomeView: View {
 
     /// Any recurring bill not yet marked paid for its current occurrence — gates the card below.
     private var hasUpcomingBills: Bool {
-        recurrings.contains { !$0.isIncome && !$0.isPaidThisCycle(startDay: monthStartDay) }
+        recurrings.contains { !$0.isIncome && !$0.isEffectivelyPaidThisCycle(startDay: monthStartDay) }
     }
 
     /// Recurring bills due soon (moved here from Insights): each unpaid bill, soonest due-day first,
@@ -850,7 +850,7 @@ struct HomeView: View {
     /// Upcoming bills section, which sits directly below the budget card.
     private var upcomingBillsCard: some View {
         let sorted = recurrings
-            .filter { !$0.isIncome && !$0.isPaidThisCycle(startDay: monthStartDay) }
+            .filter { !$0.isIncome && !$0.isEffectivelyPaidThisCycle(startDay: monthStartDay) }
             .sorted { $0.dueDay < $1.dueDay }
         return VStack(alignment: .leading, spacing: 14) {
             Text("Upcoming bills").font(.headline)

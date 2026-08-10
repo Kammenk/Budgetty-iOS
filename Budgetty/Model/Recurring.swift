@@ -39,6 +39,11 @@ final class Recurring {
 
     var createdAt: Date
 
+    /// Bills only: when true, the bill auto-marks as paid once `dueDay` passes each cycle (monthly &
+    /// weekly only — yearly stores no month, one-offs don't recur). Derived on read, no scheduled job.
+    /// Defaulted so SwiftData lightweight-migrates existing rows.
+    var autoPay: Bool = false
+
     // Reserved for the later auto-posting phase (unused while planning-only).
     var nextDue: Date?
     var lastPosted: Date?

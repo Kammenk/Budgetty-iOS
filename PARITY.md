@@ -1022,3 +1022,23 @@ Android-only. Neither the 11.2.1 AAB nor iOS build 10 uploaded yet.
 Android `7a8cce2` PUSHED (unmerged; detekt/tests/Roborazzi green). iOS committed on-branch (sim BUILD
 SUCCEEDED), unpushed. Neither merged/uploaded. Related open follow-up: scope for auto-marking recurring
 bills as paid on their due date (per-bill "Autopay", compute-on-read) — not yet built.
+
+## Per-bill Autopay: bills auto-mark paid on their due day (both) — 2026-08-10
+
+- **Feature (both platforms):** a recurring bill can be set to Autopay (a switch in the add/edit sheet,
+  shown for monthly/weekly bills). Once its due day passes in the current cycle it counts as paid
+  automatically — no monthly re-tap. Derived on read (no background job), mirroring the existing
+  `isPaidThisCycle` reset; yearly/one-off bills have no computable due date and stay manual.
+- **Data:** Android `RecurringEntity.autoPay` (Room v23 migration, column defaults 0); iOS
+  `Recurring.autoPay` (SwiftData lightweight migration, defaults false).
+- **Logic:** `RecurringMath` gains `isDuePassedThisCycle` + `isEffectivelyPaidThisCycle` (manual OR
+  autopay-and-due). Home Safe-to-Spend cash-flow, the Budget paid list/counter, and the Upcoming-bills
+  filter all read the effective state — autopay bills fold into paid / total-spent and drop off
+  still-due / upcoming. Safe to Spend stays net-neutral (paid and still-due are both subtracted).
+- **UI:** the Budget bill row shows a static "Auto" chip (greens once due) instead of the manual paid
+  toggle; the sheet gains the Autopay switch. Strings "Autopay" / "Mark as paid automatically on its
+  due day" / "Auto" × 15 locales both sides. Unit tests for the due-date / effective-paid math both sides.
+
+**Status (2026-08-10):** DONE both, on branch `recurring-bill-autopay` (stacked on
+`safe-to-spend-reserve-paid-bills` — merge that first). Android `ea4e044` (compile + detekt + full unit
+tests green). iOS committed on-branch (sim BUILD SUCCEEDED + RecurringPaidTests 12/12 pass). Unpushed.
