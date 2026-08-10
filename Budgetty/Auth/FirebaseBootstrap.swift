@@ -20,6 +20,24 @@ struct FirebaseTokenProvider: TokenProvider {
     }
 }
 
+/// Account-comp entitlement — the server-granted `premium` custom claim (set by functions/tools/comp.js).
+/// This is the friends-unlock mechanism on iOS: read the claim, cache it in `pref.comp`, and let
+/// `StoreManager` OR it into Premium. Mirrors Android's `BillingManager.refreshComp`. There is no in-app
+/// code field or hidden gesture — nothing for App Store review to flag; the entitlement simply exists on
+/// the accounts the owner grants, and because it rides on the account it restores on any device.
+enum CompEntitlement {
+    /// Re-reads the `premium` claim for the signed-in user into `pref.comp`, forcing a token refresh so
+    /// a revoke is picked up. Signed out clears it; a network failure keeps the cached value.
+    static func refresh() async {
+        guard let user = Auth.auth().currentUser else {
+            UserDefaults.standard.set(false, forKey: SettingsKey.comp)
+            return
+        }
+        guard let result = try? await user.getIDTokenResult(forcingRefresh: true) else { return }
+        UserDefaults.standard.set((result.claims["premium"] as? Bool) == true, forKey: SettingsKey.comp)
+    }
+}
+
 enum FirebaseBootstrap {
     /// Configure Firebase and route extraction through the real backend. Safe to call once at launch.
     @discardableResult

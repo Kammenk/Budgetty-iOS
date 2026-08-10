@@ -84,12 +84,19 @@ final class StoreManager {
         syncPremiumFlag()
     }
 
-    /// Mirror StoreKit entitlement into the app-wide `premium` flag.
+    /// Mirror the effective entitlement — a StoreKit subscription OR a comped account (the
+    /// server-granted `premium` claim, cached in `pref.comp`; see `CompEntitlement`) — into the
+    /// app-wide `premium` flag the rest of the app reads.
     private func syncPremiumFlag() {
-        UserDefaults.standard.set(isSubscribed, forKey: SettingsKey.premium)
+        let comp = UserDefaults.standard.bool(forKey: SettingsKey.comp)
+        UserDefaults.standard.set(isSubscribed || comp, forKey: SettingsKey.premium)
         // Widgets live in another process and enforce their own cap, so they need telling.
         WidgetSharing.premiumDidChange()
     }
+
+    /// Re-mirror the Premium flag after the account-comp claim was refreshed (see `CompEntitlement`),
+    /// so a grant or revoke takes effect without waiting on a StoreKit entitlement change.
+    func applyComp() { syncPremiumFlag() }
 
     private func observeTransactionUpdates() -> Task<Void, Never> {
         Task(priority: .background) { [weak self] in

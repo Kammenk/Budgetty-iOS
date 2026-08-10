@@ -83,6 +83,14 @@ struct BudgettyApp: App {
         WidgetSharing.update(from: container.mainContext)
     }
 
+    /// Refresh the account-comp entitlement (the server-granted `premium` claim) and re-mirror the
+    /// Premium flag. Runs at launch, on account change, and on foreground so a grant or revoke applies.
+    @MainActor
+    private func refreshComp() async {
+        await CompEntitlement.refresh()
+        store.applyComp()
+    }
+
     var body: some Scene {
         WindowGroup {
             Group {
@@ -101,15 +109,20 @@ struct BudgettyApp: App {
             .tint(Palette.tint)
             .preferredColorScheme((AppearancePref(rawValue: appearanceRaw) ?? .system).colorScheme)
             .task { @MainActor in prepare(container) }
+            .task { await refreshComp() }
             .onChange(of: auth.uid) { _, uid in
                 // A fresh account opens a store that has never been seeded, so prepare it too.
                 let next = UserStore.container(for: uid)
                 container = next
                 prepare(next)
+                // The comped entitlement is per-account, so re-read it when the account changes.
+                Task { await refreshComp() }
             }
             .onChange(of: scenePhase) { _, phase in
                 if phase == .active {
                     WidgetSharing.update(from: container.mainContext)
+                    // Foreground: pick up a comp grant/revoke made since the app was last active.
+                    Task { await refreshComp() }
                 }
             }
         }

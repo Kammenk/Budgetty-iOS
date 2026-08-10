@@ -1000,3 +1000,25 @@ BUILD SUCCEEDED). Neither uploaded to a store yet.
 
 **Status (2026-08-06):** 11-tap removal DONE + pushed on both (`00000eb` / `10fd81a`); Play language fix is
 Android-only. Neither the 11.2.1 AAB nor iOS build 10 uploaded yet.
+
+## Safe to Spend reserves paid bills (fix) + "Total spent this cycle" row (both) — 2026-08-10
+
+- **Bug (both platforms):** Safe to spend subtracted only *bills still due*, not *bills already paid*, so
+  marking a recurring bill paid moved its amount out of the only subtracted bucket and the figure jumped
+  UP by that amount (testers: 2700 → 2790 after paying a 90 bill). Fix = also subtract paid bills:
+  `income − spent − billsStillDue − billsPaid`. A due bill is already reserved out of the number, so
+  paying it is now net-neutral (2700 → 2700), NOT −90. The user confirmed the reserve model over a
+  running-wallet one. Android `HomeViewModel.safeToSpend`; iOS `HomeView.safeToSpend` (whose comment had
+  even documented the old "drop off / not re-subtracted" behaviour — corrected).
+- **"Total spent this cycle" row (both):** receipts + paid bills, shown only once a bill is marked paid
+  (until then it equals the "Spent" figure and is hidden). Android: a new row under the Spent/Bills strip;
+  iOS: a new inset-list row between "Bills still due" and "Income this cycle". String
+  `safe_to_spend_total_spent` / "Total spent this cycle", 15 locales both sides.
+- **Bar (both):** paid bills fold into the solid "spent" segment, so the hatched "still due" / safe share
+  is unchanged when a bill is paid; screenshot fixtures reconciled to sum-to-income (Android goldens
+  re-recorded).
+
+**Status (2026-08-10):** PORTED — both on their own `safe-to-spend-reserve-paid-bills` branch off `main`.
+Android `7a8cce2` PUSHED (unmerged; detekt/tests/Roborazzi green). iOS committed on-branch (sim BUILD
+SUCCEEDED), unpushed. Neither merged/uploaded. Related open follow-up: scope for auto-marking recurring
+bills as paid on their due date (per-bill "Autopay", compute-on-read) — not yet built.
