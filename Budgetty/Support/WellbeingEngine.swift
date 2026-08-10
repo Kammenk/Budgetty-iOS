@@ -140,6 +140,12 @@ enum WellbeingEngine {
     /// Below this many logged receipts we can't score meaningfully → first-run state.
     static let minReceiptsToScore = 5
 
+    /// A subscription share of 0% only counts as a genuine "no subscriptions" win once there's at
+    /// least this many months of history. Before that, a brand-new user simply hasn't accrued
+    /// subscription data — scoring the absence as a perfect 100 would hand them a bogus top score,
+    /// since it can be their only scored component. Android parity: `MIN_MONTHS_FOR_ZERO_SUBS`.
+    static let minMonthsForZeroSubs = 2
+
     static let monthlyTipCap = 5
     static let weeklyTipCap = 3
 
@@ -192,6 +198,15 @@ enum WellbeingEngine {
         clampScore(100.0 - Double(max(0, sharePercent - 5)) * 11.0)
     }
 
+    /// The subscriptions component's sub-score, or nil when there isn't enough signal to score it — a
+    /// 0% share only counts once there are at least `minMonthsForZeroSubs` months of history. This is
+    /// what stops a brand-new user (no income/budget/goals/trend yet, no subscriptions) from scoring a
+    /// bogus 100 off their only scored component. Android parity: `subscriptionsComponentScore`.
+    static func subscriptionsComponentScore(_ i: WellbeingInputs) -> Int? {
+        if i.subsCount == 0 && i.monthsTracked < minMonthsForZeroSubs { return nil }
+        return i.subsSharePercent.map { subscriptionsScore(sharePercent: $0) }
+    }
+
     // ── Aggregate ─────────────────────────────────────────────────────────────────
 
     /// Weighted, renormalising mean over the components that have a score. Nil if none do.
@@ -213,7 +228,7 @@ enum WellbeingEngine {
             WellbeingComponent(key: .trend, weight: wTrend,
                                score: i.trendPercent.map { trendScore(percentVsAverage: $0) }),
             WellbeingComponent(key: .subscriptions, weight: wSubscriptions,
-                               score: i.subsSharePercent.map { subscriptionsScore(sharePercent: $0) }),
+                               score: subscriptionsComponentScore(i)),
             WellbeingComponent(key: .goals, weight: wGoals, score: goalsScore(i.goals)),
         ]
     }

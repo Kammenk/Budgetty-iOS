@@ -199,4 +199,42 @@ struct WellbeingEngineTests {
         #expect(tips.contains { $0.type == .underPaceWin && $0.tone == .win })
         #expect(tips.count <= WellbeingEngine.weeklyTipCap)
     }
+
+    // MARK: Score floor — Subscriptions must not score 100 from the absence of data
+
+    @Test func newUserWithNoSignalAndNoSubscriptionsScoresNil() {
+        // A fresh account: 5+ receipts but no income/budget/goals/trend and no subscriptions. Before
+        // the fix, Subscriptions scored a perfect 100 from a 0% share and was the only scored
+        // component → 100/Thriving. Now every component is nil → no total (first-run state).
+        let s = WellbeingEngine.score(inputs(
+            hasIncome: false, hasAnyBudget: false, trendPercent: nil,
+            subsSharePercent: 0, subsCount: 0, goals: [],
+            receiptsLogged: WellbeingEngine.minReceiptsToScore, monthsTracked: 1
+        ))
+        #expect(s.score == nil)
+        #expect(s.band == nil)
+    }
+
+    @Test func zeroSubscriptionsOnlyScoresWithEnoughHistory() {
+        #expect(WellbeingEngine.subscriptionsComponentScore(
+            inputs(subsSharePercent: 0, subsCount: 0, monthsTracked: 1)) == nil)
+        // After minMonthsForZeroSubs months, a real 0% share is a genuine win (full marks).
+        #expect(WellbeingEngine.subscriptionsComponentScore(
+            inputs(subsSharePercent: 0, subsCount: 0, monthsTracked: 2)) == 100)
+    }
+
+    @Test func realSignalStillScoresInTheFirstMonth() {
+        // A user who set up income has a genuine savings component — that should still score.
+        let s = WellbeingEngine.score(inputs(
+            hasIncome: true, savingsRatePercent: 20, hasAnyBudget: false, trendPercent: nil,
+            subsSharePercent: 0, subsCount: 0, goals: [], monthsTracked: 1
+        ))
+        #expect(s.score != nil)
+    }
+
+    @Test func actualSubscriptionsScoreRegardlessOfHistory() {
+        // subsCount > 0 means there IS data to score, from month one: 100 - (10-5)*11 = 45.
+        #expect(WellbeingEngine.subscriptionsComponentScore(
+            inputs(subsSharePercent: 10, subsCount: 2, monthsTracked: 1)) == 45)
+    }
 }
