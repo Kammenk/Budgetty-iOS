@@ -38,7 +38,12 @@ enum CategoryOps {
         let newParent = normalizedParent(parent, for: trimmed)
 
         if let e = editing {
-            if e.name.caseInsensitiveCompare(trimmed) != .orderedSame {
+            // Compare EXACTLY (not case-insensitively): a case-only rename ("Coffee" → "COFFEE") is
+            // still a rename, so its references must repoint too — otherwise transactions / rules /
+            // budget / children keep the old-cased name and detach from the renamed category. (iOS
+            // edits the row in place, so unlike Android there's no duplicate row — only stale refs.)
+            // Android parity.
+            if e.name != trimmed {
                 renameReferences(context, from: e.name, to: trimmed)   // repoint refs + children
             }
             e.name = trimmed
