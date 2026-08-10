@@ -1042,3 +1042,27 @@ bills as paid on their due date (per-bill "Autopay", compute-on-read) — not ye
 **Status (2026-08-10):** DONE both, on branch `recurring-bill-autopay` (stacked on
 `safe-to-spend-reserve-paid-bills` — merge that first). Android `ea4e044` (compile + detekt + full unit
 tests green). iOS committed on-branch (sim BUILD SUCCEEDED + RecurringPaidTests 12/12 pass). Unpushed.
+
+## Safe-to-spend Home card → spent-first (Total spent hero) (both) — 2026-08-10
+
+- **Design:** Direction C from the "total spent on Home" brief — Android mockup `HomeTotalSpent.dc.html`,
+  iOS `iOS Home Total Spent.dc.html` (Liquid Glass). The safe-to-spend card had grown dense; this flips
+  it spent-first.
+- **Both platforms:** the hero becomes **Total spent this cycle** (discretionary spend + bills already
+  paid) in neutral label colour, with a composition caption ("X spending + Y bills paid", else the
+  receipt count, else "Nothing spent yet this cycle"). New 4-segment bar / swatch language: solid tint =
+  spending, solid secondary/outline = paid bills, hatch = bills still due, status tone = safe. Safe to
+  spend demotes to a status-coloured figure (per-day sub); Bills still due gains a "N bills" count.
+- **Footer REMOVED** per the user (compactness / screen real estate): the "= income − total spent −
+  bills still due" formula is gone; only the overspent one-line warning remains. Setup shows the real
+  total-spent hero + add-income prompt (no "—" placeholder).
+- **Android:** `SafeToSpendCard`/`SafeToSpendBar`/`SafeToSpendStat` reworked (two-column stat strip);
+  `HomeUiState.billsStillDueCount` added. Strings +`safe_to_spend_composition`/`_nothing_yet` + plural
+  `safe_to_spend_bills_count`, −5 orphaned, ×16 locales. 7 Roborazzi goldens re-recorded.
+- **iOS:** `HomeView.swift` safe-to-spend section reworked into the inset-list idiom (Safe to spend →
+  Bills still due → Income this cycle); `billsStillDueCount`/`totalSpentThisCycle` added. xcstrings
+  +`%@ spending + %@ bills paid` / `Nothing spent yet this cycle` / `%lld bills`, ×15 locales.
+
+**Status (2026-08-10):** PORTED both, on branch `safe-to-spend-total-spent-first` off `main`.
+Android `152cd64` (compile + detekt + lintDebug + Roborazzi green). iOS committed on-branch (sim BUILD
+SUCCEEDED + rendered on iPhone 17 Pro). Both unpushed/unmerged.
