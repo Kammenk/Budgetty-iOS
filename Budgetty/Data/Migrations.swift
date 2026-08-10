@@ -90,4 +90,69 @@ enum Migrations {
             try? context.save()
         }
     }
+
+    /// Android `MIGRATION_22_23`: splits the old "Insurance & Utilities" three ways. The survivor is
+    /// **"Utilities"** (it reuses the old slot/colour in `Categories`); "Insurance" and
+    /// "Phone & Internet" arrive via the normal seed (no work here). Everything referencing the old
+    /// name is repointed onto "Utilities" — the commoner recurring bill — mirroring the
+    /// Subscriptions/Services rule; re-filing the odd insurance/phone entry is a two-tap edit.
+    ///
+    /// ⚠️ Must run **before** `Seed.categoriesIfNeeded`, for the same reason as
+    /// `splitSubscriptionsAndServices`.
+    @MainActor
+    static func splitInsuranceAndUtilities(_ context: ModelContext) {
+        let old = "Insurance & Utilities"
+        let new = "Utilities"
+
+        var touched = false
+
+        let categories = (try? context.fetch(
+            FetchDescriptor<Category>(predicate: #Predicate { $0.name == old || $0.name == new })
+        )) ?? []
+        if let stale = categories.first(where: { $0.name == old }) {
+            if categories.contains(where: { $0.name == new }) {
+                context.delete(stale)
+            } else {
+                stale.name = new
+            }
+            touched = true
+        }
+
+        for item in (try? context.fetch(
+            FetchDescriptor<LineItem>(predicate: #Predicate { $0.category == old })
+        )) ?? [] {
+            item.category = new
+            touched = true
+        }
+        for recurring in (try? context.fetch(
+            FetchDescriptor<Recurring>(predicate: #Predicate { $0.category == old })
+        )) ?? [] {
+            recurring.category = new
+            touched = true
+        }
+        for rule in (try? context.fetch(
+            FetchDescriptor<CategoryRule>(predicate: #Predicate { $0.category == old })
+        )) ?? [] {
+            rule.category = new
+            touched = true
+        }
+
+        let oldKey = Budget.categoryKey(old)
+        let newKey = Budget.categoryKey(new)
+        let budgets = (try? context.fetch(
+            FetchDescriptor<Budget>(predicate: #Predicate { $0.key == oldKey || $0.key == newKey })
+        )) ?? []
+        if let stale = budgets.first(where: { $0.key == oldKey }) {
+            if budgets.contains(where: { $0.key == newKey }) {
+                context.delete(stale)
+            } else {
+                stale.key = newKey
+            }
+            touched = true
+        }
+
+        if touched {
+            try? context.save()
+        }
+    }
 }

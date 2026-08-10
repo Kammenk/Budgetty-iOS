@@ -12,9 +12,11 @@ import Testing
 
 struct CategoriesTests {
     @Test func canonicalCountAndGroups() {
-        // 51 selectable categories (7 groups + subs + Other) across 8 top-level groups.
-        #expect(Categories.predefined.count == 51)
-        #expect(Categories.groups.count == 8)
+        // 68 selectable categories (8 groups + subs + Other) across 9 top-level groups
+        // (2026-08 expansion: Bills & Finance group + Transportation/Health/Dining fills + the
+        // Insurance & Utilities three-way split).
+        #expect(Categories.predefined.count == 68)
+        #expect(Categories.groups.count == 9)
     }
 
     /// The 2026-07-21 split (Android `581302f`): the old "Subscriptions & Services" sub-category was
