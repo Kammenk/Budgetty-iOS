@@ -33,6 +33,10 @@ enum SettingsKey {
     static let onboarded = "pref.onboarded"
     static let quizPending = "pref.quizPending"   // armed at sign-up; gates the one-time Insights setup quiz
     static let scanQuotaUsed = "quota.scansUsed"  // lifetime finalized AI scans (see ScanQuota)
+    /// Whether the user has agreed to the one-time disclosure that a scanned receipt photo is sent to
+    /// a third-party AI service (App Review 5.1.2(i)). Gates the first cloud scan; manual entry never
+    /// checks it. See `ScanConsentSheet`.
+    static let scanAIConsent = "pref.scanAIConsent"
     /// Dismissed Wellbeing tips, as newline-separated "periodId|tipId" entries (see WellbeingTipsStore).
     static let dismissedWellbeingTips = "wellbeing.dismissedTips"
 }
