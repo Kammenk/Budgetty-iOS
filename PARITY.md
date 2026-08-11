@@ -1091,3 +1091,34 @@ SUCCEEDED + rendered on iPhone 17 Pro). Both unpushed/unmerged.
 test, proven to fail without the guard; compile + detekt green; emulator-verified "2.50 € across 1
 receipt"). iOS `duplicate-receipt-save-guard` → `origin/Budgetty-iOS` (`53892a6`, sim BUILD SUCCEEDED).
 LEFT: open PRs + merge both.
+
+## Code-review blocker fixes — behaviour parity (both) — 2026-08-10
+
+A 12-agent code review of the Android app surfaced 10 blockers; all 10 were fixed on Android
+(10 branches off `main`, pushed to `origin/Budgetty-Android`). Five are behaviour/logic bugs that had
+an iOS twin — ported here. (The other five are Android-platform-specific: `flowOn` threading,
+`enableEdgeToEdge` status-bar contrast, Compose `Text()` hardcoded strings + a Gradle lint guard,
+CSV/PDF export ANR, and Compose-tip plurals — no iOS equivalent.)
+
+- **Settings cross-account leak** — `AuthModel.signOut()`/`deleteAccount()` cleared no device-global
+  `UserDefaults`, so a shared device leaked the previous account's app-lock PIN + biometric, setup
+  quiz, dismissed tips, and Home/Insights layout. Fix: `UserState.clear()` (Settings.swift) called
+  from both, covering the Account button and Forgot-PIN paths (both route through `signOut()`).
+  *(Android #1.)*
+- **Autopay stuck "Auto" chip** — `RecurringSheet` saved `autoPay` gated only on `!isIncome`, so a
+  monthly+autopay bill switched to yearly/once kept the flag. Fix: `Recurring.autoPayEligible` /
+  `isAutoPayActive` (monthly/weekly bills only), applied on save, edit-sheet load, and the Budget row
+  chip. `RecurringPaidTests`. *(Android #3.)*
+- **New-user 100/Thriving wellbeing score** — Subscriptions scored a full 100 from a 0% share (no
+  data) as the only scored component. Fix: `WellbeingEngine.subscriptionsComponentScore` gates a 0%
+  share on `minMonthsForZeroSubs` (2 months). `WellbeingEngineTests`. *(Android #8.)*
+- **Case-only category rename** — `CategoryOps.saveCustom` compared names case-insensitively, so a
+  case-only rename skipped the reference cascade (iOS edits the row in place, so no duplicate row like
+  Android — but refs detached). Fix: compare exactly. *(Android #10.)*
+- **Backup drops savings** *(Android #2)* — **no port needed:** iOS `Backup.swift` already serializes
+  savings goals + nested contributions in `export`/`restore`, so the bug never existed here.
+
+**Status (2026-08-10):** PORTED (4 code fixes; #2 already correct). iOS on branch
+`fix/android-blocker-parity-2026-08` off `main`, **unpushed/unmerged** — sim BUILD SUCCEEDED, the
+WellbeingEngine + RecurringPaid test suites green. Android side on 10 branches on
+`origin/Budgetty-Android`. LEFT: push iOS branch + open PRs both sides.

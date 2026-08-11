@@ -139,6 +139,10 @@ final class AuthModel {
     }
 
     func signOut() throws {
+        // Wipe this account's device-global local state before the auth flips, so a shared device
+        // never leaks one account's app-lock PIN / quiz / layout to the next (Android parity). Both
+        // real sign-out paths — the Account button and Forgot-PIN — route through here.
+        UserState.clear()
         try Auth.auth().signOut()
     }
 
@@ -154,6 +158,9 @@ final class AuthModel {
         // deletion (Android parity).
         ScanQuota.reset()
         ReviewGate.reset()
+        // Erase this account's device-global settings (app-lock PIN, quiz, tips, layout) so nothing
+        // survives the deletion (Android parity: SettingsStore.clearUserState).
+        UserState.clear()
         // Wipe this account's local receipts too — the store outlives the Firebase user otherwise,
         // and a later account could adopt the file (Android `deleteDataFor`).
         if let uid { UserStore.deleteData(for: uid) }

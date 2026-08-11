@@ -128,7 +128,9 @@ struct RecurringSheet: View {
         guard let e = existing else { return }
         label = e.label; amount = e.amount; cadence = e.cadence
         dueDay = e.dueDay; category = e.category.isEmpty ? Categories.defaultName : e.category
-        autoPay = e.autoPay
+        // Load the *effective* autopay (gated on cadence eligibility) so editing a row saved before
+        // the rule was enforced doesn't preload a stale "on".
+        autoPay = e.isAutoPayActive
     }
 
     private func save() {
@@ -142,7 +144,9 @@ struct RecurringSheet: View {
         entry.cadence = cadence
         entry.dueDay = dueDay
         entry.category = isIncome ? "" : category
-        entry.autoPay = !isIncome && autoPay
+        // Autopay applies to monthly/weekly bills only; force it off for income, yearly, and one-off
+        // entries so a hidden or stale toggle can't persist a stuck "Auto" state (Android parity).
+        entry.autoPay = autoPay && entry.autoPayEligible
         try? context.save()
         dismiss()
     }
