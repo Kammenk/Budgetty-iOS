@@ -76,6 +76,18 @@ final class Recurring {
         set { cadenceRaw = newValue.rawValue }
     }
 
+    /// Whether autopay can apply to this entry at all — bills only (never income), and only monthly or
+    /// weekly cadences: yearly stores no month and one-offs don't recur, so neither has a due date to
+    /// auto-mark against. Independent of the `autoPay` toggle. Android parity: `autoPayEligible`.
+    var autoPayEligible: Bool { !isIncome && (cadence == .monthly || cadence == .weekly) }
+
+    /// True when autopay is both switched on and `autoPayEligible` for this entry's cadence — the
+    /// single source of truth for "this bill is auto-managed". Used when persisting (so a yearly/
+    /// one-off entry can never keep a stuck autopay flag) and when displaying (so the Budget row shows
+    /// a manual paid toggle, not the "Auto" chip, for any ineligible entry — including rows saved
+    /// before the rule was enforced). Android parity: `isAutoPayActive`.
+    var isAutoPayActive: Bool { autoPay && autoPayEligible }
+
     /// The amount normalized to a monthly figure (for period-scaled Insights).
     var monthlyEquivalent: Decimal {
         switch cadence {

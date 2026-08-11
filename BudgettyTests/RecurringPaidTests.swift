@@ -103,4 +103,27 @@ struct RecurringPaidTests {
         b.lastPosted = at(2026, 7, 10)
         #expect(b.isEffectivelyPaidThisCycle(todayDate, startDay: 1, calendar: cal))
     }
+
+    // MARK: - Autopay eligibility: monthly/weekly bills only (fixes the stuck "Auto" chip)
+
+    @Test func autoPayEligibleForMonthlyAndWeeklyBillsOnly() {
+        func r(_ cadence: Cadence, income: Bool = false) -> Recurring {
+            Recurring(label: "x", amount: 10, isIncome: income, cadence: cadence)
+        }
+        #expect(r(.monthly).autoPayEligible)
+        #expect(r(.weekly).autoPayEligible)
+        #expect(!r(.yearly).autoPayEligible)
+        #expect(!r(.once).autoPayEligible)
+        #expect(!r(.monthly, income: true).autoPayEligible)   // income never autopays
+    }
+
+    @Test func isAutoPayActiveRequiresToggleOnAndEligibleCadence() {
+        #expect(autoBill(.monthly, dueDay: 1).isAutoPayActive)
+        #expect(autoBill(.weekly, dueDay: 1).isAutoPayActive)
+        #expect(!autoBill(.monthly, dueDay: 1, autoPay: false).isAutoPayActive)
+        // The bug: a yearly/one-off bill that still carries autoPay must NOT read as auto-managed
+        // (otherwise its Budget row shows a permanent "Auto" chip with no way to mark it paid).
+        #expect(!autoBill(.yearly, dueDay: 1).isAutoPayActive)
+        #expect(!autoBill(.once, dueDay: 1).isAutoPayActive)
+    }
 }

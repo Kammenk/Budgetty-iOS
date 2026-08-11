@@ -376,9 +376,11 @@ struct BudgetView: View {
                 }
             }
             .buttonStyle(.plain)
-            if r.autoPay {
+            if r.isAutoPayActive {
                 // Autopay bills manage their own paid-state from the due date, so there's no manual
-                // toggle — just a static "Auto" chip that greens once the day has passed.
+                // toggle — just a static "Auto" chip that greens once the day has passed. Gated on
+                // cadence eligibility so an ineligible row (e.g. a yearly bill saved before the rule
+                // was enforced) falls back to the manual toggle instead of a stuck chip.
                 HStack(spacing: 3) {
                     Image(systemName: "arrow.triangle.2.circlepath")
                         .font(.system(size: 11, weight: .semibold))
