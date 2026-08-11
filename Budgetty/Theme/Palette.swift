@@ -209,6 +209,29 @@ enum Palette {
     static let warn = Color(uiColor: .systemOrange)
     static let bad = Color(uiColor: .systemRed)
 
+    // MARK: - Accessible status TEXT tones (WCAG AA on card surfaces)
+    //
+    // The bright `good`/`warn`/`bad` above are for BARS / graphics (large shapes clear 3:1), but
+    // system orange/red on a light card fail 4.5:1 as *text*. These darker (light) / lighter (dark)
+    // "on" tones are for coloured status TEXT — the demoted "Safe to spend" figure, "€X left",
+    // "Near limit". Values shared verbatim with Android's Status*On tokens (2026-08 Home/Budget
+    // audit): goodOn #1B5E20/#9BD99F · warnOn #8A6100/#FFCF70 · badOn #B3261E/#FFB4AB.
+    static let goodOn = dynamic(light: 0xFF1B5E20, dark: 0xFF9BD99F)
+    static let warnOn = dynamic(light: 0xFF8A6100, dark: 0xFFFFCF70)
+    static let badOn  = dynamic(light: 0xFFB3261E, dark: 0xFFFFB4AB)
+
+    /// Bright traffic-light tone for budget BARS / graphics, by spent÷limit fraction. Bands match
+    /// Android's `budgetColor`: green under 50%, amber 50–74%, red at 75%+.
+    static func budgetBarTone(_ fraction: Double) -> Color {
+        fraction >= 0.75 ? bad : (fraction >= 0.5 ? warn : good)
+    }
+
+    /// Accessible on-surface TEXT tone matching `budgetBarTone`'s bands — for the coloured "€X left"
+    /// / "over" figures where the bright amber/red fail WCAG 4.5:1 as text (Android's `budgetOnColor`).
+    static func budgetTextTone(_ fraction: Double) -> Color {
+        fraction >= 0.75 ? badOn : (fraction >= 0.5 ? warnOn : goodOn)
+    }
+
     /// Soft violet-tinted drop shadow that lifts content cards off the canvas (mockup:
     /// `0 10px 28px rgba(25,12,60,.1)`).
     static let cardShadow = Color(argb: 0x1A190C3C)

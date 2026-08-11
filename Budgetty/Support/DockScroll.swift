@@ -64,8 +64,12 @@ extension View {
 /// the chrome rather than sitting flush against it (screens that already pad their own content just
 /// get a little more). Zero wherever `dockChromeHeight` is — no chrome on screen, or a presentation
 /// that covers it (see `coversFloatingDock`).
+///
+/// The breathing room is `spaceL`, not `spaceS`: the Scan pill casts a soft drop shadow (~16pt blur)
+/// that reached over the last row of a scrolled-to-end page — Home's most-recent receipt row and its
+/// tappable amount (2026-08 audit H7). A full `spaceL` gap clears the shadow, not just the pill edge.
 private func dockClearance(_ chromeHeight: CGFloat) -> CGFloat {
-    chromeHeight > 0 ? chromeHeight + Dimens.spaceS : 0
+    chromeHeight > 0 ? chromeHeight + Dimens.spaceL : 0
 }
 
 private struct FloatingDockScroll: ViewModifier {
