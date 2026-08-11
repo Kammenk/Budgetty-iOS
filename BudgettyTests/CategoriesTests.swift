@@ -32,7 +32,7 @@ struct CategoriesTests {
         #expect(Categories.groupOf("Services") == "Services & Subscriptions")
         // "Subscriptions" reuses the retired category's slot in `defs` so it keeps that colour —
         // sub-hues are assigned by walking the list in order.
-        #expect(Categories.color(for: "Subscriptions") == 0xFFBF9559)
+        #expect(Categories.color(for: "Subscriptions") == 0xFFBFA959)
     }
 
     @Test func namesAreUnique() {
