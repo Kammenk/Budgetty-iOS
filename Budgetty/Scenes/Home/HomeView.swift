@@ -160,12 +160,17 @@ struct HomeView: View {
                 .foregroundStyle(Palette.tint)
                 .padding(.horizontal, 12).padding(.vertical, 6)
                 .background(Palette.fill, in: Capsule())
+                // ≥44pt tap target: expand the hittable frame without enlarging the pill visual.
+                .frame(minHeight: 44)
+                .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
             .accessibilityLabel("Customize sections")
             .accessibilityIdentifier(A11y.Home.customize)
             NavigationLink { AccountView() } label: {
                 AvatarView(initials: auth.initials, size: 36, fontSize: 14)
+                    .frame(minWidth: 44, minHeight: 44)     // ≥44pt tap target around the 36pt avatar
+                    .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
             .accessibilityLabel("Account")
@@ -317,18 +322,61 @@ struct HomeView: View {
         }
     }
 
+    /// Accessible on-surface tone for the demoted "Safe to spend" FIGURE (WCAG 4.5:1). The bright
+    /// `safeToSpendTone` stays on the bar / swatch / wash graphics; mirrors Android's safeTextTone split.
+    private func safeToSpendTextTone(_ s: SafeToSpendStatus) -> Color {
+        switch s {
+        case .over: Palette.badOn
+        case .low: Palette.warnOn
+        case .setup: Palette.tertiaryLabel
+        case .healthy: Palette.goodOn
+        }
+    }
+
+    /// Small text+icon status pill beside the hero label, so the safe-to-spend health isn't signalled
+    /// by colour alone (WCAG 1.4.1): On track (✓) / Running low (⚠) / Over (⚠). None in the setup state.
+    @ViewBuilder
+    private func safeToSpendStatusChip(_ status: SafeToSpendStatus) -> some View {
+        let spec: (label: LocalizedStringKey, icon: String, wash: Color, ink: Color)? = {
+            switch status {
+            case .healthy: (label: "On track", icon: "checkmark", wash: Palette.good, ink: Palette.goodOn)
+            case .low: (label: "Running low", icon: "exclamationmark.triangle.fill", wash: Palette.warn, ink: Palette.warnOn)
+            case .over: (label: "Over", icon: "exclamationmark.triangle.fill", wash: Palette.bad, ink: Palette.badOn)
+            case .setup: nil
+            }
+        }()
+        if let spec {
+            HStack(spacing: 3) {
+                Image(systemName: spec.icon).font(.system(size: 10, weight: .bold))
+                Text(spec.label).font(.caption2).fontWeight(.semibold).lineLimit(1)
+            }
+            .foregroundStyle(spec.ink)
+            .padding(.horizontal, 8).padding(.vertical, 3)
+            .background(spec.wash.opacity(0.15), in: Capsule())
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel(Text(spec.label))
+        }
+    }
+
 
     private var safeToSpendCard: some View {
         let status = safeToSpendStatus
         let tone = safeToSpendTone(status)
+        let textTone = safeToSpendTextTone(status)
+        // Only flag "· incl. bills" once a bill has actually been folded into the hero (billsPaid > 0)
+        // — the confusing case the audit flagged. Otherwise the hero is pure discretionary spend.
+        let heroLabel: LocalizedStringKey = billsPaidThisCycle > 0
+            ? "Total out · incl. bills" : "Total spent this cycle"
         return VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: 6) {
                 totalSpentSwatch.frame(width: 8, height: 8)
-                Text("Total spent this cycle")
+                Text(heroLabel)
                     .font(.subheadline).fontWeight(.medium)
                     .foregroundStyle(Palette.secondaryLabel)
-                    .lineLimit(1)
-                Spacer()
+                    .lineLimit(2)                                 // long locales wrap, never ellipsise
+                    .fixedSize(horizontal: false, vertical: true)
+                safeToSpendStatusChip(status)                     // icon+word status; none in setup
+                Spacer(minLength: 6)
                 periodPillGlass
             }
             .padding(.bottom, 6)
@@ -367,7 +415,7 @@ struct HomeView: View {
                     .frame(height: 6)
                     .padding(.top, 16)
 
-                safeToSpendList(status: status, tone: tone)
+                safeToSpendList(status: status, tone: tone, textTone: textTone)
                     .padding(.top, 16)
 
                 // Overspent keeps a one-line warning; healthy/low stay compact (no income − spent − bills
@@ -451,9 +499,11 @@ struct HomeView: View {
         }
     }
 
-    /// The inset grouped list under the bar — spent-first: Safe to spend leads (status tone + per-day),
-    /// then Bills still due, then Income this cycle.
-    private func safeToSpendList(status: SafeToSpendStatus, tone: Color) -> some View {
+    /// The inset grouped list under the bar — spent-first: Safe to spend leads, promoted to the
+    /// visually second-strongest element (larger, bolder, accessible status tone + per-day), then
+    /// Bills still due, then Income this cycle. `tone` keys the bright swatch; `textTone` (WCAG) inks
+    /// the figure.
+    private func safeToSpendList(status: SafeToSpendStatus, tone: Color, textTone: Color) -> some View {
         let perDay = safeToSpend / Decimal(daysUntilPayday)
         return VStack(spacing: 0) {
             safeToSpendRow(
@@ -461,7 +511,8 @@ struct HomeView: View {
                 title: "Safe to spend",
                 subtitle: status == .over ? nil : perDayLabel(perDay),
                 value: safeToSpend.formatMoney(),
-                valueColor: tone)
+                valueColor: textTone,
+                emphasized: true)
             Divider().overlay(Palette.separator)
             safeToSpendRow(
                 swatch: hatchSwatch,
@@ -483,22 +534,29 @@ struct HomeView: View {
     private func safeToSpendRow(
         swatch: some View, title: LocalizedStringKey, titleBold: Bool = false,
         subtitle: String? = nil, value: String, valueBold: Bool = false,
-        valueColor: Color = Palette.label
+        valueColor: Color = Palette.label, emphasized: Bool = false
     ) -> some View {
+        // `emphasized` promotes the Safe-to-spend row to the second-strongest element after the hero
+        // figure (larger title + a headline-size value) so the daily runway is the scannable takeaway.
         HStack(spacing: 11) {
             swatch.frame(width: 8, height: 8)
             VStack(alignment: .leading, spacing: 2) {
-                Text(title).font(.system(size: 16, weight: titleBold ? .semibold : .regular))
+                Text(title)
+                    .font(.system(size: emphasized ? 17 : 16,
+                                  weight: emphasized || titleBold ? .semibold : .regular))
                     .foregroundStyle(Palette.label)
                 if let subtitle {
-                    Text(subtitle).font(.system(size: 12)).foregroundStyle(Palette.secondaryLabel)
+                    Text(subtitle).font(.system(size: emphasized ? 13 : 12))
+                        .foregroundStyle(Palette.secondaryLabel)
                 }
             }
             Spacer(minLength: 8)
-            Text(value).font(.system(size: 17, weight: valueBold ? .bold : .semibold))
-                .foregroundStyle(valueColor).lineLimit(1)
+            Text(value)
+                .font(.system(size: emphasized ? 24 : 17,
+                              weight: emphasized || valueBold ? .bold : .semibold))
+                .foregroundStyle(valueColor).lineLimit(1).minimumScaleFactor(0.7)
         }
-        .padding(.horizontal, 14).padding(.vertical, 12)
+        .padding(.horizontal, 14).padding(.vertical, emphasized ? 13 : 12)
     }
 
     /// A split key — half tint (spending), half secondary (paid bills) — marking the "Total spent"
@@ -530,12 +588,14 @@ struct HomeView: View {
         periodMenu {
             HStack(spacing: 5) {
                 Text(period.label).font(.caption).fontWeight(.semibold)
+                    .lineLimit(1).fixedSize(horizontal: true, vertical: false)
                 Image(systemName: "chevron.down").font(.system(size: 9, weight: .bold))
             }
             .foregroundStyle(.white)
             .padding(.horizontal, 11).padding(.vertical, 5)
             .background(.white.opacity(0.22), in: Capsule())
             .overlay(Capsule().strokeBorder(.white.opacity(0.4), lineWidth: 0.5))
+            .fixedSize()
         }
     }
 
@@ -546,11 +606,13 @@ struct HomeView: View {
             HStack(spacing: 4) {
                 Text(period.label).font(.system(size: 12.5, weight: .semibold))
                     .foregroundStyle(Palette.label)
+                    .lineLimit(1).fixedSize(horizontal: true, vertical: false)
                 Image(systemName: "chevron.down").font(.system(size: 9, weight: .bold))
                     .foregroundStyle(Palette.secondaryLabel)
             }
             .padding(.horizontal, 11).padding(.vertical, 5)
             .background(Palette.fill, in: Capsule())
+            .fixedSize()  // keep the pill one line; the wrapped hero label + status chip yield instead
         }
     }
 
@@ -569,7 +631,10 @@ struct HomeView: View {
             }
             .pickerStyle(.inline)
         } label: {
+            // ≥44pt tap target around the compact period pill (both the gradient and glass variants).
             label()
+                .frame(minHeight: 44)
+                .contentShape(Rectangle())
         }
         .accessibilityLabel("Spending period")
     }
@@ -795,7 +860,7 @@ struct HomeView: View {
         let showMonthly = monthly != nil || weekly == nil
         return VStack(spacing: 14) {
             HStack {
-                Text("Budgets").font(.headline)
+                Text("Discretionary budgets").font(.headline)
                 Spacer()
                 Button { selectTab?(.budget) } label: {
                     Text("See All").font(.subheadline).foregroundStyle(Palette.tint)
@@ -820,7 +885,7 @@ struct HomeView: View {
     private var budgetsEmptyCard: some View {
         Button { selectTab?(.budget) } label: {
             VStack(alignment: .leading, spacing: 8) {
-                Text("Budgets").font(.headline)
+                Text("Discretionary budgets").font(.headline)
                 Text("No budgets yet").font(.subheadline).fontWeight(.semibold)
                 Text("Set one and Budgetty can tell you how you're pacing.")
                     .font(.caption).foregroundStyle(Palette.secondaryLabel)

@@ -177,6 +177,15 @@ struct BudgetView: View {
 
     // MARK: - Overall card
 
+    /// The caution-band status WORD for a budget bar (a non-colour signal, WCAG 1.4.1): "Over budget"
+    /// once spend passes the limit, "Near limit" from 50% up, else none. Paired with the accessible
+    /// `Palette.budgetTextTone` on the figure; the bar itself stays the bright `budgetBarTone`.
+    static func budgetStatusWord(spent: Decimal, limit: Decimal) -> LocalizedStringKey? {
+        guard limit > 0 else { return nil }
+        if spent > limit { return "Over budget" }
+        return HomeView.fraction(spent, of: limit) >= 0.5 ? "Near limit" : nil
+    }
+
     private var overallCard: some View {
         Button {
             budgetEditor = BudgetEditor(id: overallKey, title: "\(period.localized) \(String(localized: "Budget"))",
@@ -192,28 +201,42 @@ struct BudgetView: View {
                     let carried = carriedFor(overallKey)
                     let effective = b.amount + carried
                     let frac = HomeView.fraction(spent, of: effective)
-                    let color: Color = frac >= 1 ? Palette.bad : (frac >= 0.85 ? Palette.warn : Palette.good)
+                    let barTone = Palette.budgetBarTone(frac)     // bright bar (50/75% bands, Android parity)
+                    let textTone = Palette.budgetTextTone(frac)   // accessible figure tone (WCAG 4.5:1)
+                    let statusWord = Self.budgetStatusWord(spent: spent, limit: effective)
+                    let remaining = effective - spent
                     HStack(alignment: .firstTextBaseline, spacing: 6) {
                         Text(b.amount.formatMoney())
                             .font(.system(size: 40, weight: .bold)).foregroundStyle(Palette.label)
                         Text(isWeekly ? "/ week" : "/ month")
                             .font(.subheadline).foregroundStyle(Palette.secondaryLabel)
                     }
-                    .padding(.bottom, carried > 0 ? 4 : 14)
-                    if carried > 0 {
-                        Text("+\(carried.formatMoney()) carried over")
-                            .font(.footnote).fontWeight(.semibold).foregroundStyle(Palette.good)
-                            .padding(.bottom, 12)
-                    }
-                    ProgressBarView(fraction: frac, color: color, height: 8)
-                    HStack {
+                    .padding(.bottom, 14)
+                    ProgressBarView(fraction: frac, color: barTone, height: 8)
+                    HStack(spacing: 6) {
                         Text("\(spent.formatMoney()) spent · \(Int(frac * 100))%")
-                        Spacer()
-                        Text("\((effective - spent).formatMoney()) left").fontWeight(.semibold)
-                            .foregroundStyle(color)
+                            .foregroundStyle(Palette.secondaryLabel)
+                        if let statusWord {
+                            Text(statusWord).fontWeight(.semibold).foregroundStyle(textTone)
+                        }
+                        Spacer(minLength: 4)
+                        // With carry-over the "left" reads on its own line below as the full effective
+                        // limit; without it, keep the compact "€X left" on the right.
+                        if carried == 0 {
+                            Text("\(remaining.formatMoney()) left").fontWeight(.semibold)
+                                .foregroundStyle(textTone)
+                        }
                     }
-                    .font(.footnote).foregroundStyle(Palette.secondaryLabel)
+                    .font(.footnote)
                     .padding(.top, 8)
+                    if carried > 0 {
+                        // State the effective limit inline so the base (big number) and the bar/"left"
+                        // reconcile on-screen — "€260 left of €1,240 · incl. €40 carried over" (B2).
+                        Text("\(remaining.formatMoney()) left of \(effective.formatMoney()) · incl. \(carried.formatMoney()) carried over")
+                            .font(.footnote).fontWeight(.semibold).foregroundStyle(textTone)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .padding(.top, 4)
+                    }
                 } else {
                     HStack(spacing: 6) {
                         Image(systemName: "plus.circle.fill")
@@ -504,7 +527,8 @@ struct BudgetView: View {
         let carried = carriedFor(key)
         let effective = s.amount + carried
         let frac = HomeView.fraction(sp, of: effective)
-        let color: Color = frac >= 1 ? Palette.bad : (frac >= 0.85 ? Palette.warn : Palette.good)
+        let barTone = Palette.budgetBarTone(frac)     // bright bar; text uses the accessible tone
+        let textTone = Palette.budgetTextTone(frac)
         return Button {
             categoryRoute = CategoryRoute(id: s.parent)
         } label: {
@@ -520,9 +544,10 @@ struct BudgetView: View {
                                 .font(.caption2).fontWeight(.semibold).foregroundStyle(Palette.good)
                         }
                         Text("\(sp.formatMoney()) / \(effective.formatMoney())")
-                            .font(.caption).fontWeight(.semibold).foregroundStyle(color)
+                            .font(.caption).fontWeight(.semibold).foregroundStyle(textTone)
+                            .lineLimit(1).minimumScaleFactor(0.8)
                     }
-                    ProgressBarView(fraction: frac, color: color, height: 4)
+                    ProgressBarView(fraction: frac, color: barTone, height: 4)
                 }
             }
             .padding(.horizontal, 16).padding(.vertical, 12)
@@ -535,6 +560,14 @@ struct BudgetView: View {
     private var categorySection: some View {
         VStack(spacing: 0) {
             sectionHeader("Category Budgets")
+            if isWeekly {
+                // Category budgets stay monthly even under the Weekly overall toggle — label it so the
+                // period mismatch isn't silent (B5).
+                Text("Category budgets are monthly")
+                    .font(.caption).foregroundStyle(Palette.secondaryLabel)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 16).padding(.bottom, 8)
+            }
             // 2 columns on iPhone; 3 within the readable single column on iPad.
             LazyVGrid(columns: adaptiveGridColumns(compact: 2, regular: 3,
                                                    isRegular: hSize == .regular, spacing: 10),
@@ -579,17 +612,29 @@ struct BudgetView: View {
                     .lineLimit(1)
                 if effective > 0 {
                     let frac = HomeView.fraction(spent, of: effective)
-                    let color: Color = frac >= 1 ? Palette.bad : (frac >= 0.85 ? Palette.warn : Palette.good)
+                    let textTone = Palette.budgetTextTone(frac)
+                    let statusWord = Self.budgetStatusWord(spent: spent, limit: effective)
                     Text("\(spent.formatMoney()) / \(effective.formatMoney())")
-                        .font(.caption).foregroundStyle(color)
+                        .font(.caption).foregroundStyle(textTone)
+                        .lineLimit(1).minimumScaleFactor(0.8)          // B6: single line, shrink for DE/HUF
                     if carried > 0 {
                         Text("+\(carried.formatMoney())")
                             .font(.caption2).fontWeight(.semibold).foregroundStyle(Palette.good)
                     }
+                    // Bar keeps the category's brand colour (mockup); the status WORD below carries the
+                    // caution signal so it isn't colour-only (B1).
                     ProgressBarView(fraction: frac, color: Color(argb: Categories.color(for: group)), height: 4)
+                    if let statusWord {
+                        Text(statusWord).font(.caption2).fontWeight(.semibold)
+                            .foregroundStyle(textTone).lineLimit(1).minimumScaleFactor(0.8)
+                    }
                 } else {
                     Text("Set a budget").font(.caption).foregroundStyle(Palette.tint)
-                    ProgressBarView(fraction: 0, color: .clear, height: 4)
+                    // B7: a real empty "set a budget" track (dashed) instead of an invisible clear bar.
+                    Capsule()
+                        .strokeBorder(Palette.separatorStrong,
+                                      style: StrokeStyle(lineWidth: 1, dash: [3, 3]))
+                        .frame(height: 4)
                 }
                 if subCount > 0 {
                     Text("\(subCount) sub-budget\(subCount == 1 ? "" : "s")")
