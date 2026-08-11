@@ -85,13 +85,15 @@ final class Recurring {
         }
     }
 
-    /// The entry's contribution to `window`, counting a recurring cadence only from the calendar month
-    /// it was added (`createdAt`) onward — so a salary or bill is never projected back onto months it
-    /// didn't yet exist for (a half-year view no longer shows 6× a just-added salary). A one-time entry
-    /// counts its full amount once, and only if it was added inside the window. Whole calendar-month
-    /// windows scale the monthly rate by eligible months; partial windows (a week step, a custom range,
-    /// or a pay-cycle month) scale by active days over an average month (30.4375). A direct port of
-    /// Android's `RecurringEntity.windowAmount` — the createdAt-clip that fixed the back-projection bug.
+    /// The entry's contribution to `window`, counting a recurring cadence only from the month it was
+    /// added (`createdAt`) onward — so a salary or bill is never projected back onto months it didn't
+    /// yet exist for (a half-year view no longer shows 6× a just-added salary). A one-time entry counts
+    /// its full amount once, and only if it was added inside the window. A window that is a whole number
+    /// of monthly steps from its own start day — the calendar month, the user's pay-cycle month (e.g.
+    /// the 10th → the 9th) and quarters/halves — counts by months, so one such period is exactly one
+    /// month's rate whatever its 28–31 day length; only genuinely partial windows (a week step, a custom
+    /// range) are day-scaled over an average month (30.4375). A direct port of Android's
+    /// `RecurringEntity.windowAmount` — the createdAt-clip that fixed the back-projection bug.
     func windowAmount(_ window: DateInterval, calendar cal: Calendar = .current) -> Decimal {
         if cadence == .once {
             return window.contains(createdAt) ? amount : 0
@@ -102,27 +104,30 @@ final class Recurring {
         let startDate = cal.startOfDay(for: window.start)
         // window.end is exclusive, so the last included day is the day before it.
         let lastDate = cal.startOfDay(for: cal.date(byAdding: .day, value: -1, to: window.end) ?? window.end)
+        let createdDay = cal.startOfDay(for: createdAt)
         let createdMonth = cal.date(from: cal.dateComponents([.year, .month], from: createdAt)) ?? startDate
         // Clip to the part of the window on/after the month the entry was added.
         let activeStart = max(startDate, createdMonth)
         if activeStart > lastDate { return 0 }
 
-        let daysInLastMonth = cal.range(of: .day, in: .month, for: lastDate)?.count ?? 0
-        let wholeMonths = cal.component(.day, from: startDate) == 1
-            && cal.component(.day, from: lastDate) == daysInLastMonth
-        if wholeMonths {
-            // Whole calendar-month window (the default month/quarter/half steps): count eligible whole
-            // months for clean integer scaling of the monthly rate.
-            let startMonth = cal.date(from: cal.dateComponents([.year, .month], from: startDate)) ?? startDate
-            let endMonth = cal.date(from: cal.dateComponents([.year, .month], from: lastDate)) ?? lastDate
-            var months = 0
-            var m = startMonth
-            while m <= endMonth {
-                if m >= createdMonth { months += 1 }
-                guard let next = cal.date(byAdding: .month, value: 1, to: m) else { break }
-                m = next
+        // Whole-month window: an exact integer number of monthly steps from the window's own start day —
+        // the calendar month (1st → next 1st), the user's pay-cycle month (e.g. the 10th → the 9th), and
+        // quarters/halves. Such a period counts as exactly one month's rate whether it spans 28 or 31
+        // days, instead of being day-scaled. `months == 0` ⇒ a genuine partial window (a week step or a
+        // custom range). A pay day clamped into a short month (29–31) can leave a boundary that isn't a
+        // clean month step; that rare case falls back to day-scaling below.
+        let endExclusive = cal.date(byAdding: .day, value: 1, to: lastDate) ?? lastDate
+        let months = cal.dateComponents([.month], from: startDate, to: endExclusive).month ?? 0
+        let landsExactly = cal.date(byAdding: .month, value: months, to: startDate) == endExclusive
+        if months >= 1 && landsExactly {
+            // Count only the month-steps whose occurrence began on/after the entry was added, so a plan
+            // is never projected back onto cycles before it existed (matches Android's clip).
+            var eligible = 0
+            for step in 0..<months {
+                let boundary = cal.date(byAdding: .month, value: step + 1, to: startDate) ?? endExclusive
+                if boundary > createdDay { eligible += 1 }
             }
-            return rate * Decimal(months)
+            return rate * Decimal(eligible)
         }
         // Partial window: scale by active days over an average month, matching Android's factor.
         let activeDays = (cal.dateComponents([.day], from: activeStart, to: lastDate).day ?? 0) + 1
