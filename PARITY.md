@@ -1122,3 +1122,19 @@ CSV/PDF export ANR, and Compose-tip plurals — no iOS equivalent.)
 `fix/android-blocker-parity-2026-08` off `main`, **unpushed/unmerged** — sim BUILD SUCCEEDED, the
 WellbeingEngine + RecurringPaid test suites green. Android side on 10 branches on
 `origin/Budgetty-Android`. LEFT: push iOS branch + open PRs both sides.
+
+---
+
+## Android → iOS — 2026-08-12 (11.2.2 / vc1122)
+
+- **Manage Categories toolbar double-inset gap** *(Android `c19d61a`)* — **NO PORT NEEDED.** Android's
+  `ManageCategoriesScreen` `TopAppBar` re-applied the status-bar inset that the parent NavHost
+  `Scaffold` already applied → a gap above the toolbar (fixed with `windowInsets =
+  WindowInsets(0,0,0,0)`). A Compose-`Scaffold`-nesting artifact with **no SwiftUI equivalent**: iOS
+  `ManageCategoriesView` is a native `List` + `.navigationTitle`, pushed via `NavigationLink`, so the
+  system nav bar applies the top safe-area inset exactly once. Codebase-wide check: 0 Swift files use
+  manual `statusBar` padding or `safeAreaInset(edge: .top)`. Verified 2026-08-12 (read the view + AccountView).
+- **detekt rule `TopAppBarInsetNotZeroed`** *(Android `a44058e`)* — Android build-tooling only (detekt +
+  Compose); **N/A on iOS.**
+- **Home & Budget design-audit revert** *(Android `288fb0c`)* — already handled on iOS (matching revert
+  `66fad82`). Not a new port.
