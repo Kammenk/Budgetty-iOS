@@ -1138,3 +1138,75 @@ WellbeingEngine + RecurringPaid test suites green. Android side on 10 branches o
   Compose); **N/A on iOS.**
 - **Home & Budget design-audit revert** *(Android `288fb0c`)* — already handled on iOS (matching revert
   `66fad82`). Not a new port.
+
+---
+
+## Android → iOS — 2026-08-22 — Buying limits (keyword purchase caps)
+
+New feature ported from the Android `feat/buying-limits` branch (ViewModels/repos/pure counter, not
+Compose). A limit = keywords + Weekly/Monthly + a count; Budgetty counts matching items off saved
+receipts and nudges in-app when a just-saved receipt brings a limit to/over its cap. iOS branch
+`feat/buying-limits`.
+
+- **Model / migration** — `Model/BuyingLimit.swift`: `@Model BuyingLimit { emoji, label,
+  keywords:[String] (normalized), timeframeRaw (BuyingLimitTimeframe .weekly/.monthly), count (floor
+  1), createdAt }`; `displayTitle` = label else first keyword capitalized; `normalizeKeyword`
+  (trim+lowercased, Cyrillic-safe) + `normalizedKeywords` (dedup, order-stable). Mirrors Android's
+  `BuyingLimitEntity`. **SwiftData migration = additive only:** `BuyingLimit.self` added to
+  `UserStore.models`; empty new table, no backfill — SwiftData lightweight-migrates it (the app has no
+  `VersionedSchema`/migration plan, so a new `@Model` is the whole change). Room's v25 has no analog
+  needed. `keywords` stored as a Swift `[String]` (vs Android's newline-joined column) — same normalized
+  contents, round-trips through backup.
+- **Counter (crown jewel)** — `Support/BuyingLimitCounter.swift`, pure 1:1 port: `matches` = any
+  keyword is a substring of the lowercased name (OR across keywords, case/Cyrillic-insensitive, no
+  diacritic stripping); `countInWindow` = Σ **quantity** of items whose timestamp ∈ window and match;
+  monthly window via existing `PayCycle`, weekly via `Calendar.firstWeekday`; `nextReset` = next
+  cycle/week start. Card count and the nudge call the same function so they always agree. Ported test
+  `BuyingLimitCounterTests` (13 cases: Σ qty, OR, substring/case/Cyrillic, monthly calendar + pay-cycle
+  boundaries, weekly Mon/Sun boundaries, nextReset).
+- **Preview** — `Support/BuyingLimitPreview.swift`, 1:1: distinct matching names (all-time) by total
+  qty, top 3 + "+n more"; window quantity; "too broad" = ≥6 distinct AND any keyword length ≤4;
+  suggestion = normalized label (if longer/new) else top match. Warning only — never blocks Save.
+- **List / gating** — `Scenes/BuyingLimits/BuyingLimitsView.swift` (`@Query` limits + line items;
+  derives bought + on-track/at-limit/over per card). Free = **1** limit (`BuyingLimitQuota.freeLimit`);
+  at cap the Add row locks → paywall. `PremiumBenefits` gains "Unlimited buying limits" (id `limits`,
+  detail from the constant) between widgets and themes.
+- **Editor** — `Scenes/BuyingLimits/BuyingLimitEditorSheet.swift`: emoji (reuses `EmojiPickerSheet`) +
+  label, keyword chip input (commit on space/comma/return via ported `commitKeywordInput`, removable,
+  Cyrillic-safe), live match preview (matches / no-match / amber "catching a lot" + suggestion pill),
+  `GlassSegmentedControl` Weekly|Monthly, − [n] + stepper (floor 1). Save floors count at 1, normalizes
+  + dedupes keywords, preserves `createdAt` on edit.
+- **Nudge** — `Scenes/BuyingLimits/BuyingLimitNudge.swift` (`BuyingLimitNudge`,
+  `BuyingLimitNudgeCenter` @Observable app-scoped hand-off = Android's `BuyingLimitNudgeBus`,
+  `BuyingLimitNudger.evaluate`). `ScanFlowView.save()` computes it for **new receipts only**
+  (`ReceiptDraft.isNewReceipt`) off the just-saved rows + live store: `contributed > 0` AND
+  `countAfter ≥ count` qualifies; most-over wins (then higher count, then most-recent createdAt).
+  `BuyingLimitNudgeCard` floats over the live shell (no scrim) above the dock; copy = "Heads up —
+  that's {n}× {keyword} this {week/month} (limit {n})", Got it / View limits.
+- **Backup** — `Data/Backup.swift`: `BuyingLimitDTO` + `buyingLimits` on `BackupFile`, export + restore
+  (fresh ids, keywords re-normalized). Field is **Optional** (`[BuyingLimitDTO]?`) so a pre-feature
+  backup still decodes (Swift's synthesized `Decodable` throws on a missing non-optional key — verified
+  — same reason `CategoryDTO.parent` is optional). `BuyingLimitsBackupRestoreTests` (round-trip + a
+  legacy backup missing the field imports cleanly).
+- **Timestamp source (justified deviation)** — Android windows on the transaction timestamp
+  (= the receipt's made-date, `receiptDate`); iOS windows on `LineItem.createdAt` (the upload moment),
+  because that is the field Home/Insights already filter every period by on iOS. Using it keeps the
+  buying-limit window consistent with the rest of the iOS app; card and nudge use it identically so they
+  agree. Behaviour is identical for same-day scans (the common case).
+- **Nudge host (justified native deviation)** — Android hosts the nudge on Home (its post-upload nav
+  lands there). iOS's scan is a shell-level `fullScreenCover`, so the nudge is hosted on the shell
+  (`RootView`, above the custom dock) and shows over whatever tab the user lands on — guaranteeing it's
+  seen post-scan. "View limits" presents the screen as a sheet. The custom dock is untouched.
+- **Account entry** — a "Buying limits" row in `AccountView` just before "Manage categories" (iOS has
+  no separate Category-rules row; category rules live in a sheet), `chart.bar.xaxis` glyph → pushes
+  `BuyingLimitsView`.
+- **Localization** — 42 new keys in `Localizable.xcstrings` across all 16 locales (English source + 15
+  translations ported verbatim from Android's `values-*`, format specifiers converted `%1$d`→`%1$lld`,
+  `%1$s`→`%1$@`); the "N bought this week/month" plural authored as a String Catalog substitution
+  (one/few/many/other per CLDR). Reused 7 existing keys (Weekly, Monthly, Got it, resets %@, this
+  week/month, Free plan includes %lld).
+
+**Status (2026-08-22):** PORTED on `feat/buying-limits` (off `main`), unpushed/unmerged. `xcodebuild`
+BUILD SUCCEEDED (iPhone 17 sim, iOS 26); full test suite green (152 tests, incl. the 2 new suites);
+simctl smoke-verified — screen (empty→cards with status/pips/meta, locked+unlock) and the save-time
+nudge over live Home both render to the mockup. Deep-flow device testing deferred to the user.

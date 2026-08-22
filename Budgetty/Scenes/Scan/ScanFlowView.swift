@@ -16,6 +16,7 @@ struct ScanFlowView: View {
     @Environment(\.modelContext) private var context
     @Environment(\.dismiss) private var dismiss
     @Environment(\.requestReview) private var requestReview
+    @Environment(BuyingLimitNudgeCenter.self) private var buyingLimitNudge
 
     private enum Phase: Equatable { case capture, reading, review, failed(String) }
     @State private var phase: Phase = .capture
@@ -325,7 +326,19 @@ struct ScanFlowView: View {
         // before `dismiss()` tears the sheet down would run the whole save again — minting a fresh
         // receipt (a duplicate) and double-counting the scan quota. Mirrors Android's finalize guard.
         guard !draft.hasSaved else { return }
-        draft.persist(into: context, isManual: isManual)
+        let isNew = draft.isNewReceipt
+        let stamp = draft.persist(into: context, isManual: isManual)
+        // Save-time buying-limit nudge — new receipts only (an edit re-save doesn't re-nudge), computed
+        // off the just-saved rows against the live store. Non-blocking: the receipt is already saved.
+        if isNew {
+            let savedItems = draft.items
+                .map { CountableItem(name: $0.name.trimmingCharacters(in: .whitespaces),
+                                     quantity: $0.quantity, timestamp: stamp) }
+                .filter { !$0.name.isEmpty }
+            if let nudge = BuyingLimitNudger.evaluate(savedItems: savedItems, in: context) {
+                buyingLimitNudge.post(nudge)
+            }
+        }
         // Only a successful, finalized scan counts against the free quota — failed reads and
         // abandoned reviews never got here, and manual entry is always free. The rating gate rides
         // the exact same guard: a finalized scan is both what burns a free scan and what can earn a

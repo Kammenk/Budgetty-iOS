@@ -90,12 +90,14 @@ final class ReceiptDraft: Identifiable {
     func remove(_ item: DraftItem) { items.removeAll { $0.id == item.id } }
 
     /// Save as a real receipt. When editing, update in place (keeping the original upload moment);
-    /// otherwise insert a new receipt with `createdAt` = now.
+    /// otherwise insert a new receipt with `createdAt` = now. Returns the timestamp the line items
+    /// were stamped with, so the caller can window the save-time buying-limit nudge on the same moment.
     @MainActor
-    func persist(into context: ModelContext, isManual: Bool = false) {
+    @discardableResult
+    func persist(into context: ModelContext, isManual: Bool = false) -> Date {
         // Latch against a re-entrant save (see `hasSaved`): the edit path calls this directly, so the
         // guard lives here as well as in `ScanFlowView.save()`.
-        guard !hasSaved else { return }
+        guard !hasSaved else { return editing?.createdAt ?? .now }
         hasSaved = true
         let cleanStore = store.isEmpty ? "Unknown" : store
         let receipt: Receipt
@@ -126,5 +128,11 @@ final class ReceiptDraft: Identifiable {
             context.insert(li)
         }
         try? context.save()
+        return stamp
     }
+
+    /// True when this draft creates a brand-new receipt (not an edit of an existing one). The save-time
+    /// buying-limit nudge fires only for new receipts, so editing an old receipt that still matches a
+    /// keyword doesn't re-nudge — mirrors Android's `if (editing == null)` guard.
+    var isNewReceipt: Bool { editing == nil }
 }

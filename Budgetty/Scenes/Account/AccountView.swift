@@ -199,6 +199,11 @@ struct AccountView: View {
             }
             .buttonStyle(.plain)
             divider
+            NavigationLink { BuyingLimitsView() } label: {
+                row("Buying limits", "chart.bar.xaxis", Color(argb: 0xFF30B0C7)) { chevron }
+            }
+            .buttonStyle(.plain)
+            divider
             NavigationLink { ManageCategoriesView() } label: {
                 row("Manage categories", "square.grid.3x3.fill", Color(argb: 0xFFFF9F0A)) { chevron }
             }

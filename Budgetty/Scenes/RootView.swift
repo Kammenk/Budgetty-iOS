@@ -62,6 +62,9 @@ struct RootView: View {
     /// Measured height of `bottomChrome`, handed to the tab roots so their scroll content clears it.
     @State private var chromeHeight: CGFloat = 0
     @Environment(\.horizontalSizeClass) private var hSize
+    @Environment(BuyingLimitNudgeCenter.self) private var buyingLimitNudge
+    @AppStorage(SettingsKey.monthStartDay) private var monthStartDay = 1
+    @State private var showBuyingLimits = false
     @Namespace private var dockNS
 
     var body: some View {
@@ -77,10 +80,39 @@ struct RootView: View {
             #endif
         }
         .fullScreenCover(isPresented: $showScan) { ScanFlowView().coversFloatingDock() }
+        // The save-time buying-limit nudge floats over the live shell (no scrim) just above the dock —
+        // shown wherever the user lands after the scan cover dismisses, so it's never missed. "View
+        // limits" opens the Buying limits screen; the receipt is already saved either way.
+        .overlay(alignment: .bottom) { nudgeOverlay }
+        .sheet(isPresented: $showBuyingLimits) { NavigationStack { BuyingLimitsView().coversFloatingDock() } }
         .onAppear {
             #if DEBUG
             if ProcessInfo.processInfo.environment["SHOW_SCAN"] == "1" { showScan = true }
+            if ProcessInfo.processInfo.environment["BL_NUDGE"] == "1", buyingLimitNudge.pending == nil {
+                buyingLimitNudge.post(BuyingLimitNudge(title: "Fizzy drinks", emoji: "🥤",
+                    countAfter: 4, limitCount: 3, timeframe: .monthly))
+            }
             #endif
+        }
+    }
+
+    /// The floating nudge card, lifted clear of the dock chrome. Padding is tuned so it clears the
+    /// custom dock (compact) / tab-bar accessory (regular) without covering it.
+    @ViewBuilder
+    private var nudgeOverlay: some View {
+        if let nudge = buyingLimitNudge.pending {
+            BuyingLimitNudgeCard(
+                nudge: nudge,
+                monthStartDay: monthStartDay,
+                onDismiss: { withAnimation(.spring(duration: 0.3)) { buyingLimitNudge.clear() } },
+                onView: {
+                    buyingLimitNudge.clear()
+                    showBuyingLimits = true
+                }
+            )
+            .padding(.horizontal, 14)
+            .padding(.bottom, hSize == .compact ? chromeHeight + Dimens.spaceS : 96)
+            .transition(.move(edge: .bottom).combined(with: .opacity))
         }
     }
 
@@ -285,13 +317,14 @@ struct RootView: View {
         case "widgets": NavigationStack { WidgetsView() }
         case "lock": LockScreenView(onUnlocked: {})
         case "memory": DebugMemorySheet()
+        case "buyinglimits": NavigationStack { DebugBuyingLimits() }
         default: EmptyView().hidden()
         }
     }
 
     private var hasDebugPreview: Bool {
         ["account", "paywall", "receipt", "category", "review",
-         "notifications", "support", "widgets", "lock", "memory"]
+         "notifications", "support", "widgets", "lock", "memory", "buyinglimits"]
             .contains(ProcessInfo.processInfo.environment["SHOW_SCREEN"] ?? "")
     }
     #endif
@@ -344,6 +377,39 @@ private struct DebugMemorySheet: View {
             CategoryMemorySheet(itemName: "Wholegrain bread", oldCategory: "Snacks & Sweets",
                                 newCategory: "Bakery") { _ in }
         }
+    }
+}
+#endif
+
+#if DEBUG
+/// Seeds three buying limits (on-track / at-limit / over) plus matching line items, for the
+/// SHOW_SCREEN=buyinglimits screenshot hook — the screen derives its counts off real line items.
+private struct DebugBuyingLimits: View {
+    @Environment(\.modelContext) private var context
+    @Query private var limits: [BuyingLimit]
+
+    var body: some View {
+        BuyingLimitsView().onAppear(perform: seed)
+    }
+
+    private func seed() {
+        guard limits.isEmpty else { return }
+        let now = Date()
+        let receipt = Receipt(createdAt: now, store: "Debug", date: now)
+        context.insert(receipt)
+        for (name, qty) in [("Red Bull 250ml", 1), ("Coffee latte", 5),
+                            ("Coca-Cola 1L", 2), ("Fanta Orange", 2)] {
+            let li = LineItem(name: name, createdAt: now, price: 1, quantity: qty)
+            li.receipt = receipt
+            context.insert(li)
+        }
+        context.insert(BuyingLimit(emoji: "⚡", label: "Energy drinks",
+                                   keywords: ["red bull", "monster"], timeframe: .weekly, count: 2))
+        context.insert(BuyingLimit(emoji: "☕", label: "Takeaway coffee",
+                                   keywords: ["coffee"], timeframe: .weekly, count: 5))
+        context.insert(BuyingLimit(emoji: "🥤", label: "Fizzy drinks",
+                                   keywords: ["coke", "cola", "fanta"], timeframe: .monthly, count: 3))
+        try? context.save()
     }
 }
 #endif
