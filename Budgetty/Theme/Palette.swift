@@ -217,6 +217,27 @@ enum Palette {
     /// (light rgba(25,12,60,.28)/(.14) · dark rgba(0,0,0,.55)/(.32)).
     static let dropShadow = dynamic(light: 0x47190C3C, dark: 0x8C000000)
     static let dropShadowSoft = dynamic(light: 0x24190C3C, dark: 0x52000000)
+
+    // MARK: - End-of-period Recap band backdrops
+    //
+    // The Wrapped-style story cards each sit on a full-screen tonal band — the recap mockup's
+    // `--pc/--goodc/--warnc/--greatc/--secc/--sch` container tints. Pinned dynamic (light/dark) so
+    // every card themes correctly in dark with no hard-coded greys (Android maps these to the M3
+    // *Container roles). Card content uses `Palette.label` on top; the inner panels bring the glass
+    // material. Kept soft so the neutral label reads on all six in both themes.
+
+    /// `--pc` primary container: the cover + focus backdrop (violet wash).
+    static let recapPrimary = dynamic(light: 0xFFEBE4FA, dark: 0xFF241E3C)
+    /// `--goodc` good container: an improved-total / on-track-pace backdrop (green wash).
+    static let recapGood = dynamic(light: 0xFFDDF2E2, dark: 0xFF13301D)
+    /// `--warnc` warn container: a spent-more / limits backdrop (amber wash).
+    static let recapWarn = dynamic(light: 0xFFFBEAD6, dark: 0xFF382913)
+    /// `--greatc` deeper-green container: the budget-&-streak backdrop.
+    static let recapGreat = dynamic(light: 0xFFCBEBD3, dark: 0xFF103A23)
+    /// `--secc` secondary container: the wellbeing-score backdrop (calm blue).
+    static let recapSecondary = dynamic(light: 0xFFDCE7F5, dark: 0xFF15273A)
+    /// `--sch` neutral surface container: the biggest-mover backdrop.
+    static let recapNeutral = dynamic(light: 0xFFECEBF1, dark: 0xFF211F2C)
 }
 
 // MARK: - Page canvas

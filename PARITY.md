@@ -1210,3 +1210,79 @@ receipts and nudges in-app when a just-saved receipt brings a limit to/over its 
 BUILD SUCCEEDED (iPhone 17 sim, iOS 26); full test suite green (152 tests, incl. the 2 new suites);
 simctl smoke-verified — screen (empty→cards with status/pips/meta, locked+unlock) and the save-time
 nudge over live Home both render to the mockup. Deep-flow device testing deferred to the user.
+
+## Android → iOS — 2026-08-22 — End-of-period Recap (Wrapped-style story)
+
+Ported the **End-of-period Recap** — a once-per-period interstitial that, on the first app open after a
+week/month closes, shows a Spotify-Wrapped-style card sequence of the period's spending vs the previous
+one. Built on `feat/recap` (off `feat/buying-limits`, so the Buying-limits types exist). Direction B
+(the story) only — the scrollable Direction A was rejected. Ported from the Android `feat/recap`
+ViewModels/provider, not Compose.
+
+- **Model** — `Support/RecapModel.swift` (port of `RecapModel.kt` + `RecapFrequency`): `RecapKind`,
+  `RecapFrequency` (weekly/monthly/both, raw-string, `.current` defaults monthly), `RecapBand`,
+  `RecapPillTone`, `RecapSegStatus`, `RecapLimitChip`, `RecapSecondMover`, `RecapFocus`, the `RecapCard`
+  enum (cover/total/score/mover/budgetStreak/limits/pace/focus, each raw figures only), `RecapStory`.
+  YearMonth → `Date` (cycle starts) since Swift has no YearMonth; the view formats month names.
+- **Scheduler (the tested surface)** — `Support/RecapScheduler.swift` (port of `RecapScheduler` +
+  `RecapDataGuard`): `justClosedMonthId` = `PayCycle.month(offset:-1)` `yyyy-MM`; `justClosedWeekId` =
+  previous week's start (locale `firstWeekday`) ISO date; `due()` (disabled→nil; monthlyDue = freq≠weekly
+  && lastShownMonth≠id; weeklyDue = freq≠monthly && lastShownWeek≠id; monthly wins & marks both when both
+  due); `RecapDataGuard.evaluate` (< 5 receipts OR no period spend → skip; else show, `withComparison` =
+  priorPeriodHasSpend). Pure; calendar/firstWeekday injectable for tests.
+- **Builder** — `Support/RecapBuilder.swift` (port of `RecapProvider`): reuses `PayCycle`,
+  `Receipt.paidTotal`/`LineItem.lineTotal` spend, `WellbeingEngine.score` over the just-closed month
+  offset (+ prev for the delta; the score-input derivation MIRRORS `WellbeingScan.inputsFor`, keep in
+  step), `SubscriptionScan`/`SavingsMath` for the score components, `BuyingLimitCounter` for limits (a
+  weekly-timeframe limit → its worst single week vs cap), category movers + budget outcome + streak.
+  Tough-month variant (spend up ≥ 8% or score down ≤ −5): total(amber)/mover(rise)/focus, no
+  score/streak/limits. **Omits** activity counts + the savings-goal bar (7-card ceiling), matching Android.
+- **Story view** — `Scenes/Recap/RecapStoryView.swift` (port of `RecapStoryScreen`): full-screen pager
+  on tonal band backdrops (new `Palette.recap*` tokens = the mockup `--pc/--goodc/--warnc/--greatc/
+  --secc/--sch` containers, theme-aware). Segmented progress bar, ✕ header (bar title + tag), one big
+  figure + one sentence per card, Done (`ctaPill`) + See details only on the last card. Tap right ⅔
+  advances / left ⅓ back / swipe (a `SpatialTapGesture` + `DragGesture` on an interaction layer under
+  the chrome, so buttons keep priority). Reuses `SavingsRing` + `wbBandColor`/`wbBandWord` for the score
+  card, `ProgressBarView` for the pace bar, `.ultraThinMaterial` panels for the budget/pace blocks + chips.
+- **Reopen** — `Scenes/Recap/RecapReopenView.swift` (port of `RecapReopenScreen`/`RecapReopenRow` +
+  `RecapViewModel.reopen` `lastShownTarget`): recomputes the most-recently-ended period's story on demand;
+  `RecapReopenRow` shown in Insights only once a recap has been generated.
+- **Trigger gate + persistence** — the cheap `RecapScheduler.due` check runs in `RootView.task` (once
+  per session, deferred past the app-lock via a new `\.appLocked` environment flag set by `AppLockGate`
+  so a recap never presents over the lock); on a boundary it builds the story off the just-closed period
+  and hosts it as a **`fullScreenCover` on the shell** (the scan idiom; the custom dock untouched) — the
+  iOS analogue of Android's `RecapGate` layered after the quiz gate (iOS shows `RootView` only
+  post-auth/quiz). On close/skip/see-details it stamps the last-shown keys; a guard-skip stamps + shows
+  nothing (with ANY receipts; a store with **zero** receipts is left un-stamped so a later cold launch
+  re-checks once data exists — hardens against the store not being ready, user-visible behaviour
+  identical to Android since the guard shows nothing either way). 4 keys in `SettingsKey`
+  (`recap.enabled` default true, `recap.frequency` default monthly, `recap.lastShownWeek`,
+  `recap.lastShownMonth`); the two last-shown keys reset in `UserState.clear()` on sign-out (cadence
+  kept, device-global — Android parity).
+- **Settings** — a new **RECAP** group in `AccountView` (between Preferences and Privacy & Security):
+  master `Toggle` (default on, reveals more like the app-lock group), `GlassSegmentedControl`
+  Weekly|Monthly|Both (default Monthly), a next-date hint line, an honesty footnote under the card.
+- **Insights re-open entry** — `recapEntry` pinned under the Wellbeing row in all three layouts,
+  presents `RecapReopenView` as a `fullScreenCover`.
+- **Localization** — 51 new keys in `Localizable.xcstrings` across all 16 locales (English source keys +
+  15 translations ported verbatim from Android's `values-*/strings.xml`, `%1$s`→`%1$@` / `%1$d`→`%1$lld`
+  in the *values*, plain `%@`/`%lld` in the *keys* to match SwiftUI's synthesized lookup keys). Reused
+  existing keys (This week, vs last week, %@ left, Weekly, Monthly, Done, Close, the 4 wellbeing band
+  words). `knownRegions` already covered all 16 — no change. Limit-chip line rendered verbatim (numbers
+  only, no words) — matches Android's `recap_limits_chip`.
+- **Justified native deviations:**
+  - **No new content model / migration** — confirmed (matches Android): only the 4 settings keys.
+  - **Score band colour** uses the iOS Wellbeing ring's `wbBandColor` (needsWork = red) rather than
+    Android's amber, so the recap score card matches the Wellbeing screen the user already sees. The
+    tough-month total/mover accents still use amber (never red), per the design.
+  - **Trigger placement** — Android returns the story from `RecapGate` before `MainScaffold`; iOS hosts
+    it as a shell `fullScreenCover` gated on the app-lock clearing (the scan flow's idiom). Both fire
+    once per completed period on first open, dismiss to Home, no notifications, no background work.
+  - **Dismiss affordance** — ✕ (a fullScreenCover has no grabber); the mockup's grabber is Compose-only.
+
+**Status (2026-08-22):** PORTED on `feat/recap` (off `feat/buying-limits`), unpushed/unmerged.
+`xcodebuild` BUILD SUCCEEDED (iPhone 17 sim, iOS 26); full test suite green (**171 tests**, incl. the new
+19-test `RecapSchedulerTests` mirroring Android's `RecapSchedulerTest`). simctl-verified all card types
+against the mockup (cover, total w/ comparison pill, score ring, mover, budget+streak w/ segment bar,
+limits chips, focus w/ Done CTA) — plus the real interstitial firing end-to-end from sample data and
+French localization live. Deep-flow device testing (real boundary crossing, Both cadence) deferred.

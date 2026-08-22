@@ -22,6 +22,8 @@ struct AccountView: View {
     @AppStorage(SettingsKey.faceID) private var faceID = false
     @AppStorage(SettingsKey.appLockEnabled) private var appLockEnabled = false
     @AppStorage(SettingsKey.autoLockMinutes) private var autoLockMinutes = 0
+    @AppStorage(SettingsKey.recapEnabled) private var recapEnabled = true
+    @AppStorage(SettingsKey.recapFrequency) private var recapFrequencyRaw = RecapFrequency.monthly.rawValue
     @AppStorage(SettingsKey.crashReporting) private var crashReporting = true
     @AppStorage(SettingsKey.premium) private var premium = false
     private let theme = AppTheme.shared
@@ -58,6 +60,11 @@ struct AccountView: View {
 
                 sectionHeader("Preferences")
                 preferencesCard
+                    .padding(.bottom, 24)
+
+                sectionHeader("Recap")
+                recapCard
+                recapFootnote
                     .padding(.bottom, 24)
 
                 sectionHeader("Privacy & Security")
@@ -268,6 +275,80 @@ struct AccountView: View {
             .buttonStyle(.plain)
         }
         .contentCard(cornerRadius: 14)
+    }
+
+    /// The "Recap" group: a master switch (default on) turns the end-of-period recap on/off; when on it
+    /// reveals a Weekly | Monthly | Both selector and a hint naming when the next one lands, with an
+    /// honesty footnote below the card. Modelled on the app-lock group's on/reveals-more shape. Turning
+    /// it off keeps the stored cadence, so switching back on doesn't re-ask. Free. Android parity:
+    /// `RecapSectionRows`.
+    private var recapCard: some View {
+        VStack(spacing: 0) {
+            Toggle(isOn: $recapEnabled) {
+                HStack(spacing: 12) {
+                    SettingsIcon(symbol: "calendar.badge.checkmark", background: Color(argb: 0xFFAF52DE))
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("End-of-period recap").foregroundStyle(Palette.label)
+                        Text(recapEnabled ? "A summary when the period closes"
+                                          : "Get a summary when a month or week closes")
+                            .font(.caption).foregroundStyle(Palette.secondaryLabel)
+                    }
+                }
+            }
+            .tint(Palette.good)
+            .padding(.vertical, 8).padding(.horizontal, 16)
+            if recapEnabled {
+                divider
+                VStack(alignment: .leading, spacing: 12) {
+                    GlassSegmentedControl(options: RecapFrequency.allCases,
+                                          selection: recapFrequencyBinding) { recapTitle($0) }
+                    Text(recapHint(RecapFrequency(rawValue: recapFrequencyRaw) ?? .monthly))
+                        .font(.caption).foregroundStyle(Palette.secondaryLabel)
+                }
+                .padding(.horizontal, 16).padding(.vertical, 12)
+            }
+        }
+        .contentCard(cornerRadius: 14)
+    }
+
+    private var recapFootnote: some View {
+        Text(recapEnabled
+             ? "Not a notification. It appears the next time you open Budgetty after the period ends, once per period, and closes to Home."
+             : "Turn this on to get a short summary when a month or week closes. You can still open the last one from Insights.")
+            .font(.caption).foregroundStyle(Palette.secondaryLabel)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 16).padding(.top, 8)
+    }
+
+    private var recapFrequencyBinding: Binding<RecapFrequency> {
+        Binding(get: { RecapFrequency(rawValue: recapFrequencyRaw) ?? .monthly },
+                set: { recapFrequencyRaw = $0.rawValue })
+    }
+
+    private func recapTitle(_ frequency: RecapFrequency) -> LocalizedStringKey {
+        switch frequency {
+        case .weekly: "Weekly"
+        case .monthly: "Monthly"
+        case .both: "Both"
+        }
+    }
+
+    /// The hint line under the cadence selector, naming when the next recap lands (Android's `recapHint`).
+    private func recapHint(_ frequency: RecapFrequency) -> LocalizedStringKey {
+        let cal = Calendar.current
+        let weekday = cal.weekdaySymbols[(cal.firstWeekday - 1) % 7]
+        let nextStart = PayCycle.month(.now, startDay: monthStartDay, offset: 1).start
+        let f = DateFormatter()
+        f.setLocalizedDateFormatFromTemplate("d MMM")
+        let nextMonthly = f.string(from: nextStart)
+        switch frequency {
+        case .weekly:
+            return "Every \(weekday), for the week just finished. No monthly report card."
+        case .monthly:
+            return "Next one on \(nextMonthly) — monthly follows your pay-cycle start day."
+        case .both:
+            return "Every \(weekday), and again on \(nextMonthly) for the month. The weekly one is a short momentum check."
+        }
     }
 
     /// Security group: the app-lock PIN gate (with biometrics as an optional shortcut and the

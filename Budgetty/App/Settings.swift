@@ -39,6 +39,17 @@ enum SettingsKey {
     static let scanAIConsent = "pref.scanAIConsent"
     /// Dismissed Wellbeing tips, as newline-separated "periodId|tipId" entries (see WellbeingTipsStore).
     static let dismissedWellbeingTips = "wellbeing.dismissedTips"
+    // ── End-of-period recap ──
+    /// Whether the end-of-period recap interstitial is shown at all. Default on. Device-global (like
+    /// appearance) — NOT reset on sign-out. See `RecapScheduler`.
+    static let recapEnabled = "recap.enabled"
+    /// Which period(s) trigger a recap (`RecapFrequency` raw value). Default MONTHLY. Device-global.
+    static let recapFrequency = "recap.frequency"
+    /// ISO date (yyyy-MM-dd) of the start of the last weekly recap already shown; empty = none yet.
+    /// Per-user timing — reset on sign-out so the next account gets fresh boundaries.
+    static let recapLastShownWeek = "recap.lastShownWeek"
+    /// Pay-cycle month id (yyyy-MM) of the last monthly recap already shown; empty = none yet. Per-user.
+    static let recapLastShownMonth = "recap.lastShownMonth"
 }
 
 /// Wipes every setting tied to the signed-in account — the app-lock PIN + biometric, the one-time
@@ -58,6 +69,10 @@ enum UserState {
             SettingsKey.dismissedWellbeingTips,
             SettingsKey.appLockEnabled,
             SettingsKey.faceID,
+            // Per-user recap timing (not the cadence preference, which is device-global like appearance):
+            // reset so the next account on a shared device gets fresh recap boundaries. Android parity.
+            SettingsKey.recapLastShownWeek,
+            SettingsKey.recapLastShownMonth,
             HomeLayoutStore.orderKey,
             HomeLayoutStore.hiddenKey,
             InsightsLayoutStore.orderKey,
