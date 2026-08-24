@@ -39,6 +39,13 @@ enum SettingsKey {
     static let scanAIConsent = "pref.scanAIConsent"
     /// Dismissed Wellbeing tips, as newline-separated "periodId|tipId" entries (see WellbeingTipsStore).
     static let dismissedWellbeingTips = "wellbeing.dismissedTips"
+    /// Insights planned recurring-bills overlay opt-in (default off). When on, the Breakdown / Trend
+    /// sections draw planned bills as a distinct hatched "planned" layer. Per-user (reset on sign-out).
+    /// Android parity: `SettingsStore` KEY_INCLUDE_RECURRING_BILLS.
+    static let insightsIncludeRecurringBills = "insights.includeRecurringBills"
+    /// Whether the one-time "Insights and Home disagree — overlay planned bills?" discovery nudge has
+    /// been dismissed. Per-user. Android parity: `SettingsStore` KEY_OVERLAY_NUDGE_DISMISSED.
+    static let insightsOverlayNudgeDismissed = "insights.overlayNudgeDismissed"
 }
 
 /// Wipes every setting tied to the signed-in account — the app-lock PIN + biometric, the one-time
@@ -58,6 +65,10 @@ enum UserState {
             SettingsKey.dismissedWellbeingTips,
             SettingsKey.appLockEnabled,
             SettingsKey.faceID,
+            // Insights planned-bills overlay opt-in + its one-time nudge dismissal — per-user, so the
+            // next account on a shared device starts with the overlay off and the nudge fresh.
+            SettingsKey.insightsIncludeRecurringBills,
+            SettingsKey.insightsOverlayNudgeDismissed,
             HomeLayoutStore.orderKey,
             HomeLayoutStore.hiddenKey,
             InsightsLayoutStore.orderKey,

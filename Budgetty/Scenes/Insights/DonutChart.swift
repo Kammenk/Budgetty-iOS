@@ -15,12 +15,21 @@ struct DonutChart: View {
     var lineWidth: CGFloat = 18
     /// When set, that slice is emphasised (full opacity, a touch thicker) and the others recede.
     var selectedIndex: Int? = nil
-    /// Tapping the ring reports the slice under the touch (by angle).
+    /// The planned recurring-bills overlay: the share of the ring — planned / (spend + planned) — given
+    /// to a single hatched "Bills · planned" wedge appended after the category arcs. When set (> 0) the
+    /// category arcs are compressed into the remaining `spend` share, so the ring reads spend + bills,
+    /// but their percentages (owned by the caller's legend) stay a share of spend. `nil`/0 = off.
+    var plannedFraction: CGFloat? = nil
+    /// Tapping the ring reports the slice under the touch (by angle). Kept last so callers can pass it
+    /// as a trailing closure after `plannedFraction`.
     var onSelect: ((Int) -> Void)? = nil
 
     private var total: Double { max(slices.reduce(0) { $0 + $1.value }, 0.0001) }
     /// Reserve room for the emphasised (thicker) stroke so it never clips at the frame edge.
     private var maxLineWidth: CGFloat { lineWidth + 4 }
+    /// The share of the ring the category arcs occupy — the whole ring when off, `1 − plannedFraction`
+    /// when the overlay is on (the rest is the hatched planned wedge).
+    private var spendScale: CGFloat { plannedFraction.map { max(0, min(1, 1 - $0)) } ?? 1 }
 
     var body: some View {
         GeometryReader { geo in
@@ -36,6 +45,24 @@ struct DonutChart: View {
                 .rotationEffect(.degrees(-90))
                 .padding(maxLineWidth / 2)
                 .animation(.easeInOut(duration: 0.18), value: selectedIndex)
+
+                // The single hatched "Bills · planned" wedge filling the remainder of the ring. The
+                // hatch itself is drawn un-rotated (so its 135° angle matches Home's planned texture);
+                // only the ring-band mask is rotated to the 12-o'clock start the category arcs use.
+                if let pf = plannedFraction, pf > 0 {
+                    Rectangle()
+                        .fill(Palette.plan.opacity(0.12))
+                        .overlay(HatchStripes(step: 5).stroke(Palette.plan, lineWidth: 1.2))
+                        .mask {
+                            Circle()
+                                .trim(from: spendScale, to: 1)
+                                .stroke(style: StrokeStyle(lineWidth: lineWidth, lineCap: .butt))
+                                .rotationEffect(.degrees(-90))
+                                .padding(maxLineWidth / 2)
+                        }
+                        .opacity(selectedIndex == nil ? 1 : 0.28)
+                        .animation(.easeInOut(duration: 0.18), value: selectedIndex)
+                }
 
                 // Un-rotated, full-area tap layer so the tap location stays in screen space (a tap
                 // gesture doesn't block the surrounding ScrollView the way a 0-distance drag would).
@@ -64,7 +91,8 @@ struct DonutChart: View {
         return slices.map { s in
             let start = acc / total
             acc += s.value
-            return (s.color, CGFloat(start), CGFloat(acc / total))
+            // Compress the category arcs into the `spend` share when the planned overlay is on.
+            return (s.color, CGFloat(start) * spendScale, CGFloat(acc / total) * spendScale)
         }
     }
 
@@ -76,6 +104,9 @@ struct DonutChart: View {
         let deg = atan2(p.y - center.y, p.x - center.x) * 180 / .pi
         var f = (deg + 90) / 360
         f -= f.rounded(.down)                                    // wrap into [0, 1)
+        // The hatched planned wedge (in [spendScale, 1)) is non-interactive — a tap there selects
+        // nothing, matching Android (the per-bill makeup lives in the Breakdown sheet).
+        if plannedFraction != nil, f >= spendScale { return nil }
         let segs = bounds()
         for (i, s) in segs.enumerated() where f >= s.start && f < s.end { return i }
         return segs.indices.last

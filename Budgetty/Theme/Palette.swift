@@ -187,6 +187,13 @@ enum Palette {
     static let secondaryLabel = dynamic(light: 0x943C3C43, dark: 0x8CEBEBF5)          // --label2
     static let tertiaryLabel = dynamic(light: 0x403C3C43, dark: 0x40EBEBF5)           // --label3
 
+    /// `--plan`: the neutral muted ink of the shared "planned, not yet real" hatch — the diagonal
+    /// texture that reads as "planned recurring bills" identically on Home's spent-vs-planned strip
+    /// and in the Insights recurring-bills overlay. Deliberately a neutral (never a category hue or a
+    /// status colour), sitting between label2 and label3 (mockup light rgba(60,60,67,.4) · dark
+    /// rgba(235,235,245,.36)). Android parity: `outlineVariant`.
+    static let plan = dynamic(light: 0x663C3C43, dark: 0x5CEBEBF5)
+
     // MARK: - Signature glass CTA (Scan)
 
     /// The prominent Scan button stays a rich colour in *both* themes (mockup `--lg-cta`), so it

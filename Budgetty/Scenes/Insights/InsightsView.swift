@@ -28,6 +28,14 @@ struct InsightsView: View {
     /// The pay-cycle start day; the money-flow snapshot and the MONTH period follow it (re-read here
     /// so the screen re-renders when "Month starts on" changes).
     @AppStorage(SettingsKey.monthStartDay) private var monthStartDay = 1
+    /// Planned recurring-bills overlay opt-in (Customize → Layers). Off by default; when off the
+    /// Breakdown / Trend sections render exactly as they ship (zero added height). See `PlannedOverlay`.
+    @AppStorage(SettingsKey.insightsIncludeRecurringBills) private var includeRecurringBills = false
+    /// One-time discovery nudge dismissal ("Insights and Home disagree?").
+    @AppStorage(SettingsKey.insightsOverlayNudgeDismissed) private var overlayNudgeDismissed = false
+    /// The section explainer sheet the "Planned" badge opens (nil = none). No Summary case: the iOS
+    /// stat grid ships with no header row to hang a badge on, and nothing in it changes with the layer.
+    @State private var plannedDialog: PlannedDialog?
 
     /// The window the whole screen is scoped to; the stepper walks it one unit at a time.
     @State private var period: InsightsPeriod = {
@@ -81,6 +89,13 @@ struct InsightsView: View {
                 InsightsCustomizeSheet(orderRaw: $orderRaw, hiddenRaw: $hiddenRaw)
             }
             .sheet(isPresented: $showCustomSheet) { DateRangeSheet(range: $customRange) }
+            .sheet(item: $plannedDialog) { dialog in
+                // Breakdown's "Spent"/denominator is the donut's slice-sum basis (so "44% of €X"
+                // reconciles with the legend); Trend's is the period's paid total (its bars' spend).
+                PlannedOverlaySheet(dialog: dialog, overlay: plannedOverlay,
+                                    spent: dialog == .breakdown ? breakdownSpent : totalSpent,
+                                    periodLabel: dialog == .trend ? trendRangeLabel : period.friendlyLabel)
+            }
             .onChange(of: customRange) { _, range in
                 if let range {
                     period = .custom(start: range.lowerBound, end: range.upperBound)
@@ -133,9 +148,48 @@ struct InsightsView: View {
             if periodReceipts.isEmpty {
                 emptyState
             } else {
+                if showOverlayNudge { overlayNudge }
                 ForEach(visibleSections) { sectionView($0) }
             }
         }
+    }
+
+    /// The one-time discovery nudge above the analysis sections: names, in the user's own terms, the
+    /// disagreement a tester reported ("Home also counts €X of recurring bills") and offers to switch
+    /// the overlay on — the only surface that reveals an otherwise-invisible, off-by-default preference.
+    /// Android parity: `OverlayDiscoveryNudge`.
+    private var overlayNudge: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .top) {
+                Text("Insights and Home disagree?")
+                    .font(.subheadline).fontWeight(.semibold).foregroundStyle(Palette.label)
+                Spacer(minLength: 8)
+                Button {
+                    withAnimation { overlayNudgeDismissed = true }
+                } label: {
+                    Image(systemName: "xmark").font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(Palette.secondaryLabel).frame(width: 28, height: 28)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Dismiss")
+            }
+            Text("Home also counts \(periodBills.formatMoney()) of recurring bills this period. Overlay them here as a planned layer.")
+                .font(.caption).foregroundStyle(Palette.secondaryLabel)
+            Button {
+                withAnimation { includeRecurringBills = true; overlayNudgeDismissed = true }
+            } label: {
+                HStack(spacing: 7) {
+                    PlannedHatchSwatch(size: 12, corner: 3)
+                    Text("Overlay bills").font(.subheadline).fontWeight(.semibold)
+                }
+                .foregroundStyle(Palette.tint)
+            }
+            .buttonStyle(.plain)
+            .padding(.top, 2)
+        }
+        .padding(.horizontal, 16).padding(.vertical, 14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Palette.tintSoft, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
 
     /// The Wellbeing score's door — pinned directly under the stepper, above Breakdown, in every
@@ -376,6 +430,49 @@ struct InsightsView: View {
     private var totalSpent: Decimal { periodReceipts.reduce(.zero) { $0 + $1.paidTotal } }
     private var totalSaved: Decimal { periodReceipts.reduce(.zero) { $0 + $1.discount } }
 
+    // MARK: - Planned recurring-bills overlay (Android parity)
+
+    /// The recurring bills (non-income) the overlay projects; empty for an income-only plan.
+    private var overlayBills: [Recurring] { recurring.filter { !$0.isIncome } }
+
+    /// This period's recurring bills, projected onto the window (`windowAmount`, so no back-projection)
+    /// — the figure Home already shows, used to gate the discovery nudge.
+    private var periodBills: Decimal {
+        overlayBills.reduce(Decimal.zero) { $0 + $1.windowAmount(period.interval) }
+    }
+
+    /// The de-duplicated planned overlay for the selected period. Empty unless the user has opted in
+    /// (Customize → Layers), so the OFF screen is byte-for-byte the shipped one.
+    private var plannedOverlay: PlannedOverlay {
+        guard includeRecurringBills, !overlayBills.isEmpty else { return .empty }
+        return PlannedOverlay.build(bills: overlayBills, window: period.interval, receipts: periodReceipts)
+    }
+
+    /// Whether the planned layer is on AND has something to draw this period.
+    private var overlayActive: Bool { includeRecurringBills && plannedOverlay.hasPlanned }
+
+    /// The Breakdown donut's spend basis — the sum of line totals the category slices and their
+    /// percentages are taken against. The Breakdown sheet's "Spent" and % denominator use this (not the
+    /// paid total, which nets off discounts) so "44% of €X" reconciles with the legend.
+    private var breakdownSpent: Decimal { periodItems.reduce(.zero) { $0 + $1.lineTotal } }
+
+    /// The one-time discovery nudge shows when: overlay off, not dismissed, and there are recurring
+    /// bills projecting a positive amount this period (the figure Home already counts). iPhone only.
+    private var showOverlayNudge: Bool {
+        hSize == .compact && !includeRecurringBills && !overlayNudgeDismissed
+            && !overlayBills.isEmpty && periodBills > 0
+    }
+
+    /// "Dec 2025 – Jun 2026" — the span the 7 trend bars cover, for the Trend sheet subtitle.
+    private var trendRangeLabel: String {
+        var windows = [period]
+        for _ in 0..<6 { windows.append(windows.last!.previous()) }
+        let f = DateFormatter(); f.dateFormat = "MMM yyyy"
+        let first = f.string(from: windows.last!.interval.start)   // oldest
+        let last = f.string(from: windows.first!.interval.start)   // selected
+        return first == last ? last : "\(first) – \(last)"
+    }
+
     private var previousReceipts: [Receipt] {
         let window = period.previous().interval
         return receipts.filter { window.contains($0.createdAt) }
@@ -461,10 +558,16 @@ struct InsightsView: View {
 
     /// Total spend for each of the last 7 windows of the selected unit, oldest → the selected
     /// window (last bar = selected).
-    private var periodTrend: [(label: String, value: Decimal)] {
+    /// The 7 windows the trend bars cover, oldest → the selected window (last = selected). Shared by
+    /// the bars and the planned-cap projection so the two always align.
+    private var trendWindows: [InsightsPeriod] {
         var windows = [period]
         for _ in 0..<6 { windows.append(windows.last!.previous()) }
-        return windows.reversed().map { p in
+        return windows.reversed()
+    }
+
+    private var periodTrend: [(label: String, value: Decimal)] {
+        trendWindows.map { p in
             let window = p.interval
             let total = receipts
                 .filter { window.contains($0.createdAt) }
@@ -473,23 +576,55 @@ struct InsightsView: View {
         }
     }
 
+    /// Planned recurring-bills cap for each of the 7 trend bars (Decimal), aligned to `trendWindows`.
+    /// Each bar's bills projected onto its own window (`windowAmount`) — so a whole-month bar carries
+    /// the flat monthly total and months before the plans were created carry none (no back-projection).
+    /// All zero unless the overlay is on. Android parity: `TrendBucket.planned` / `perMonthPlanned`.
+    private var trendPlanned: [Decimal] {
+        guard overlayActive else { return Array(repeating: .zero, count: trendWindows.count) }
+        return trendWindows.map { w in
+            overlayBills.reduce(Decimal.zero) { $0 + $1.windowAmount(w.interval) }
+        }
+    }
+
     private var trendCard: some View {
         let data = periodTrend
-        let maxV = data.map { dbl($0.value) }.max() ?? 1
+        let planned = trendPlanned
+        // When the overlay is on the axis must fit spend + bills, so the solid bars get shorter
+        // (mockup "the bars got shorter"). Otherwise it's the shipped spend-only scale.
+        let maxV = data.indices.map { dbl(data[$0].value) + dbl(planned[$0]) }.max() ?? 1
         return VStack(alignment: .leading, spacing: 12) {
-            HStack {
+            HStack(spacing: 8) {
                 Text("Trend").font(.headline)
+                if overlayActive { PlannedBadge { plannedDialog = .trend } }
                 Spacer()
                 trendDeltaPill
             }
             HStack(alignment: .bottom, spacing: 8) {
                 ForEach(Array(data.enumerated()), id: \.offset) { idx, d in
                     let isCurrent = idx == data.count - 1
+                    let cap = dbl(planned[idx])
                     VStack(spacing: 6) {
                         Spacer(minLength: 0)
-                        RoundedRectangle(cornerRadius: 5, style: .continuous)
+                        VStack(spacing: 0) {
+                            // The hatched "planned bills" cap stacked over the solid spend bar.
+                            if cap > 0 {
+                                let capShape = UnevenRoundedRectangle(topLeadingRadius: 5, topTrailingRadius: 5, style: .continuous)
+                                capShape.fill(Palette.plan.opacity(0.12))
+                                    .overlay(HatchStripes(step: 5).stroke(Palette.plan, lineWidth: 1.2).clipShape(capShape))
+                                    .overlay(capShape.strokeBorder(Palette.plan, lineWidth: 1))
+                                    .frame(height: barHeight(cap, max: maxV))
+                            }
+                            UnevenRoundedRectangle(
+                                topLeadingRadius: cap > 0 ? 0 : 5,
+                                bottomLeadingRadius: 5,
+                                bottomTrailingRadius: 5,
+                                topTrailingRadius: cap > 0 ? 0 : 5,
+                                style: .continuous
+                            )
                             .fill(isCurrent ? Palette.tint : Palette.fill)
                             .frame(height: barHeight(dbl(d.value), max: maxV))
+                        }
                         Text(d.label).font(.system(size: 10))
                             .fontWeight(isCurrent ? .semibold : .regular)
                             .foregroundStyle(isCurrent ? Palette.tint : Palette.secondaryLabel)
@@ -548,8 +683,9 @@ struct InsightsView: View {
 
     private var breakdownCard: some View {
         VStack(alignment: .leading, spacing: 16) {
-            HStack {
+            HStack(spacing: 8) {
                 Text("Breakdown").font(.headline)
+                if overlayActive { PlannedBadge { plannedDialog = .breakdown } }
                 Spacer()
                 breakdownToggle
             }
@@ -557,10 +693,15 @@ struct InsightsView: View {
             let netTotal = slices.reduce(Decimal.zero) { $0 + $1.value }
             let selIndex = pickedCategory.flatMap { pc in slices.firstIndex { $0.name == pc } }
             let picked = selIndex.map { slices[$0] }
+            let planned = plannedOverlay.plannedTotal
+            // planned / (spend + planned) — the share of the ring the hatched "Bills · planned" wedge
+            // takes, compressing the category arcs into the spend share (their % stay a % of spend).
+            let plannedFrac: CGFloat? = (overlayActive && netTotal + planned > 0)
+                ? CGFloat(dbl(planned) / dbl(netTotal + planned)) : nil
             HStack(spacing: 4) {
                 ZStack {
                     DonutChart(slices: slices.map { (categoryColor($0.name), dbl($0.value)) },
-                               selectedIndex: selIndex) { idx in
+                               selectedIndex: selIndex, plannedFraction: plannedFrac) { idx in
                         let name = slices[idx].name
                         pickedCategory = (pickedCategory == name) ? nil : name
                     }
@@ -575,6 +716,15 @@ struct InsightsView: View {
                                 .font(.caption2).foregroundStyle(Palette.secondaryLabel)
                         }
                         .frame(width: 108).multilineTextAlignment(.center)
+                    } else if overlayActive {
+                        // Overlay on: keep the spend hero and add the planned bills below it — the
+                        // centre reads spend first, planned second (mockup "€950 / + €967 bills").
+                        VStack(spacing: 0) {
+                            Text("Spent").font(.caption2).foregroundStyle(Palette.secondaryLabel)
+                            Text(netTotal.formatMoney()).font(.title3).fontWeight(.bold)
+                            Text("+ \(planned.formatMoney()) bills")
+                                .font(.caption2).fontWeight(.medium).foregroundStyle(Palette.secondaryLabel)
+                        }
                     } else {
                         VStack(spacing: 0) {
                             Text("Total").font(.caption2).foregroundStyle(Palette.secondaryLabel)
