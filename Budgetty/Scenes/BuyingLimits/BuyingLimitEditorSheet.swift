@@ -90,17 +90,19 @@ struct BuyingLimitEditorSheet: View {
     }
 
     private var emojiChip: some View {
-        let shape = RoundedRectangle(cornerRadius: 12, style: .continuous)
+        let shape = RoundedRectangle(cornerRadius: 14, style: .continuous)
+        // Taller than the label field beside it and bottom-aligned with it (see the HStack above): the
+        // chip's top rises up beside the LABEL while its bottom edge lines up flush with the field's bottom.
         return shape
             .fill(emoji.isEmpty ? Color.clear : Palette.tintSoft)
-            .frame(width: 46, height: 46)
+            .frame(width: 60, height: 60)
             .overlay {
                 if emoji.isEmpty {
                     shape.strokeBorder(Palette.separatorStrong, style: StrokeStyle(lineWidth: 1, dash: [4]))
-                        .overlay(Image(systemName: "tag").font(.system(size: 18))
+                        .overlay(Image(systemName: "tag").font(.system(size: 22))
                             .foregroundStyle(Palette.secondaryLabel))
                 } else {
-                    Text(emoji).font(.system(size: 24))
+                    Text(emoji).font(.system(size: 28))
                 }
             }
             .accessibilityLabel("Choose an emoji")
@@ -173,6 +175,9 @@ struct BuyingLimitEditorSheet: View {
                 Text("Nothing on your saved receipts matches. We'll start counting from your next one.")
                     .font(.caption).foregroundStyle(Palette.secondaryLabel)
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(12)
+            .glassControl(cornerRadius: 12)
         case .match where preview.tooBroad:
             tooBroadCard
         case .match:
@@ -181,13 +186,16 @@ struct BuyingLimitEditorSheet: View {
                 matchNames
                 matchCount
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(12)
+            .glassControl(cornerRadius: 12)
         }
     }
 
     private var previewHeader: some View {
         Label("Currently matches", systemImage: "magnifyingglass")
-            .font(.caption).fontWeight(.semibold).foregroundStyle(Palette.secondaryLabel)
-            .textCase(.uppercase)
+            .font(.caption2).fontWeight(.bold).foregroundStyle(Palette.secondaryLabel)
+            .textCase(.uppercase).tracking(0.6)
     }
 
     private var matchNames: some View {
@@ -249,7 +257,7 @@ struct BuyingLimitEditorSheet: View {
             HStack(spacing: 0) {
                 stepperButton("minus", enabled: count > 1) { if count > 1 { count -= 1 } }
                 Text("\(count)").font(.title3).fontWeight(.bold).foregroundStyle(Palette.label)
-                    .frame(minWidth: 56)
+                    .frame(maxWidth: .infinity)
                 stepperButton("plus", enabled: true) { count += 1 }
             }
             .frame(maxWidth: .infinity)
@@ -260,8 +268,8 @@ struct BuyingLimitEditorSheet: View {
 
     private func stepperButton(_ symbol: String, enabled: Bool, action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            Image(systemName: symbol).font(.system(size: 16, weight: .semibold))
-                .foregroundStyle(enabled ? Palette.label : Palette.tertiaryLabel)
+            Image(systemName: symbol).font(.system(size: 18, weight: .semibold))
+                .foregroundStyle(enabled ? Palette.tint : Palette.tertiaryLabel)
                 .frame(width: 56, height: 40)
                 .contentShape(Rectangle())
         }
@@ -273,7 +281,10 @@ struct BuyingLimitEditorSheet: View {
     // MARK: - Helpers
 
     private func sectionLabel(_ text: LocalizedStringKey) -> some View {
-        Text(text).font(.caption).fontWeight(.semibold).foregroundStyle(Palette.secondaryLabel)
+        Text(text)
+            .font(.caption2).fontWeight(.bold)
+            .textCase(.uppercase).tracking(0.6)
+            .foregroundStyle(Palette.secondaryLabel)
     }
 
     private func loadExisting() {
