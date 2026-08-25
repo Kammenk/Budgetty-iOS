@@ -66,6 +66,9 @@ struct InsightsCustomizeSheet: View {
     @Environment(\.dismiss) private var dismiss
     @Binding var orderRaw: String
     @Binding var hiddenRaw: String
+    /// The planned recurring-bills overlay opt-in. Off by default, remembered per user; flipping it
+    /// costs the Insights screen zero added height. Android parity: Customize → LAYERS.
+    @AppStorage(SettingsKey.insightsIncludeRecurringBills) private var includeRecurringBills = false
 
     @State private var order: [InsightSection] = []
     @State private var hidden: Set<InsightSection> = []
@@ -73,6 +76,24 @@ struct InsightsCustomizeSheet: View {
     var body: some View {
         NavigationStack {
             List {
+                Section {
+                    Toggle(isOn: $includeRecurringBills) {
+                        HStack(spacing: 12) {
+                            // The hatch swatch as the leading icon, so the sheet teaches the "planned"
+                            // texture before it appears on the charts.
+                            PlannedHatchSwatch(size: 20, corner: 5)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Include recurring bills").foregroundStyle(Palette.label)
+                                Text("Overlay planned bills as a separate layer")
+                                    .font(.caption).foregroundStyle(Palette.secondaryLabel)
+                            }
+                        }
+                    }
+                    .tint(Palette.tint)
+                } header: {
+                    Text("Layers")
+                }
+
                 Section {
                     ForEach(order) { section in
                         HStack(spacing: 12) {

@@ -769,20 +769,8 @@ struct HomeView: View {
             .overlay(shape.strokeBorder(.white.opacity(0.4), lineWidth: 1))
     }
 
-    /// Diagonal 135° stripe lines covering the given rect.
-    private struct HatchStripes: Shape {
-        func path(in rect: CGRect) -> Path {
-            var p = Path()
-            let step: CGFloat = 4.5
-            var x = rect.minX - rect.height
-            while x < rect.maxX {
-                p.move(to: CGPoint(x: x, y: rect.maxY))
-                p.addLine(to: CGPoint(x: x + rect.height, y: rect.minY))
-                x += step
-            }
-            return p
-        }
-    }
+    // The diagonal planned-hatch texture is the shared `HatchStripes` (see PlannedHatch.swift), so
+    // Home's spent-vs-planned strip and the Insights recurring-bills overlay use one identical texture.
 
     // MARK: - Budgets
 

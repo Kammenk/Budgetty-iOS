@@ -1286,3 +1286,53 @@ ViewModels/provider, not Compose.
 against the mockup (cover, total w/ comparison pill, score ring, mover, budget+streak w/ segment bar,
 limits chips, focus w/ Done CTA) — plus the real interstitial firing end-to-end from sample data and
 French localization live. Deep-flow device testing (real boundary crossing, Both cadence) deferred.
+
+## Android → iOS — Insights: planned recurring-bills overlay — 2026-08-25
+
+Ported the presentation-layer overlay that draws planned recurring bills as a distinct hatched
+"planned" layer alongside actual receipt spend in the Breakdown and Trend sections. Off by default,
+remembered per user. Ported from the Android **ViewModels + `RecurringMath`** (not Compose); the only
+new logic is the dedup matcher. iOS branch `feat/insights-planned-overlay` off `main`.
+
+- **Dedup matcher** — `PlannedBills.swift` ports `splitPlannedBills` + `PlannedBillLine` /
+  `MatchedBillLine` / `ReceiptCharge` and `PlannedOverlay.build(...)` from `RecurringMath.kt` /
+  `InsightsViewModel.computePlannedOverlay`, byte-faithfully (same name-align + `max(€2, 15%)` amount
+  tolerance, closest-charge-wins, unmatched-stays-visible, non-positive-window dropped). Reuses the
+  existing `Recurring.windowAmount` (no back-projection) and `StoreNormalizer`. `PlannedBillsSplitTest`
+  mirrors Android's `PlannedBillsSplitTest.kt` (all 10 cases green).
+- **Switch in Customize** — `InsightsCustomizeSheet` gains a "Layers" group with an "Include recurring
+  bills" toggle (hatch swatch leading icon, `UISwitch`), a single `@AppStorage`
+  (`SettingsKey.insightsIncludeRecurringBills`, default false, cleared by `UserState.clear` alongside
+  its nudge-dismissed key). Android parity: Customize → LAYERS.
+- **Breakdown donut** — `DonutChart` gains `plannedFraction`: one hatched "Bills · planned" wedge
+  appended, category arcs compressed into `spend/(spend+planned)`, percentages unchanged (a % of
+  spend); centre keeps the spend hero + a "+ €X bills" subline. Quiet tappable "Planned" badge →
+  Breakdown sheet.
+- **Trend** — hatched planned cap stacked over each solid spend bar (flat per month, no back-projection
+  so the earliest bars carry none), axis rescaled to fit spend+bills. "Planned" badge → Trend sheet.
+- **Shared hatch** — `PlannedHatch.swift` extracts Home's `HatchStripes` into a shared texture +
+  `PlannedHatchSwatch` / `PlannedBadge`, drawn on the new neutral `Palette.plan` (`--plan`) token, so
+  "hatched = planned bills" reads identically on Home and Insights. Android parity: `PlannedHatch.kt`.
+- **Explainer sheets** — `PlannedOverlaySheet` (Breakdown + Trend) carries Android's dialog content
+  line-for-line (per-bill wedge list, denominator rule, dedup note; caps-reading rows), as iOS sheets
+  sized by detent.
+- **Discovery nudge** — `OverlayDiscoveryNudge` equivalent above the sections (iPhone), one-time per
+  user (`SettingsKey.insightsOverlayNudgeDismissed`), shown only when off + bills exist.
+
+**Justified iOS deviations from Android:**
+- **No Summary badge/sheet.** Per the converged design, the iOS stat grid ships with no header row to
+  hang a badge on, and nothing in it changes when the layer is on — so the Summary explainer is
+  omitted (Android has a Summary dialog). `PlannedDialog` has only `.breakdown` / `.trend`.
+- **Sheets, not M3 dialogs** — the explainers are native sheets at content-sized detents (Breakdown
+  large, Trend medium); Done + grabber are the only exits.
+- **Nudge placement** — rendered at the top of the analysis stack rather than strictly above Breakdown
+  (iOS section order is user-customizable), so it stays visible regardless of order.
+- **Breakdown sheet "Spent"** uses the donut's slice-sum basis (so "44% of €X" reconciles with the
+  legend); the Trend sheet uses the period's paid total (its bars' spend). Mirrors the pre-existing iOS
+  gross-slices vs paid-total split; identical in the no-discount case.
+
+**Status:** BUILT + sim-verified (iPhone 17, iOS 26). BUILD SUCCEEDED, dedup test suite green,
+screenshots confirm OFF (with nudge), ON Breakdown (wedge + badge + "Spent / + €967 bills"), ON Trend
+(stacked caps, capless early months), both explainer sheets, and the Customize Layers toggle — all
+matching the iOS mockup. `Localizable.xcstrings` +23 keys × 16 locales (pulled from Android's shipped
+translations). LEFT: push + open PR.
