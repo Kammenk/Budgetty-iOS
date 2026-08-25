@@ -1336,3 +1336,37 @@ screenshots confirm OFF (with nudge), ON Breakdown (wedge + badge + "Spent / + �
 (stacked caps, capless early months), both explainer sheets, and the Customize Layers toggle — all
 matching the iOS mockup. `Localizable.xcstrings` +23 keys × 16 locales (pulled from Android's shipped
 translations). LEFT: push + open PR.
+
+---
+
+## Android → iOS — Retention foundation §2 StreakEngine (pure) — 2026-08-25
+
+Port of Android's `ui/streaks/StreakEngine.kt` + `StreakModel.kt` + `StreakEngineTest.kt` (retention
+spec §2). Ported from the Kotlin **logic**, not UI — this is a pure object with no SwiftUI/SwiftData.
+
+- **`Support/StreakEngine.swift`** (new) — 1:1 with the Kotlin. `StreakKind {budgetMonth, budgetWeek,
+  limit}` (with a `token` for the future `streak_surfaced` analytics param); `Streak(kind, label,
+  current, best, periodsChecked, liveOnTrack)`; `StreakTxn` / `LiveBudgetPeriod` / `BudgetStreakInput`
+  / `LimitWindow` / `LimitStreakInput`. Public API `budgetStreaks`, `allScopesStreak`, `limitStreak`,
+  `surfaced` (current ≥ `minToSurface` = 2). Money is `Decimal`. Following the `WellbeingEngine.swift`
+  precedent, the model types (Android's separate `StreakModel.kt`) live in the same file as the engine.
+- **Invariants preserved:** one-pass grouping by (periodIndex, category); closed periods only (open
+  period → `liveOnTrack`, never `current`); strict reset on a miss with `best` always computed within
+  the 24-period window; the **NO_DATA vs MET** distinction (an empty period breaks a run; a budgeted
+  scope with zero spend in a *data-bearing* period is MET); per-category budgets take precedence over
+  the monthly scope; the whole-budget scope carries the per-period paid adjustment. Caller owns the
+  timestamp → periodIndex mapping.
+- **Recap re-source:** `RecapBuilder`'s `streakMonths(endOffset:)` (the recap monthly `budgetStreak`
+  card's number) is re-sourced from `StreakEngine.allScopesStreak` — one implementation shared with the
+  Budget row / Wellbeing evidence, matching Android's `RecapProvider` re-source. Behaviour-preserving:
+  months tagged 0 = endOffset increasing into the past, empty month = no data (was the `!items.isEmpty`
+  break), per-category caps use net line spend, monthly scope carries the month's paid adjustment.
+- **Tests:** `BudgettyTests/StreakEngineTests.swift` ports the full Android matrix case-for-case
+  (consecutive, strict reset, best-in-window, `liveOnTrack` never counted, no-budget, empty-period vs
+  zero-spend-with-data, per-scope independence, category-precedence, monthly + paid adjustment,
+  all-scopes aggregate, limit windows, `surfaced` bar).
+
+**Status:** BUILD SUCCEEDED (iPhone 17 Pro sim, iOS 26). Full suite green — 208 tests / 25 suites,
+incl. new `StreakEngineTests` and the unchanged `RecapSchedulerTests` (recap re-source verified
+behaviour-preserving). Not yet surfaced in any UI (Budget row / Wellbeing evidence / recap Streak card
+are §1/§3 UI work, deferred).

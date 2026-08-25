@@ -314,19 +314,33 @@ enum RecapBuilder {
         }
 
         /// Consecutive closed months under budget, ending with `endOffset`; 0 if that month wasn't under.
+        ///
+        /// Re-sourced from `StreakEngine.allScopesStreak` (§2.1) so the recap's every-scope streak is the
+        /// one shared implementation — the same object the Budget row and Wellbeing evidence read — rather
+        /// than a second hand-rolled loop. Behaviour-preserving: each closed month's line items are tagged
+        /// with a period index (0 = `endOffset`, increasing into the past) and the engine walks the
+        /// aggregate. A month with no receipts is "no data" and breaks the run (matching the old
+        /// `!items.isEmpty` check); per-category caps use net line spend; the monthly-only scope carries
+        /// that month's paid adjustment (tax/fees − discount), exactly as `budgetOutcome` did.
         private func streakMonths(endOffset: Int) -> Int {
-            var count = 0
-            var off = endOffset
-            while count < maxStreak {
-                let rcpts = receipts(in: monthInterval(off))
+            var txns: [StreakTxn] = []
+            var adjustment: [Int: Decimal] = [:]
+            for idx in 0..<maxStreak {
+                let rcpts = receipts(in: monthInterval(endOffset - idx))
                 let items = rcpts.flatMap(\.items)
-                let outcome = budgetOutcome(monthItems: items, spend: paidSpend(rcpts))
-                let under = outcome.hasBudget && outcome.underCount == outcome.scopeCount && !items.isEmpty
-                if !under { break }
-                count += 1
-                off -= 1
+                guard !items.isEmpty else { continue }   // empty month → no data at this index (breaks the run)
+                txns.append(contentsOf: items.map {
+                    StreakTxn(periodIndex: idx, category: $0.category, amount: $0.lineTotal)
+                })
+                adjustment[idx] = paidSpend(rcpts) - netSpend(items)
             }
-            return count
+            var catBudgets: [String: Decimal] = [:]
+            for b in budgets where b.key.hasPrefix("CAT:") { catBudgets[String(b.key.dropFirst(4))] = b.amount }
+            let monthlyBudget = budgets.first { $0.key == Budget.monthlyKey }?.amount
+            return StreakEngine.allScopesStreak(BudgetStreakInput(
+                transactions: txns, categoryBudgets: catBudgets, monthlyBudget: monthlyBudget,
+                kind: .budgetMonth, monthlyLabel: Budget.monthlyKey,
+                monthlyAdjustmentByPeriod: adjustment, live: nil)).current
         }
 
         // ── Buying-limits outcome ──────────────────────────────────────────────────
