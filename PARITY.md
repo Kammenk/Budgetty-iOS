@@ -1520,3 +1520,75 @@ the new `RecapWeekStreakTests` + weekly-floor guard cases). Simulator screenshot
 Streak card (motif + "3 weeks under your Groceries budget"), the weekly Focus card with the "Weekly
 recaps · Change" row, and the de-flamed monthly card (motif + "3 closed months · August on track so far",
 no flame) — all matching the mockup's `w-streak` / `w-focus` / `m-streak-new` states.
+
+---
+
+## Android → iOS — Retention §3 Wellbeing score as meta-progression — 2026-08-25
+
+Port of Android's `§3` (commit `b685845`): the Wellbeing screen gains a trend sparkline, attributable
+"+N to your score" tip pills, gain-ranked tips, a band-up nudge, budget-streak evidence, and the win
+de-flame. Ported from the Android `WellbeingEngine`/`WellbeingProvider`/`WellbeingScreen` +
+`RETENTION_GAMIFICATION_SPEC.md` §3 (3.2–3.5) + §2.6 + the `RetentionWellbeing.dc.html` mockup notes,
+never from Compose. Reuses the §1 `StreakMotif` and the §3.1 `WellbeingHistory.trend` / `WellbeingScoreStore`.
+
+- **§3.2 Trend sparkline** — new `TrendSparkline` in `WellbeingView.swift`, hand-rolled with SwiftUI
+  `Canvas` (no chart lib): the last-6 CLOSED months as a solid `Palette.tint` polyline + dots, then a
+  dashed ghost segment to a **hollow** dot for the in-flight live score. "LAST SIX CLOSED MONTHS" label,
+  first/last-or-ghost month x-labels, "Up N since <month>." caption. Reads `WellbeingHistory.trend` off a
+  new `@Query` of `WellbeingScoreEntity` (`.suffix(6)` = Android `getRecent(6)`, oldest→newest); the
+  `.task` records the just-closed month first, so `@Query` re-fetches it in. **Replaces** the old
+  "vs last month" chip; renders **nothing** below 2 stored months (the thin state). It sits on a nested
+  `Palette.tertiaryBackground` panel (the ghost hole is knocked with that same colour).
+- **§3.3 Attributable tip pills** — `projectedGain: Int?` added to `WellbeingTip`; computed in
+  `WellbeingEngine.projectedGain` by re-running `aggregate()` with the affected component's sub-score
+  replaced per the §3.3 table (MISSING_BUDGET budgetedCount+1; OVER_BUDGET overCount−1 + averaged
+  overspend removed via `SubscriptionDetector.round2`; SUBSCRIPTION_COST proportional share after one
+  cancel; NO_GOAL goals→100 *entering* the mean; GOAL_OFF_TRACK that goal 40→100; win/other tones → nil).
+  Rendered as a small green "+N to your score" pill (`Palette.good` on a good wash). `tips()` attaches the
+  gain only on scored months.
+- **The renormalisation guard** — `showsProjectedGain(_ gain: Int?) -> Bool` = `gain != nil && gain >= 2`
+  (a single predicate covering both the <2 noise floor and any non-positive renormalisation delta). Entering
+  a previously-nil component (NO_GOAL / no-budget MISSING_BUDGET) at its assumed-100 mark can only move a
+  maxed base by ≤ 0, so a "+0"/"−N" is never rendered. **Pinned** by
+  `noGoalProjectionIsNonPositiveWhenTheBaseIsAlreadyMaxed_andIsSuppressed` (base 100 → gain 0 → suppressed),
+  contrasted with `noGoalProjectionIsAGenuineGainWhenTheBaseHasRoom` (base 50 → +22 → shown).
+- **§3.4 Rank by gain** — `WellbeingEngine.rank` gains a secondary key: within a tone, larger
+  `projectedGain` leads; ties keep insertion order via an explicit `enumerated().offset` tiebreaker (Swift
+  `sorted` isn't stable — this reproduces Kotlin's `compareBy{severity}.thenByDescending{gain}`).
+- **§3.5 Band-up nudge** — `WellbeingEngine.bandUp(score)` → `BandUp?` (within 3 below 40/60/80). Rendered
+  as an accessible warn-tone pill (`Palette.warn` content on a warn wash, up-arrow) just under the ring; a
+  true xcstrings plural (`%lld points to %@`) so "1 point to Healthy" reads correctly.
+- **§2.6 Streak evidence** — `WellbeingEngine.budgetStreakEvidence` (surfaced ≥ 2, longest-first, cap 2)
+  fed by a `budgetMonthStreaks` helper in `WellbeingScan` that tags closed pay-cycle months by index and
+  calls `StreakEngine.budgetStreaks(.budgetMonth)` (mirrors Android's provider + `RecapBuilder.monthStreak`;
+  `monthlyLabel: ""` → "Overall budget"). Rendered under the Budget row only: the reused **`StreakMotif`**
+  (`maxSegments: 6`) + "<scope> — N months under". No flames.
+- **Win de-flame** — the saving-win emoji `🔥` → `📈` in `WellbeingScan.winEmoji` (§2.4).
+- **Analytics** — `WellbeingView` fires `Analytics.logTipProjectedGain(type, gain)` per visible gain pill
+  and `logStreakSurfaced(kind, length)` per surfaced streak, once per unique monthly content via
+  `.onChange(of: impressionKey, initial: true)` (parity with Android's keyed `LaunchedEffect`); `tip_acted`
+  was already wired.
+- **Data plumbing** — `WellbeingSummary` gains `trend`/`bandUp`/`budgetStreaks`; `WellbeingScan.run` gains
+  a defaulted `storedHistory:` param (the full screen passes the `@Query`; Home/Insights leave it empty, so
+  they never render the trend). All new logic stays in the pure engine/history/StreakEngine seams.
+- **Strings** — 8 new §3 keys spliced into `Localizable.xcstrings` across all 16 locales (English = the
+  key; 15 translations pulled from Android's shipped `strings.xml`, `%1$d`→`%1$lld` / `%1$s`→`%1$@`).
+  892 → 900 keys; semantic key-diff = exactly +8, 0 removed, 0 existing modified. `band_up` is the only
+  plural (English one/other; non-English single-form per the shipped `%lld days left` convention);
+  `streak_under` is single-form (always ≥ 2, matching the shipped Recap streak copy).
+
+**Justified iOS deviations:** the trend is threaded through `WellbeingScan.run(storedHistory:)` from a
+SwiftData `@Query` rather than an Android-style `Flow` that reads `getRecent(6)` after the upsert — same
+data, SwiftData-idiomatic (the `.task` write triggers the `@Query` re-fetch). The band-up / gain pills map
+to the app's `Palette.warn` / `Palette.good` washes (the app has no dedicated `--warnfg`/`--goodc` tokens)
+— consistent with the existing Wellbeing screen's caution/good tones. `streak_under` is a single (non-plural)
+localized form, matching the sibling Recap streak strings already shipped on iOS.
+
+**Status:** BUILD SUCCEEDED (iPhone 17 Pro sim, iOS 26). Full suite green — **250 tests / 28 suites** (+14
+new `WellbeingEngineTests`: projection math per tip type, the renormalisation-negative guard, band-up
+thresholds, gain-ranking, streak-evidence surfacing; the sparkline "< 2 months → nothing" stays covered by
+`WellbeingHistoryTests`). Simulator screenshots confirm the sparkline (polyline + dashed ghost + hollow dot
++ "Up N since April."), the "1 point to Healthy" band-up pill, "+10 / +9 to your score" gain pills
+(suppressed on the spike + win tips), the ranked feed, the 📈 saving-win chip, and the StreakMotif evidence
+rows with correct live-ghost behaviour (present for on-track Transportation, dropped for over-budget Dining)
+— all matching the mockup. On `feat/retention-ios`, unpushed.

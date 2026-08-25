@@ -79,6 +79,14 @@ struct WellbeingSummary {
     /// The just-closed month's "yyyy-MM" id (offset -1) — the unique key of its history row. Distinct
     /// from `periodId` (the in-flight month), so the current month never reaches history.
     let closedPeriodId: String
+    /// Six-point trend sparkline (§3.2), built from the stored closed months + the live score; nil below
+    /// two stored months → the screen renders nothing (no placeholder). Only the full Wellbeing screen
+    /// passes stored history in, so Home/Insights summaries leave this nil.
+    var trend: WellbeingTrend? = nil
+    /// Band-up nudge (§3.5); nil unless the score is within 3 of a band boundary.
+    var bandUp: BandUp? = nil
+    /// Budget-adherence streak evidence (§2.6), already surfaced (current ≥ 2) and capped, longest first.
+    var budgetStreaks: [Streak] = []
 
     var hasScore: Bool { score.hasScore }
 }
@@ -89,9 +97,17 @@ enum WellbeingScan {
 
     /// Builds the whole `WellbeingSummary` for the current pay-cycle month (plus the previous month
     /// for the trend delta) and the current Mon–Sun week. A faithful port of `WellbeingProvider.build`.
+    ///
+    /// `storedHistory` is the stored closed-month snapshots (oldest→newest) read back from
+    /// `WellbeingScoreEntity`, which the full Wellbeing screen passes in so the §3.2 sparkline pairs them
+    /// with the live in-flight score. The Home banner / Insights row don't render the trend and leave it
+    /// empty. Mirrors Android's `WellbeingProvider` reading `history.getRecent(6)` after the just-closed
+    /// upsert — SwiftData's `@Query` re-fetches after `WellbeingScoreStore.record`, so the newest closed
+    /// month is included on the next render.
     static func run(receipts: [Receipt], budgets: [Budget], recurring: [Recurring],
                     goals: [SavingsGoal], contributions: [SavingsContribution],
-                    ignoredSubs: Set<String>, today: Date = .now, monthStartDay: Int) -> WellbeingSummary {
+                    ignoredSubs: Set<String>, today: Date = .now, monthStartDay: Int,
+                    storedHistory: [WellbeingScoreEntity] = []) -> WellbeingSummary {
         let cal = Calendar.current
 
         // ── Windowed spend helpers (pay-cycle months) ──────────────────────────────
@@ -289,6 +305,14 @@ enum WellbeingScan {
             .goals: ComponentDetail(goalsOnPace: onPace, goalsTotal: current.goals.count),
         ]
 
+        // ── §3.5 band-up nudge + §3.2 trend + §2.6 budget-streak evidence (all derived) ─
+        let bandUp = score.score.flatMap { WellbeingEngine.bandUp($0) }
+        let budgetStreaks = WellbeingEngine.budgetStreakEvidence(
+            budgetMonthStreaks(receipts: receipts, budgets: budgets, monthStartDay: monthStartDay,
+                               today: today, cal: cal))
+        // The trend pairs the stored closed months with the in-flight live score as the ghost point.
+        let trend = WellbeingHistory.trend(storedHistory, liveScore: score.score)
+
         // ── Labels ──────────────────────────────────────────────────────────────────
         let cycleStart = PayCycle.month(today, startDay: monthStartDay, offset: 0).start
         let idFmt = DateFormatter(); idFmt.dateFormat = "yyyy-MM"
@@ -302,12 +326,58 @@ enum WellbeingScan {
             monthLabel: monthFmt.string(from: cycleStart),
             weekLabel: "\(dayFmt.string(from: weekStart)) – \(dayFmt.string(from: weekEnd))",
             closedScore: previousFull,
-            closedPeriodId: WellbeingHistory.periodId(today, monthStartDay: monthStartDay, offset: -1))
+            closedPeriodId: WellbeingHistory.periodId(today, monthStartDay: monthStartDay, offset: -1),
+            trend: trend, bandUp: bandUp, budgetStreaks: budgetStreaks)
+    }
+
+    /// Per-scope monthly budget streaks for the Wellbeing evidence (§2.6), computed by `StreakEngine` in
+    /// one pass. Tags each closed pay-cycle month's line items with a period index (0 = the just-closed
+    /// month, increasing into the past); the current OPEN month becomes the live period that only feeds
+    /// `Streak.liveOnTrack` (§2.3). Mirrors Android's `WellbeingProvider.budgetMonthStreaks` and the
+    /// identical tagging in `RecapBuilder.monthStreak` — but `budgetStreaks` (per-scope), not the
+    /// all-scopes aggregate. The caller surfaces/caps via `WellbeingEngine.budgetStreakEvidence`.
+    private static func budgetMonthStreaks(receipts: [Receipt], budgets: [Budget], monthStartDay: Int,
+                                           today: Date, cal: Calendar) -> [Streak] {
+        func monthInterval(_ offset: Int) -> DateInterval {
+            PayCycle.monthInterval(today, startDay: monthStartDay, offset: offset, calendar: cal)
+        }
+        func receiptsIn(_ interval: DateInterval) -> [Receipt] { receipts.filter { interval.contains($0.createdAt) } }
+        func paidSpend(_ list: [Receipt]) -> Decimal { list.reduce(Decimal.zero) { $0 + $1.paidTotal } }
+        func netSpend(_ items: [LineItem]) -> Decimal { items.reduce(Decimal.zero) { $0 + $1.lineTotal } }
+
+        // idx 0 = the just-closed cycle (offset -1), increasing into the past; an empty month is "no data".
+        var txns: [StreakTxn] = []
+        var adjustment: [Int: Decimal] = [:]
+        for idx in 0..<StreakEngine.maxStreak {
+            let rcpts = receiptsIn(monthInterval(-1 - idx))
+            let items = rcpts.flatMap(\.items)
+            guard !items.isEmpty else { continue }
+            txns.append(contentsOf: items.map {
+                StreakTxn(periodIndex: idx, category: $0.category, amount: $0.lineTotal)
+            })
+            adjustment[idx] = paidSpend(rcpts) - netSpend(items)
+        }
+        var catBudgets: [String: Decimal] = [:]
+        for b in budgets where b.key.hasPrefix("CAT:") { catBudgets[String(b.key.dropFirst(4))] = b.amount }
+        let monthlyBudget = budgets.first { $0.key == Budget.monthlyKey }?.amount
+
+        // The OPEN month (offset 0) is the live period — feeds liveOnTrack only, never counted.
+        let liveRcpts = receiptsIn(monthInterval(0))
+        let liveItems = liveRcpts.flatMap(\.items)
+        let live = LiveBudgetPeriod(
+            transactions: liveItems.map { StreakTxn(periodIndex: 0, category: $0.category, amount: $0.lineTotal) },
+            monthlyAdjustment: paidSpend(liveRcpts) - netSpend(liveItems))
+
+        return StreakEngine.budgetStreaks(BudgetStreakInput(
+            transactions: txns, categoryBudgets: catBudgets, monthlyBudget: monthlyBudget,
+            kind: .budgetMonth, monthlyLabel: "",   // blank → the surface shows "Overall budget"
+            monthlyAdjustmentByPeriod: adjustment, live: live))
     }
 
     private static func winEmoji(_ type: TipType) -> String {
         switch type {
-        case .savingsWin: "🔥"
+        // §2.4 no-flames: the saving win used a 🔥; a calm 📈 keeps it a win, not a loss-framed streak.
+        case .savingsWin: "📈"
         case .categoryImproved: "📉"
         case .underPaceWin: "🎉"
         default: "✅"

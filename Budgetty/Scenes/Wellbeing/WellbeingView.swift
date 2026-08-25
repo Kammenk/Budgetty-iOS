@@ -59,6 +59,18 @@ func wbBandWord(_ band: WellbeingBand?) -> LocalizedStringKey {
     }
 }
 
+/// The band word as a resolved `String` (same keys as `wbBandWord`), for interpolating into the §3.5
+/// band-up pill — a `LocalizedStringKey` can't be nested inside another `Text`'s interpolation.
+func wbBandWordString(_ band: WellbeingBand?) -> String {
+    switch band {
+    case .needsWork: String(localized: "Needs work")
+    case .gettingThere: String(localized: "Getting there")
+    case .healthy: String(localized: "Healthy")
+    case .thriving: String(localized: "Thriving")
+    case nil: String(localized: "Not scored yet")
+    }
+}
+
 func wbTierColor(_ score: Int) -> Color {
     switch WellbeingEngine.tier(score) {
     case .good: Palette.good
@@ -80,6 +92,10 @@ struct WellbeingView: View {
     @Query(sort: \SavingsGoal.createdAt) private var goals: [SavingsGoal]
     @Query private var contributions: [SavingsContribution]
     @Query private var ignoredRows: [IgnoredSubscription]
+    // §3.2: the stored closed-month snapshots, oldest→newest (periodId "yyyy-MM" sorts chronologically).
+    // The last six are the sparkline's history; the `.task` below writes the just-closed month, and this
+    // query re-fetches so the newest closed month is included on the next render (Android's getRecent(6)).
+    @Query(sort: \WellbeingScoreEntity.periodId, order: .forward) private var scoreHistory: [WellbeingScoreEntity]
 
     @AppStorage(SettingsKey.monthStartDay) private var monthStartDay = 1
     @AppStorage(SettingsKey.dismissedWellbeingTips) private var dismissedRaw = ""
@@ -90,7 +106,7 @@ struct WellbeingView: View {
     private var summary: WellbeingSummary {
         WellbeingScan.run(receipts: receipts, budgets: budgets, recurring: recurring, goals: goals,
                           contributions: contributions, ignoredSubs: Set(ignoredRows.map(\.merchant)),
-                          monthStartDay: monthStartDay)
+                          monthStartDay: monthStartDay, storedHistory: Array(scoreHistory.suffix(6)))
     }
 
     var body: some View {
@@ -111,6 +127,10 @@ struct WellbeingView: View {
             WellbeingScoreStore.record(closedScore: summary.closedScore,
                                        closedPeriodId: summary.closedPeriodId, into: context)
         }
+        // Impression analytics (§3.3 / §2.6): fire once per unique content shown on the monthly view — a
+        // "+N to your score" pill for each visible actionable tip, and streak evidence for each surfaced
+        // budget streak. Keyed on stable content strings so re-renders of the same data don't over-count.
+        .onChange(of: impressionKey(summary), initial: true) { _, _ in logImpressions(summary) }
         .navigationTitle("Wellbeing")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
@@ -152,6 +172,11 @@ struct WellbeingView: View {
     private func scoreCard(_ summary: WellbeingSummary) -> some View {
         VStack(spacing: 16) {
             scoreRingHero(summary)
+            // §3.2: the sparkline replaces the old "vs last month" chip. Rendered only with ≥ 2 stored
+            // closed months (WellbeingHistory.trend is nil below that); the thin state shows nothing.
+            if let trend = summary.trend {
+                TrendSparkline(trend: trend, nowMonth: YearMonth(id: summary.periodId))
+            }
             Divider().overlay(Palette.separator)
             componentsSection(summary)
         }
@@ -172,21 +197,24 @@ struct WellbeingView: View {
                 }
             }
             .frame(width: 132, height: 132)
-            if let delta = summary.score.trendDeltaVsPrevious { trendChip(delta) }
+            // §3.5: the band-up nudge replaces the old "vs last month" chip, sitting just under the ring.
+            if let bandUp = summary.bandUp { bandUpPill(bandUp) }
         }
         .frame(maxWidth: .infinity)
     }
 
-    private func trendChip(_ delta: Int) -> some View {
-        let up = delta >= 0
-        return HStack(spacing: 5) {
-            Text(verbatim: (up ? "▲ " : "▼ ") + "\(abs(delta))")
+    // §3.5 Band-up nudge: an accessible warn-tone pill, never the bright band hue (matches the caution
+    // tip tone — Palette.warn content on a warn wash — the closest app-token mapping to the mockup's
+    // --warnc / --warnfg).
+    private func bandUpPill(_ bandUp: BandUp) -> some View {
+        HStack(spacing: 4) {
+            Image(systemName: "arrow.up").font(.system(size: 11, weight: .bold))
+            Text("\(bandUp.pointsAway) points to \(wbBandWordString(bandUp.nextBand))")
                 .font(.caption).fontWeight(.bold)
-                .foregroundStyle(up ? Palette.good : Palette.secondaryLabel)
-            Text("vs last month").font(.caption2).foregroundStyle(Palette.secondaryLabel)
         }
+        .foregroundStyle(Palette.warn)
         .padding(.horizontal, 12).padding(.vertical, 6)
-        .background(Palette.fill, in: Capsule())
+        .background(Palette.warn.opacity(0.15), in: Capsule())
     }
 
     private func componentsSection(_ summary: WellbeingSummary) -> some View {
@@ -234,6 +262,17 @@ struct WellbeingView: View {
 
             ProgressBarView(fraction: Double(comp.score ?? 0) / 100, color: color, height: 5, track: Palette.fill)
 
+            // §2.6: budget-adherence streak evidence hangs under the Budget row only — calm supporting
+            // detail, always visible (not gated behind expand).
+            if comp.key == .budget, !summary.budgetStreaks.isEmpty {
+                VStack(alignment: .leading, spacing: 3) {
+                    ForEach(Array(summary.budgetStreaks.enumerated()), id: \.offset) { _, streak in
+                        streakEvidenceRow(streak)
+                    }
+                }
+                .padding(.top, 8)
+            }
+
             if isOpen && !excluded {
                 VStack(alignment: .leading, spacing: 8) {
                     Text(componentWhy(comp.key, summary.detail[comp.key]))
@@ -253,6 +292,29 @@ struct WellbeingView: View {
             }
         }
         .padding(.vertical, 8)
+    }
+
+    // §2.6 streak evidence: the reused StreakMotif (small — capped at 6 segments) + "<scope> — N months
+    // under". Blank scope → "Overall budget". No flames. `current` is always ≥ 2 here (surfaced), so the
+    // always-plural "months" is grammatically safe (matches the Recap streak copy convention).
+    private func streakEvidenceRow(_ streak: Streak) -> some View {
+        let scope = streak.label.isEmpty ? String(localized: "Overall budget")
+            : Categories.displayName(streak.label)
+        return HStack(spacing: 8) {
+            StreakMotif(filledCount: streak.current, showLive: streak.liveOnTrack, maxSegments: 6)
+            Text("\(scope) — \(streak.current) months under")
+                .font(.caption2).foregroundStyle(Palette.secondaryLabel)
+            Spacer(minLength: 0)
+        }
+    }
+
+    // §3.3 pill: "+N to your score" in the good tone on a good wash (matches the wins strip / .healthy
+    // chip fill — the closest app-token mapping to the mockup's --goodc / --good).
+    private func projectedGainPill(_ gain: Int) -> some View {
+        Text("+\(gain) to your score")
+            .font(.caption2).fontWeight(.bold).foregroundStyle(Palette.good)
+            .padding(.horizontal, 8).padding(.vertical, 4)
+            .background(Palette.good.opacity(0.15), in: Capsule())
     }
 
     // MARK: - Weekly
@@ -395,6 +457,11 @@ struct WellbeingView: View {
                     if let detail = tipDetail(tip) {
                         detail.font(.caption).foregroundStyle(Palette.secondaryLabel)
                     }
+                    // §3.3: the modelled "+N to your score" pill, shown only when it clears the floor
+                    // (≥ 2). Suppressed for < 2 and — critically — any non-positive renormalisation delta.
+                    if WellbeingEngine.showsProjectedGain(tip.projectedGain) {
+                        projectedGainPill(tip.projectedGain ?? 0).padding(.top, 6)
+                    }
                 }
                 Spacer(minLength: 4)
                 Button { dismissTip(tip, summary: summary) } label: {
@@ -483,6 +550,31 @@ struct WellbeingView: View {
         var set = WellbeingTipsStore.set(dismissedRaw)
         set.insert(WellbeingTipsStore.entry(period: summary.periodId, tip: tip.id))
         dismissedRaw = WellbeingTipsStore.csv(set)
+    }
+
+    /// A stable digest of the monthly-view impressions worth counting (§3.3 gain pills + §2.6 surfaced
+    /// streaks), so `onChange` fires the analytics once per unique content and not on every re-render.
+    /// Weekly mode digests to a constant, so switching there logs nothing.
+    private func impressionKey(_ summary: WellbeingSummary) -> String {
+        guard mode == .monthly else { return "weekly" }
+        let gains = visible(summary.monthlyTips, summary)
+            .filter { WellbeingEngine.showsProjectedGain($0.projectedGain) }
+            .map { "\($0.type.token):\($0.projectedGain ?? 0)" }.joined(separator: ",")
+        let streaks = summary.hasScore
+            ? summary.budgetStreaks.map { "\($0.kind.token):\($0.current)" }.joined(separator: ",") : ""
+        return "m|\(gains)|\(streaks)"
+    }
+
+    /// Fires the §3.3 / §2.6 impression events for the current monthly content (Android parity:
+    /// `onProjectedGainShown` / `onStreakSurfaced`). No-op off the monthly view.
+    private func logImpressions(_ summary: WellbeingSummary) {
+        guard mode == .monthly else { return }
+        for tip in visible(summary.monthlyTips, summary) where WellbeingEngine.showsProjectedGain(tip.projectedGain) {
+            Analytics.logTipProjectedGain(tip.type, gain: tip.projectedGain ?? 0)
+        }
+        if summary.hasScore {
+            for streak in summary.budgetStreaks { Analytics.logStreakSurfaced(streak.kind, length: streak.current) }
+        }
     }
 
     // MARK: - Localised copy
@@ -663,5 +755,115 @@ struct WellbeingEntryRow: View {
         .padding(.horizontal, 14).padding(.vertical, 12)
         .frame(maxWidth: .infinity, alignment: .leading)
         .contentCard(cornerRadius: 20)
+    }
+}
+
+// MARK: - §3.2 Trend sparkline
+
+/// The six-point trend sparkline (§3.2): the last CLOSED months as a solid `--tint` polyline + dots,
+/// then a dashed ghost segment to a hollow dot for the in-flight month. Hand-rolled with SwiftUI
+/// `Canvas` (no chart library) — the Swift port of Android's `TrendSparkline`/`SparklineCanvas`. Calm:
+/// no gridlines, no axis clutter. Rendered only when a `WellbeingTrend` exists (≥ 2 stored months); the
+/// caller shows nothing otherwise. `nowMonth` labels the ghost's x-position.
+private struct TrendSparkline: View {
+    let trend: WellbeingTrend
+    let nowMonth: YearMonth?
+
+    // Chart geometry (mirrors Android's SparklineHeight / DotRadius / GhostRadius / Stroke).
+    private let chartHeight: CGFloat = 64
+    private let dotRadius: CGFloat = 3
+    private let ghostRadius: CGFloat = 3.5
+    private let stroke: CGFloat = 2
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("LAST SIX CLOSED MONTHS")
+                .font(.caption2).fontWeight(.bold).kerning(0.5).foregroundStyle(Palette.secondaryLabel)
+            sparkline.frame(maxWidth: .infinity).frame(height: chartHeight)
+            HStack {
+                Text(verbatim: shortMonth(trend.firstMonth))
+                Spacer()
+                Text(verbatim: shortMonth(rightAxisMonth))
+            }
+            .font(.caption2).foregroundStyle(Palette.secondaryLabel)
+            caption.font(.caption).foregroundStyle(Palette.secondaryLabel)
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Palette.tertiaryBackground, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+    }
+
+    /// The right x-label: the in-flight month when a live ghost exists, else the last closed month.
+    private var rightAxisMonth: YearMonth {
+        trend.liveScore != nil ? (nowMonth ?? trend.closed.last!.yearMonth) : trend.closed.last!.yearMonth
+    }
+
+    private var sparkline: some View {
+        let line = Palette.tint
+        let surface = Palette.tertiaryBackground     // the card fill — knocks the ghost dot's hole
+        let ghost = line.opacity(0.45)
+        return Canvas { ctx, size in
+            let closed = trend.closed
+            let hasGhost = trend.liveScore != nil
+            let scores = closed.map(\.score) + (trend.liveScore.map { [$0] } ?? [])
+            let minS = Double(scores.min() ?? 0)
+            let range = Double(max((scores.max() ?? 0) - (scores.min() ?? 0), 1))
+            let padX = ghostRadius + stroke
+            let padY = ghostRadius + stroke
+            let count = closed.count + (hasGhost ? 1 : 0)
+            func x(_ i: Int) -> CGFloat {
+                count <= 1 ? size.width / 2 : padX + (size.width - 2 * padX) * CGFloat(i) / CGFloat(count - 1)
+            }
+            func y(_ s: Int) -> CGFloat {
+                size.height - padY - CGFloat((Double(s) - minS) / range) * (size.height - 2 * padY)
+            }
+            // Solid polyline over the closed months.
+            var path = Path()
+            for (i, p) in closed.enumerated() {
+                let pt = CGPoint(x: x(i), y: y(p.score))
+                if i == 0 { path.move(to: pt) } else { path.addLine(to: pt) }
+            }
+            ctx.stroke(path, with: .color(line),
+                       style: StrokeStyle(lineWidth: stroke, lineCap: .round, lineJoin: .round))
+            // Dashed ghost segment to the in-flight month.
+            if hasGhost, let last = closed.last, let live = trend.liveScore {
+                var g = Path()
+                g.move(to: CGPoint(x: x(closed.count - 1), y: y(last.score)))
+                g.addLine(to: CGPoint(x: x(closed.count), y: y(live)))
+                ctx.stroke(g, with: .color(ghost),
+                           style: StrokeStyle(lineWidth: stroke, lineCap: .round, dash: [stroke * 1.5, stroke * 2]))
+            }
+            // Solid dots at the closed months.
+            for (i, p) in closed.enumerated() {
+                ctx.fill(dot(x(i), y(p.score), dotRadius), with: .color(line))
+            }
+            // Hollow ghost dot: knock a hole with the surface colour, then stroke the ghost ring.
+            if hasGhost, let live = trend.liveScore {
+                let rect = dot(x(closed.count), y(live), ghostRadius)
+                ctx.fill(rect, with: .color(surface))
+                ctx.stroke(rect, with: .color(ghost), lineWidth: stroke)
+            }
+        }
+    }
+
+    private func dot(_ cx: CGFloat, _ cy: CGFloat, _ r: CGFloat) -> Path {
+        Path(ellipseIn: CGRect(x: cx - r, y: cy - r, width: r * 2, height: r * 2))
+    }
+
+    private var caption: Text {
+        let month = fullMonth(trend.firstMonth)
+        if trend.deltaSinceFirst > 0 { return Text("Up \(trend.deltaSinceFirst) since \(month).") }
+        if trend.deltaSinceFirst < 0 { return Text("Down \(-trend.deltaSinceFirst) since \(month).") }
+        return Text("Steady since \(month).")
+    }
+
+    private func date(_ ym: YearMonth) -> Date {
+        Calendar.current.date(from: DateComponents(year: ym.year, month: ym.month, day: 1)) ?? .now
+    }
+    private func shortMonth(_ ym: YearMonth) -> String {
+        let f = DateFormatter(); f.setLocalizedDateFormatFromTemplate("MMM"); return f.string(from: date(ym))
+    }
+    private func fullMonth(_ ym: YearMonth) -> String {
+        let f = DateFormatter(); f.setLocalizedDateFormatFromTemplate("MMMM"); return f.string(from: date(ym))
     }
 }
