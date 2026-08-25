@@ -96,7 +96,9 @@ struct RootView: View {
         .fullScreenCover(isPresented: $showScan) { ScanFlowView().coversFloatingDock() }
         .fullScreenCover(isPresented: $showRecap) {
             if let story = recapStory {
-                RecapStoryView(story: story, onClose: closeRecap, onSeeDetails: openRecapDetails)
+                RecapStoryView(story: story, onClose: closeRecap, onSeeDetails: openRecapDetails,
+                               onShown: { Analytics.logRecapShown($0) },
+                               onCompleted: { Analytics.logRecapCompleted($0, cardsViewed: $1) })
             }
         }
         .task { await maybeShowRecap() }

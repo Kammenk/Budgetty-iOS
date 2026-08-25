@@ -405,7 +405,8 @@ struct WellbeingView: View {
                 .accessibilityLabel("Dismiss")
             }
             HStack(spacing: 8) {
-                Button { go(tipCta(tip.type)) } label: {
+                // §0 analytics: the tip's CTA was acted on (Android parity: onTipActed before nav).
+                Button { Analytics.logTipActed(tip.type); go(tipCta(tip.type)) } label: {
                     Text(tipCtaLabel(tip.type)).font(.caption).fontWeight(.bold).foregroundStyle(Palette.tint)
                         .padding(.horizontal, 14).padding(.vertical, 8)
                         .background(Palette.tintSoft, in: Capsule())

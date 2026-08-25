@@ -18,6 +18,12 @@ struct RecapStoryView: View {
     let story: RecapStory
     var onClose: () -> Void
     var onSeeDetails: () -> Void
+    /// Analytics (§0): fired once when the story appears (scheduled interstitial only — the Insights
+    /// re-open passes the default no-ops, matching Android's `RecapStoryScreen` params).
+    var onShown: (RecapKind) -> Void = { _ in }
+    /// Analytics (§0): fired on exit with the highest card reached + 1, so a bare cover read (1) is
+    /// distinguishable from a full read.
+    var onCompleted: (RecapKind, Int) -> Void = { _, _ in }
 
     @State private var index: Int = {
         #if DEBUG
@@ -26,6 +32,8 @@ struct RecapStoryView: View {
         return 0
     }()
     @State private var forward = true
+    /// Highest card index the user reached, for `recap_completed`'s `cards_viewed` (Android parity).
+    @State private var highestCard = 0
 
     private var cards: [RecapCard] { story.cards }
     private var currentIndex: Int { min(index, max(0, cards.count - 1)) }
@@ -37,6 +45,15 @@ struct RecapStoryView: View {
             chrome
         }
         .background(Palette.groupedBackground.ignoresSafeArea())
+        // §0 analytics: count the story as shown once it appears, track how far the user gets, and — on
+        // any exit path (✕, Done, See details, or the gate un-mounting it) — report the highest card
+        // reached + 1. Mirrors Android's RecapStoryScreen DisposableEffect(onShown / onDispose→onCompleted).
+        .onChange(of: currentIndex) { _, new in if new > highestCard { highestCard = new } }
+        .task {
+            if currentIndex > highestCard { highestCard = currentIndex }
+            onShown(story.kind)
+        }
+        .onDisappear { onCompleted(story.kind, highestCard + 1) }
     }
 
     // MARK: - Card layer (per-card backdrop + centred content)

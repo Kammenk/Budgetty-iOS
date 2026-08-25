@@ -1414,3 +1414,47 @@ layer — reads are `@Query`; the DAO's idempotent upsert + IGNORE-restore live 
 
 **Status:** BUILD SUCCEEDED (iPhone 17 Pro sim, iOS 26). Full suite green — 224 tests / 27 suites, incl.
 the two new suites. Trend sparkline UI (§3.2) is deferred; the history it reads is now being recorded.
+
+---
+
+## Android → iOS — Retention foundation §0 Firebase Analytics — 2026-08-25
+
+Port of Android's `analytics/Analytics.kt` + `AppSettings.analyticsEnabled` + `SettingsStore`
+(KEY_ANALYTICS) + `BudgettyApplication` gating + the `AccountScreen` row (retention spec §0). The
+measurement baseline that lands before the mechanics.
+
+- **`FirebaseAnalytics` product linked** — the target linked Core/Auth/Crashlytics but not Analytics;
+  added the `FirebaseAnalytics` package product (same already-resolved `firebase-ios-sdk`) to the app
+  target in the pbxproj (build file + Frameworks phase + `packageProductDependencies` + product dep).
+- **`Support/Analytics.swift`** (new) — one typed method per event with the **identical** Android names +
+  params: `recap_shown{kind}`, `recap_completed{kind,cards_viewed}`, `streak_surfaced{kind,length}`,
+  `tip_acted{type}`, `tip_projected_gain{type,gain}`, `limit_created{source}`. Event names + param keys
+  live only in private `Event`/`Param` enums; param values are enum `token`s = the Android
+  `enum.name.lowercase()` (RecapKind/TipType tokens added here, StreakKind/LimitSource carry their own).
+  **Only enums + ints — no PII** (no category/item/store name, amount, or email). Firebase's `Analytics`
+  type is module-qualified (`FirebaseAnalytics.Analytics`) to avoid a name clash with this wrapper.
+- **Opt-out toggle** — `SettingsKey.analytics` (fresh key `pref.analyticsEnabled`, default true, opt-out,
+  device-global, NOT reset on sign-out — mirrors `crashReporting`). Applied at launch in
+  `FirebaseBootstrap.configure` right after the Crashlytics line, and on every toggle change. A dedicated
+  Account "Usage analytics" row beside Crash reporting (title + subtitle, orange bar-chart icon).
+- **Strings** — `account_analytics` + `account_analytics_sub` spliced into `Localizable.xcstrings` in all
+  16 locales (English matches Android's copy; translations pulled from Android's shipped `strings.xml`).
+  873 → 875 keys; semantic key-diff = exactly +2 added, 0 removed, 0 existing keys modified.
+- **Events wired now:** `recap_shown` (on the scheduled interstitial's appear) + `recap_completed` (on
+  dismiss, `cards_viewed` = highest card reached + 1) via new `RecapStoryView` callbacks that RootView
+  passes (the Insights re-open keeps the default no-ops — not a "scheduled recap"); `tip_acted` on a
+  Wellbeing tip CTA; `limit_created(.manual)` on a new-limit save. **Stubbed** (event shape fixed, wired
+  when §1/§3/§4 UI lands): `streak_surfaced`, `tip_projected_gain`, `limit_created(.suggestion)`.
+- **No ATT / no AD_ID:** default Firebase Analytics collects no IDFA (no `AdSupport` linked), so no App
+  Tracking Transparency prompt is added; iOS has no Android AD_ID manifest concern.
+
+**Justified iOS deviations:** `Analytics` is a static `enum` (like `CrashReporting`), not a Koin-injected
+class. Crash reporting on iOS had no subtitle; the analytics row adds a subtitle-aware `label` overload.
+
+**Store follow-ups (not code):** the App Store Connect App Privacy label must declare the analytics data
+(not linked, not tracking) + a privacy-policy line — the iOS equivalent of Android's Play Data-safety
+update.
+
+**Status:** BUILD SUCCEEDED (iPhone 17 Pro sim, iOS 26) with FirebaseAnalytics linked. Full suite green —
+224 tests / 27 suites. Simulator screenshot of Account → Privacy & Security confirms the "Usage
+analytics" toggle (title + subtitle + orange chart icon) beside Crash reporting, matching Android.

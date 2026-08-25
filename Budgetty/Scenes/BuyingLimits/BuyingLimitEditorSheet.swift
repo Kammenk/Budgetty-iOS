@@ -307,6 +307,9 @@ struct BuyingLimitEditorSheet: View {
         } else {
             context.insert(BuyingLimit(emoji: trimmedEmoji, label: trimmedLabel, keywords: normalized,
                                        timeframe: timeframe, count: max(count, 1)))
+            // §0 analytics: a brand-new limit from the editor. Suggestion-sourced creation (§4.4) will
+            // pass .suggestion when that flow lands; the editor is always .manual.
+            Analytics.logLimitCreated(.manual)
         }
         try? context.save()
         dismiss()

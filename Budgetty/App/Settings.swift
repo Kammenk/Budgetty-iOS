@@ -24,8 +24,13 @@ enum SettingsKey {
     /// Auto-lock delay in minutes: 0 = immediately, 1, or 5.
     static let autoLockMinutes = "pref.autoLockMinutes"
     /// Crashlytics collection — default-ON with an opt-out toggle (see `CrashReporting`).
-    /// Unlike the `analytics` and `notifications` keys deleted alongside the trim, this one is read.
+    /// Unlike the `notifications` key deleted alongside the trim, this one is read.
     static let crashReporting = "pref.crashReporting"
+    /// Product analytics collection (Firebase Analytics, §0) — default-ON with an opt-out toggle,
+    /// SEPARATE from crash reporting (see `Analytics`). Device-global like `crashReporting` — NOT reset
+    /// on sign-out. Android parity: `SettingsStore` KEY_ANALYTICS. A fresh key string (the pre-trim
+    /// `analytics` key was removed) so no stale value is resurrected.
+    static let analytics = "pref.analyticsEnabled"
     static let premium = "pref.premium"           // effective Premium flag (subscription OR comped account)
     /// Account-comp entitlement cache: the server-granted `premium` auth claim (see `CompEntitlement`,
     /// set by functions/tools/comp.js). Cached so a comped account shows Premium instantly on launch.
