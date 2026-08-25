@@ -62,7 +62,24 @@ struct RootView: View {
     /// Measured height of `bottomChrome`, handed to the tab roots so their scroll content clears it.
     @State private var chromeHeight: CGFloat = 0
     @Environment(\.horizontalSizeClass) private var hSize
+    @Environment(\.modelContext) private var modelContext
+    @Environment(\.appLocked) private var appLocked
+    @Environment(BuyingLimitNudgeCenter.self) private var buyingLimitNudge
+    @AppStorage(SettingsKey.monthStartDay) private var monthStartDay = 1
+    @State private var showBuyingLimits = false
     @Namespace private var dockNS
+
+    // End-of-period recap interstitial (see `RecapScheduler` / `RecapBuilder`). The cheap due-check runs
+    // on app open once the lock (if any) has cleared; the story loads only when a boundary is due, and
+    // is hosted as a full-screen cover over the live shell (the dock stays untouched).
+    @AppStorage(SettingsKey.recapEnabled) private var recapEnabled = true
+    @AppStorage(SettingsKey.recapFrequency) private var recapFrequencyRaw = RecapFrequency.monthly.rawValue
+    @AppStorage(SettingsKey.recapLastShownWeek) private var recapLastShownWeek = ""
+    @AppStorage(SettingsKey.recapLastShownMonth) private var recapLastShownMonth = ""
+    @State private var recapStory: RecapStory?
+    @State private var recapDue: RecapDue?
+    @State private var showRecap = false
+    @State private var recapChecked = false
 
     var body: some View {
         Group {
@@ -77,11 +94,122 @@ struct RootView: View {
             #endif
         }
         .fullScreenCover(isPresented: $showScan) { ScanFlowView().coversFloatingDock() }
+        .fullScreenCover(isPresented: $showRecap) {
+            if let story = recapStory {
+                RecapStoryView(story: story, onClose: closeRecap, onSeeDetails: openRecapDetails)
+            }
+        }
+        .task { await maybeShowRecap() }
+        .onChange(of: appLocked) { _, locked in
+            // Once the lock clears, run the deferred due-check (it was skipped while locked).
+            if !locked { Task { await maybeShowRecap() } }
+        }
+        // The save-time buying-limit nudge floats over the live shell (no scrim) just above the dock —
+        // shown wherever the user lands after the scan cover dismisses, so it's never missed. "View
+        // limits" opens the Buying limits screen; the receipt is already saved either way.
+        .overlay(alignment: .bottom) { nudgeOverlay }
+        .sheet(isPresented: $showBuyingLimits) { NavigationStack { BuyingLimitsView().coversFloatingDock() } }
         .onAppear {
             #if DEBUG
             if ProcessInfo.processInfo.environment["SHOW_SCAN"] == "1" { showScan = true }
+            if ProcessInfo.processInfo.environment["BL_NUDGE"] == "1", buyingLimitNudge.pending == nil {
+                buyingLimitNudge.post(BuyingLimitNudge(title: "Fizzy drinks", emoji: "🥤",
+                    countAfter: 4, limitCount: 3, timeframe: .monthly))
+            }
             #endif
         }
+    }
+
+    /// The floating nudge card, lifted clear of the dock chrome. Padding is tuned so it clears the
+    /// custom dock (compact) / tab-bar accessory (regular) without covering it.
+    @ViewBuilder
+    private var nudgeOverlay: some View {
+        if let nudge = buyingLimitNudge.pending {
+            BuyingLimitNudgeCard(
+                nudge: nudge,
+                monthStartDay: monthStartDay,
+                onDismiss: { withAnimation(.spring(duration: 0.3)) { buyingLimitNudge.clear() } },
+                onView: {
+                    buyingLimitNudge.clear()
+                    showBuyingLimits = true
+                }
+            )
+            .padding(.horizontal, 14)
+            .padding(.bottom, hSize == .compact ? chromeHeight + Dimens.spaceS : 96)
+            .transition(.move(edge: .bottom).combined(with: .opacity))
+        }
+    }
+
+    // MARK: - End-of-period recap
+
+    /// The cheap due-check (settings + clock, no store) short-circuits the common "nothing due" open;
+    /// only when a boundary is due does it load the story off the just-closed period. Runs at most once
+    /// per session, and only once the app-lock (if any) has cleared. On a guard-skip (first-run / no
+    /// data) it stamps the period(s) shown and shows nothing, so no empty recap appears. Android parity:
+    /// `RecapGate` + `RecapViewModel`.
+    @MainActor
+    private func maybeShowRecap() async {
+        #if DEBUG
+        // Don't stack the interstitial over a SHOW_SCREEN debug/screenshot screen.
+        if hasDebugPreview { return }
+        #endif
+        guard !recapChecked, !appLocked else { return }
+        let ctx = modelContext
+        let receipts = (try? ctx.fetch(FetchDescriptor<Receipt>(
+            sortBy: [SortDescriptor(\.createdAt, order: .reverse)]))) ?? []
+        // A store with no receipts at all is a brand-new user (nothing to recap) — or, in DEBUG, sample
+        // seeding that hasn't committed yet. Either way don't stamp: a later cold launch re-checks once
+        // there's data, so the boundary is never spuriously consumed. With ANY receipts we proceed and
+        // stamp-on-skip exactly like Android.
+        guard !receipts.isEmpty else { return }
+        recapChecked = true
+        let frequency = RecapFrequency(rawValue: recapFrequencyRaw) ?? .monthly
+        guard let due = RecapScheduler.due(
+            enabled: recapEnabled, frequency: frequency,
+            lastShownWeek: recapLastShownWeek, lastShownMonth: recapLastShownMonth,
+            today: .now, startDay: monthStartDay, firstWeekday: BuyingLimitCounter.localeFirstWeekday()
+        ) else { return }
+
+        if let story = buildRecapStory(due.show, receipts: receipts, context: ctx) {
+            recapStory = story
+            recapDue = due
+            showRecap = true
+        } else {
+            // Guard skipped (under the receipt floor / no period spend): stamp so it isn't re-checked.
+            stampRecapShown(due)
+        }
+    }
+
+    @MainActor
+    private func buildRecapStory(_ kind: RecapKind, receipts: [Receipt], context ctx: ModelContext) -> RecapStory? {
+        let budgets = (try? ctx.fetch(FetchDescriptor<Budget>())) ?? []
+        let recurring = (try? ctx.fetch(FetchDescriptor<Recurring>())) ?? []
+        let goals = (try? ctx.fetch(FetchDescriptor<SavingsGoal>())) ?? []
+        let contributions = (try? ctx.fetch(FetchDescriptor<SavingsContribution>())) ?? []
+        let ignored = (try? ctx.fetch(FetchDescriptor<IgnoredSubscription>())) ?? []
+        let limits = (try? ctx.fetch(FetchDescriptor<BuyingLimit>())) ?? []
+        return RecapBuilder.build(kind: kind, offset: -1, receipts: receipts, budgets: budgets,
+                                  recurring: recurring, goals: goals, contributions: contributions,
+                                  ignoredSubs: Set(ignored.map(\.merchant)), limits: limits,
+                                  monthStartDay: monthStartDay)
+    }
+
+    /// Stamps the due period(s) as shown so a period's recap fires at most once. Android: `setRecapShown`.
+    private func stampRecapShown(_ due: RecapDue) {
+        if let week = due.markWeek { recapLastShownWeek = week }
+        if let month = due.markMonth { recapLastShownMonth = month }
+    }
+
+    private func closeRecap() {
+        if let due = recapDue { stampRecapShown(due) }
+        showRecap = false
+    }
+
+    /// "See details" on the last card exits to Insights; the recap is stamped either way.
+    private func openRecapDetails() {
+        if let due = recapDue { stampRecapShown(due) }
+        showRecap = false
+        tab = .insights
     }
 
     // MARK: - Adaptive tab bar
@@ -285,13 +413,15 @@ struct RootView: View {
         case "widgets": NavigationStack { WidgetsView() }
         case "lock": LockScreenView(onUnlocked: {})
         case "memory": DebugMemorySheet()
+        case "buyinglimits": NavigationStack { DebugBuyingLimits() }
+        case "recap": RecapStoryView(story: .debugMonthlySample(), onClose: {}, onSeeDetails: {})
         default: EmptyView().hidden()
         }
     }
 
     private var hasDebugPreview: Bool {
         ["account", "paywall", "receipt", "category", "review",
-         "notifications", "support", "widgets", "lock", "memory"]
+         "notifications", "support", "widgets", "lock", "memory", "buyinglimits", "recap"]
             .contains(ProcessInfo.processInfo.environment["SHOW_SCREEN"] ?? "")
     }
     #endif
@@ -344,6 +474,39 @@ private struct DebugMemorySheet: View {
             CategoryMemorySheet(itemName: "Wholegrain bread", oldCategory: "Snacks & Sweets",
                                 newCategory: "Bakery") { _ in }
         }
+    }
+}
+#endif
+
+#if DEBUG
+/// Seeds three buying limits (on-track / at-limit / over) plus matching line items, for the
+/// SHOW_SCREEN=buyinglimits screenshot hook — the screen derives its counts off real line items.
+private struct DebugBuyingLimits: View {
+    @Environment(\.modelContext) private var context
+    @Query private var limits: [BuyingLimit]
+
+    var body: some View {
+        BuyingLimitsView().onAppear(perform: seed)
+    }
+
+    private func seed() {
+        guard limits.isEmpty else { return }
+        let now = Date()
+        let receipt = Receipt(createdAt: now, store: "Debug", date: now)
+        context.insert(receipt)
+        for (name, qty) in [("Red Bull 250ml", 1), ("Coffee latte", 5),
+                            ("Coca-Cola 1L", 2), ("Fanta Orange", 2)] {
+            let li = LineItem(name: name, createdAt: now, price: 1, quantity: qty)
+            li.receipt = receipt
+            context.insert(li)
+        }
+        context.insert(BuyingLimit(emoji: "⚡", label: "Energy drinks",
+                                   keywords: ["red bull", "monster"], timeframe: .weekly, count: 2))
+        context.insert(BuyingLimit(emoji: "☕", label: "Takeaway coffee",
+                                   keywords: ["coffee"], timeframe: .weekly, count: 5))
+        context.insert(BuyingLimit(emoji: "🥤", label: "Fizzy drinks",
+                                   keywords: ["coke", "cola", "fanta"], timeframe: .monthly, count: 3))
+        try? context.save()
     }
 }
 #endif

@@ -15,7 +15,7 @@ struct PremiumBenefitsTests {
     /// Every "real" benefit must be one something actually gates on. If a future row is added here,
     /// it needs an enforcing constant — or it belongs in `soon`.
     @Test func realBenefitsAreOnlyTheEnforcedOnes() {
-        #expect(PremiumBenefits.real.map(\.id) == ["scans", "categories", "recurring", "widgets", "themes"])
+        #expect(PremiumBenefits.real.map(\.id) == ["scans", "categories", "recurring", "widgets", "limits", "themes"])
     }
 
     /// The numbers must come from the constants, not be retyped. Change a cap and this fails until
@@ -32,6 +32,9 @@ struct PremiumBenefitsTests {
 
         let widgets = try #require(PremiumBenefits.real.first(where: { $0.id == "widgets" }))
         #expect(widgets.detail.contains("\(WidgetQuota.freeLimit)"))
+
+        let limits = try #require(PremiumBenefits.real.first(where: { $0.id == "limits" }))
+        #expect(limits.detail.contains("\(BuyingLimitQuota.freeLimit)"))
     }
 
     /// The themes row names three accents; they have to exist, or it's the old "advertise what you

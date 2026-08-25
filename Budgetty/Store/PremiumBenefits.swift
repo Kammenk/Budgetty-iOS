@@ -70,6 +70,12 @@ enum PremiumBenefits {
                 detail: String(localized: "Free plan includes \(WidgetQuota.freeLimit)")
             ),
             PremiumBenefit(
+                id: "limits",
+                symbol: "chart.bar.xaxis",
+                title: String(localized: "Unlimited buying limits"),
+                detail: String(localized: "Free plan includes \(BuyingLimitQuota.freeLimit)")
+            ),
+            PremiumBenefit(
                 id: "themes",
                 symbol: "paintpalette",
                 title: String(localized: "Every accent theme"),

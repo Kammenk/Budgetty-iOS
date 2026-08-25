@@ -24,6 +24,11 @@ struct BackupFile: Codable {
     var rules: [RuleDTO] = []
     var categories: [CategoryDTO] = []   // custom categories only
     var savingsGoals: [SavingsGoalDTO] = []
+    /// Optional so a pre-buying-limits backup (no key) still decodes — Swift's synthesized `Decodable`
+    /// throws on a missing non-optional key, so a later-added collection must be optional (same reason
+    /// `CategoryDTO.parent` is). `BackupService.restore` reads it with `?? []`; buying limits carry no
+    /// child rows → no id remap.
+    var buyingLimits: [BuyingLimitDTO]? = []
 
     var itemCount: Int { receipts.reduce(0) { $0 + $1.items.count } }
 }
@@ -119,6 +124,19 @@ struct SavingsContributionDTO: Codable {
     init(_ c: SavingsContribution) { amount = c.amount; note = c.note; date = c.date }
 }
 
+struct BuyingLimitDTO: Codable {
+    var emoji: String
+    var label: String
+    var keywords: [String]
+    var timeframeRaw: String
+    var count: Int
+    var createdAt: Date
+    init(_ l: BuyingLimit) {
+        emoji = l.emoji; label = l.label; keywords = l.keywords
+        timeframeRaw = l.timeframeRaw; count = l.count; createdAt = l.createdAt
+    }
+}
+
 // MARK: - Service
 
 enum BackupService {
@@ -153,7 +171,8 @@ enum BackupService {
             recurring: try context.fetch(FetchDescriptor<Recurring>()).map(RecurringDTO.init),
             rules: try context.fetch(FetchDescriptor<CategoryRule>()).map(RuleDTO.init),
             categories: try context.fetch(FetchDescriptor<Category>()).filter(\.isCustom).map(CategoryDTO.init),
-            savingsGoals: try context.fetch(FetchDescriptor<SavingsGoal>()).map(SavingsGoalDTO.init)
+            savingsGoals: try context.fetch(FetchDescriptor<SavingsGoal>()).map(SavingsGoalDTO.init),
+            buyingLimits: try context.fetch(FetchDescriptor<BuyingLimit>()).map(BuyingLimitDTO.init)
         )
         return try encoder().encode(file)
     }
@@ -175,6 +194,7 @@ enum BackupService {
             for r in try context.fetch(FetchDescriptor<CategoryRule>()) { context.delete(r) }
             for c in try context.fetch(FetchDescriptor<Category>()) where c.isCustom { context.delete(c) }
             for g in try context.fetch(FetchDescriptor<SavingsGoal>()) { context.delete(g) } // cascades to contributions
+            for l in try context.fetch(FetchDescriptor<BuyingLimit>()) { context.delete(l) }
             try context.save() // flush deletes before re-inserting unique-keyed rows
         }
 
@@ -232,6 +252,16 @@ enum BackupService {
             for c in dto.contributions {
                 context.insert(SavingsContribution(amount: c.amount, note: c.note, date: c.date, goal: goal))
             }
+        }
+
+        // Buying limits — no unique key, no child rows; additive with fresh ids. Keywords are
+        // re-normalized on the way in so an older backup's raw values land canonical. `?? []` absorbs a
+        // pre-buying-limits backup that omits the field entirely.
+        for dto in file.buyingLimits ?? [] {
+            context.insert(BuyingLimit(emoji: dto.emoji, label: dto.label,
+                                       keywords: BuyingLimit.normalizedKeywords(dto.keywords),
+                                       timeframe: BuyingLimitTimeframe(rawValue: dto.timeframeRaw) ?? .monthly,
+                                       count: dto.count, createdAt: dto.createdAt))
         }
 
         try context.save()

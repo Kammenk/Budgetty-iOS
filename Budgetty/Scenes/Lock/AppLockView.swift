@@ -10,6 +10,12 @@
 import SwiftUI
 import LocalAuthentication
 
+extension EnvironmentValues {
+    /// True while the app-lock gate is covering content (cold start locked, or re-locked on resume).
+    /// The end-of-period recap interstitial waits for this to clear so it never presents over the lock.
+    @Entry var appLocked: Bool = false
+}
+
 // MARK: - Gate
 
 struct AppLockGate<Content: View>: View {
@@ -28,6 +34,7 @@ struct AppLockGate<Content: View>: View {
 
     var body: some View {
         content()
+            .environment(\.appLocked, locked && appLockEnabled)
             .overlay {
                 if locked && appLockEnabled {
                     LockScreenView { locked = false }

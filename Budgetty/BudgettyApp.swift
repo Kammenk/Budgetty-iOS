@@ -17,6 +17,8 @@ struct BudgettyApp: App {
 
     @State private var auth: AuthModel
     @State private var store: StoreManager
+    /// App-scoped hand-off for the save-time buying-limit nudge (the scan flow posts, the shell shows).
+    @State private var buyingLimitNudge = BuyingLimitNudgeCenter()
 
     @Environment(\.scenePhase) private var scenePhase
     @AppStorage(SettingsKey.appearance) private var appearanceRaw = AppearancePref.system.rawValue
@@ -106,6 +108,7 @@ struct BudgettyApp: App {
             }
             .environment(auth)
             .environment(store)
+            .environment(buyingLimitNudge)
             .tint(Palette.tint)
             .preferredColorScheme((AppearancePref(rawValue: appearanceRaw) ?? .system).colorScheme)
             .task { @MainActor in prepare(container) }

@@ -28,6 +28,11 @@ struct InsightsView: View {
     /// The pay-cycle start day; the money-flow snapshot and the MONTH period follow it (re-read here
     /// so the screen re-renders when "Month starts on" changes).
     @AppStorage(SettingsKey.monthStartDay) private var monthStartDay = 1
+    // Re-open the last recap: the door only exists once a recap has actually been shown for a closed
+    // period (Android's `showRecapEntry`). Recomputed on demand by `RecapReopenView`.
+    @AppStorage(SettingsKey.recapLastShownWeek) private var recapLastShownWeek = ""
+    @AppStorage(SettingsKey.recapLastShownMonth) private var recapLastShownMonth = ""
+    @State private var showRecapReopen = false
 
     /// The window the whole screen is scoped to; the stepper walks it one unit at a time.
     @State private var period: InsightsPeriod = {
@@ -81,6 +86,7 @@ struct InsightsView: View {
                 InsightsCustomizeSheet(orderRaw: $orderRaw, hiddenRaw: $hiddenRaw)
             }
             .sheet(isPresented: $showCustomSheet) { DateRangeSheet(range: $customRange) }
+            .fullScreenCover(isPresented: $showRecapReopen) { RecapReopenView() }
             .onChange(of: customRange) { _, range in
                 if let range {
                     period = .custom(start: range.lowerBound, end: range.upperBound)
@@ -130,6 +136,7 @@ struct InsightsView: View {
         VStack(spacing: 14) {
             stepper
             wellbeingEntry
+            recapEntry
             if periodReceipts.isEmpty {
                 emptyState
             } else {
@@ -149,6 +156,16 @@ struct InsightsView: View {
         WellbeingScan.run(receipts: receipts, budgets: budgets, recurring: recurring, goals: goals,
                           contributions: contributions, ignoredSubs: Set(ignoredRows.map(\.merchant)),
                           monthStartDay: monthStartDay)
+    }
+
+    /// The re-open-last-recap door — pinned just under the Wellbeing entry, shown only once a recap has
+    /// been generated for a closed period. Recomputes the story on demand as a full-screen cover.
+    @ViewBuilder
+    private var recapEntry: some View {
+        if !recapLastShownWeek.isEmpty || !recapLastShownMonth.isEmpty {
+            Button { showRecapReopen = true } label: { RecapReopenRow() }
+                .buttonStyle(.plain)
+        }
     }
 
     private var visibleSections: [InsightSection] {
@@ -208,6 +225,7 @@ struct InsightsView: View {
         VStack(spacing: Dimens.regularColumnSpacing) {
             stepper
             wellbeingEntry
+            recapEntry
             if periodReceipts.isEmpty {
                 emptyState
             } else {
@@ -234,6 +252,7 @@ struct InsightsView: View {
         VStack(spacing: Dimens.regularColumnSpacing) {
             stepper
             wellbeingEntry
+            recapEntry
             if periodReceipts.isEmpty {
                 emptyState
             } else {
