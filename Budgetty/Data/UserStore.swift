@@ -17,11 +17,14 @@ import SwiftData
 
 @MainActor
 enum UserStore {
-    /// Every persisted model. Declared once so the per-account containers can't drift apart.
+    /// Every persisted model. Declared once so the per-account containers can't drift apart. The model
+    /// set IS the schema on iOS (there is no numeric version like Room's) — adding `WellbeingScoreEntity`
+    /// (§3.1 score history; Android DB v25 → v26) is a purely additive change, so SwiftData's default
+    /// lightweight migration creates the new table on next open without a migration plan.
     static let models: [any PersistentModel.Type] = [
         LineItem.self, Receipt.self, Category.self, Budget.self, Recurring.self, CategoryRule.self,
         BudgetRollover.self, SavingsGoal.self, SavingsContribution.self, IgnoredSubscription.self,
-        BuyingLimit.self,
+        BuyingLimit.self, WellbeingScoreEntity.self,
     ]
 
     private static var containers: [String: ModelContainer] = [:]

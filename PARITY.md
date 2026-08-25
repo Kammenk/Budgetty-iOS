@@ -1370,3 +1370,47 @@ spec §2). Ported from the Kotlin **logic**, not UI — this is a pure object wi
 incl. new `StreakEngineTests` and the unchanged `RecapSchedulerTests` (recap re-source verified
 behaviour-preserving). Not yet surfaced in any UI (Budget row / Wellbeing evidence / recap Streak card
 are §1/§3 UI work, deferred).
+
+---
+
+## Android → iOS — Retention foundation §3.1 Wellbeing score history (SwiftData) — 2026-08-25
+
+Port of Android's `WellbeingScoreEntity` + `WellbeingScoreDao` + `WellbeingScoreRepository` +
+`WellbeingHistory` + the `WellbeingProvider` upsert (retention spec §3.1). The only new persistence.
+
+- **`Model/WellbeingScoreEntity.swift`** (new) — `@Model` with `@Attribute(.unique) periodId` ("yyyy-MM"),
+  `score: Int`, `band: String`, `componentsJson: String`, `computedAt: Date`. Plus `WellbeingScoreStore`
+  (`@MainActor`), the DAO/repository analog: an idempotent `upsert` (fetch-by-periodId → update-in-place
+  else insert; Android's `@Upsert`) and the closed-month-only `record` the surfaces call.
+- **`Support/WellbeingHistory.swift`** (new, pure) — `periodId(today, monthStartDay, offset)` via
+  `PayCycle` → "yyyy-MM"; `closedSnapshot(closedPeriodId, closedScore, computedAt) -> WellbeingScoreEntity?`
+  (nil when the closed month can't be scored); `encodeComponents`/`decodeComponents` — a stable
+  `{componentKey: sub-score?}` object with **explicit nulls** kept (hand-built to match Android's Gson
+  `serializeNulls` order + nulls); plus the §3.2 `trend(...)` model (`WellbeingTrend`/`WellbeingTrendPoint`/
+  `YearMonth`) and `minTrendMonths = 2`. Stable `WellbeingComponentKey.serialKey` / `WellbeingBand.name`
+  identifiers added (parity with Kotlin `enum.name`).
+- **Schema bump** — `WellbeingScoreEntity.self` added to `UserStore.models` (Android Room v25 → v26). iOS
+  has no numeric schema version; the model set IS the schema, and this is a purely additive model, so
+  SwiftData's default lightweight migration creates the table on next open (no migration plan needed).
+- **Upsert site** — `WellbeingScan.run` now scores the FULL just-closed month (`closedScore`) and exposes
+  `closedScore` + `closedPeriodId` on `WellbeingSummary`. `WellbeingScoreStore.record` upserts it from the
+  Home banner (`.task`) and the Wellbeing screen (`.task(id:closedPeriodId)`): **closed month ONLY** (never
+  the in-flight month — enforced by `closedSnapshot`), **idempotent** (unique periodId), **no backfill**.
+  Android upserts from the one shared provider flow; iOS records from the two primary surfaces that already
+  score the previous cycle (Home is near-always visited; Wellbeing is where the §3.2 trend will render).
+- **Backup** — `wellbeingScores` added to `BackupFile` (optional, forward-compat like `buyingLimits`),
+  exported, and restored with **IGNORE-on-periodId-clash** (keep the on-device snapshot — the honest,
+  first-computed record), matching Android's `insertAll(onConflict = IGNORE)`; `.replace` clears the table
+  first.
+- **Tests:** `WellbeingHistoryTests.swift` (periodId identity calendar+pay-cycle+year-rollover, closed-vs-
+  in-flight guard, nil-when-unscored, componentsJson order + explicit-null round-trip, trend model) +
+  `WellbeingScoreStoreTests.swift` (upsert idempotence, `record` closed-month guard, backup IGNORE-on-clash,
+  export→wipe→replace round-trip, pre-history backup imports cleanly).
+
+**Justified iOS deviations:** `computedAt` is a `Date` (Android stores epoch-millis `Long`) — iOS-idiomatic
+and audit-only, never scored. No numeric schema version (SwiftData model-set = schema). No DAO/repository
+layer — reads are `@Query`; the DAO's idempotent upsert + IGNORE-restore live in `WellbeingScoreStore` and
+`BackupService`.
+
+**Status:** BUILD SUCCEEDED (iPhone 17 Pro sim, iOS 26). Full suite green — 224 tests / 27 suites, incl.
+the two new suites. Trend sparkline UI (§3.2) is deferred; the history it reads is now being recorded.

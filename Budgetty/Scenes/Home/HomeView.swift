@@ -39,6 +39,7 @@ private enum HomePeriod: String, CaseIterable, Identifiable {
 struct HomeView: View {
     @Environment(AuthModel.self) private var auth
     @Environment(\.selectTab) private var selectTab
+    @Environment(\.modelContext) private var modelContext
     @Query(sort: \Receipt.createdAt, order: .reverse) private var receipts: [Receipt]
     @Query private var budgets: [Budget]
     @Query private var recurrings: [Recurring]
@@ -78,6 +79,14 @@ struct HomeView: View {
         WellbeingScan.run(receipts: receipts, budgets: budgets, recurring: recurrings, goals: goals,
                           contributions: contributions, ignoredSubs: Set(ignoredRows.map(\.merchant)),
                           monthStartDay: monthStartDay)
+    }
+
+    /// Records the just-closed month's Wellbeing snapshot into history (§3.1). No-op when the closed
+    /// month can't be scored yet; idempotent on periodId; never the in-flight month; no backfill.
+    private func recordClosedWellbeing() {
+        let s = wellbeingSummary
+        WellbeingScoreStore.record(closedScore: s.closedScore, closedPeriodId: s.closedPeriodId,
+                                   into: modelContext)
     }
 
     /// The window for the selected [period]: a pay-cycle month (this / last), the last N whole cycles,
@@ -133,6 +142,10 @@ struct HomeView: View {
             }
             .underFloatingDock()
             .screenCanvas()
+            // §3.1: the Home banner already scores the just-closed month, so record its history snapshot
+            // here too (the most-visited surface). Closed-month-only, idempotent, no backfill — matches
+            // Android upserting from the shared provider flow that feeds every Wellbeing surface.
+            .task { recordClosedWellbeing() }
             .sheet(isPresented: $showCustomize) {
                 HomeCustomizeSheet(orderRaw: $orderRaw, hiddenRaw: $hiddenRaw)
             }

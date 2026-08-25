@@ -72,6 +72,13 @@ struct WellbeingSummary {
     let monthLabel: String
     /// "22 Jun – 28 Jun" — the nav-bar label in weekly mode.
     let weekLabel: String
+    /// The just-closed pay-cycle month's FULL score (offset -1), scored for the trend delta and, via
+    /// `WellbeingScoreStore.record`, snapshotted into history (§3.1). Its total is nil when that month
+    /// can't be scored yet — then no history row is written.
+    let closedScore: WellbeingScore
+    /// The just-closed month's "yyyy-MM" id (offset -1) — the unique key of its history row. Distinct
+    /// from `periodId` (the in-flight month), so the current month never reaches history.
+    let closedPeriodId: String
 
     var hasScore: Bool { score.hasScore }
 }
@@ -204,9 +211,10 @@ enum WellbeingScan {
                 receiptsLogged: receipts.count, monthsTracked: monthsTracked)
         }
 
-        let previousScore = WellbeingEngine.score(inputsFor(-1, withDetail: false)).score
+        // The previous (just-closed) cycle is scored both for the trend chip and for history (§3.1).
+        let previousFull = WellbeingEngine.score(inputsFor(-1, withDetail: false))
         var current = inputsFor(0, withDetail: true)
-        current.previousScore = previousScore
+        current.previousScore = previousFull.score
         let score = WellbeingEngine.score(current)
         let monthlyTips = WellbeingEngine.tips(current)
 
@@ -292,7 +300,9 @@ enum WellbeingScan {
             detail: detail, receiptsLogged: receipts.count, hasBudget: current.hasAnyBudget,
             periodId: idFmt.string(from: cycleStart),
             monthLabel: monthFmt.string(from: cycleStart),
-            weekLabel: "\(dayFmt.string(from: weekStart)) – \(dayFmt.string(from: weekEnd))")
+            weekLabel: "\(dayFmt.string(from: weekStart)) – \(dayFmt.string(from: weekEnd))",
+            closedScore: previousFull,
+            closedPeriodId: WellbeingHistory.periodId(today, monthStartDay: monthStartDay, offset: -1))
     }
 
     private static func winEmoji(_ type: TipType) -> String {

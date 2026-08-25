@@ -72,6 +72,7 @@ func wbTierColor(_ score: Int) -> Color {
 struct WellbeingView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.selectTab) private var selectTab
+    @Environment(\.modelContext) private var context
 
     @Query(sort: \Receipt.createdAt, order: .reverse) private var receipts: [Receipt]
     @Query private var budgets: [Budget]
@@ -104,6 +105,12 @@ struct WellbeingView: View {
         }
         .underFloatingDock(reportingScroll: false)
         .screenCanvas()
+        // §3.1: snapshot the just-closed month into history when this screen appears (and if the closed
+        // cycle rolls over while open). Closed-month-only, idempotent, no backfill — see WellbeingScoreStore.
+        .task(id: summary.closedPeriodId) {
+            WellbeingScoreStore.record(closedScore: summary.closedScore,
+                                       closedPeriodId: summary.closedPeriodId, into: context)
+        }
         .navigationTitle("Wellbeing")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
