@@ -40,6 +40,11 @@ enum RecapScheduler {
     /// Start date (ISO yyyy-MM-dd) of the week that has just closed as of `today` — the week before the
     /// one containing today, anchored on the locale's `firstWeekday`. Its stability across a whole week
     /// is what makes it a per-week key.
+    ///
+    /// **No backfill, by design (§1.5).** This returns exactly ONE id — the single most-recently-closed
+    /// week. A user who doesn't open Budgetty for three weeks sees ONE weekly recap (that last week),
+    /// never a queue of three. Do NOT "improve" this into a list/backlog of missed weeks: the recap is a
+    /// light momentum check, not a ledger, and a stack of stale interstitials would be an anti-feature.
     static func justClosedWeekId(_ today: Date, firstWeekday: Int, calendar cal: Calendar = .current) -> String {
         var cal = cal
         cal.firstWeekday = firstWeekday
@@ -105,12 +110,25 @@ enum RecapGuard: Equatable {
 /// scoring floor (`WellbeingEngine.minReceiptsToScore` = 5 receipts), or when the just-closed period
 /// itself had no spend, the recap is skipped (and marked shown so it isn't re-checked every open). With
 /// data but no prior period to compare, a partial recap is shown that drops the comparison cards.
+///
+/// A weekly recap adds a period-scoped floor (`minWeekReceipts`, §1.2): a week that clears the lifetime
+/// floor but holds only one or two receipts produces a hollow story that trains reflex-dismiss, so it is
+/// `.skip`-ped — and, like any skip, marked shown, so it isn't re-checked on every open for the rest of
+/// that week. Monthly behaviour is unchanged (the fuller monthly report card is worth showing even in a
+/// quiet month). Android parity: `RecapDataGuard`.
 enum RecapDataGuard {
     /// Kept in step with the wellbeing score's first-run floor so the two features agree.
     static let minReceipts = WellbeingEngine.minReceiptsToScore
 
-    static func evaluate(totalReceipts: Int, periodHasSpend: Bool, priorPeriodHasSpend: Bool) -> RecapGuard {
+    /// A weekly recap needs at least this many receipts *within the week* to be worth an interstitial (§1.2).
+    static let minWeekReceipts = 3
+
+    /// `periodReceipts` is the receipt count *within the just-closed period* (only consulted for the
+    /// weekly floor; the monthly path ignores it). `totalReceipts` is the lifetime count.
+    static func evaluate(kind: RecapKind, totalReceipts: Int, periodReceipts: Int,
+                         periodHasSpend: Bool, priorPeriodHasSpend: Bool) -> RecapGuard {
         if totalReceipts < minReceipts || !periodHasSpend { return .skip }
+        if kind == .weekly && periodReceipts < minWeekReceipts { return .skip }
         return .show(withComparison: priorPeriodHasSpend)
     }
 }

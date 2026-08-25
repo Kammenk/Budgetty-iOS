@@ -140,4 +140,48 @@ struct BuyingLimitCounterTests {
                                                  startDay: 25, calendar: cal)
         #expect(reset == day(2026, 2, 25))   // cycle Jan 25–Feb 24 rolls over on Feb 25
     }
+
+    // MARK: - closedWindows(): the last N CLOSED windows, most-recent first, each (count, hasData)
+    // This single derivation feeds both the §4.3 history strip and StreakEngine.limitStreak.
+
+    @Test func closedWindowsMonthlyMetMissedNoData() {
+        // Today Apr 15; closed months (idx 0..3) = Mar, Feb, Jan, Dec 2025.
+        let today = at(2026, 4, 15)
+        let items = [
+            item("Coke", 2, 2026, 3, 10),   // March: 2 coke → met vs cap 2
+            item("Milk", 1, 2026, 3, 2),    // March: a receipt (no-match) — still hasData
+            item("Coke", 5, 2026, 1, 20),   // Jan: 5 coke → over cap → not-met
+        ]
+        let w = BuyingLimitCounter.closedWindows(items, keywords: ["coke"], timeframe: .monthly,
+                                                 windowCount: 4, today: today, startDay: 1, calendar: cal)
+        #expect(w.count == 4)
+        #expect(w[0].count == 2 && w[0].hasData)      // Mar: 2 matched, had data
+        #expect(w[1].count == 0 && !w[1].hasData)     // Feb: empty → no-data
+        #expect(w[2].count == 5 && w[2].hasData)      // Jan: 5 matched, had data
+        #expect(w[3].count == 0 && !w[3].hasData)     // Dec: empty → no-data
+    }
+
+    @Test func closedWindowsReceiptButNoMatchIsDataNotMiss() {
+        // A closed window that held a receipt but nothing matching is (0, hasData=true) — the engine
+        // scores it MET (count 0 ≤ cap), never NO_DATA. This distinction must survive the derivation.
+        let today = at(2026, 4, 15)
+        let items = [item("Bread", 1, 2026, 3, 10)]
+        let w = BuyingLimitCounter.closedWindows(items, keywords: ["coke"], timeframe: .monthly,
+                                                 windowCount: 1, today: today, startDay: 1, calendar: cal)
+        #expect(w[0].count == 0 && w[0].hasData)
+    }
+
+    @Test func closedWindowsWeeklyMostRecentFirst() {
+        // Today Wed Apr 15 (Monday weeks): closed weeks idx0 = Apr 6–12, idx1 = Mar 30–Apr 5.
+        let today = at(2026, 4, 15)
+        let items = [
+            item("Coke", 1, 2026, 4, 8),    // last full week
+            item("Coke", 3, 2026, 3, 31),   // the week before
+        ]
+        let w = BuyingLimitCounter.closedWindows(items, keywords: ["coke"], timeframe: .weekly,
+                                                 windowCount: 2, today: today,
+                                                 firstWeekday: 2 /* Monday */, calendar: cal)
+        #expect(w[0].count == 1 && w[0].hasData)
+        #expect(w[1].count == 3 && w[1].hasData)
+    }
 }

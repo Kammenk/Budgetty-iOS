@@ -24,8 +24,13 @@ enum SettingsKey {
     /// Auto-lock delay in minutes: 0 = immediately, 1, or 5.
     static let autoLockMinutes = "pref.autoLockMinutes"
     /// Crashlytics collection — default-ON with an opt-out toggle (see `CrashReporting`).
-    /// Unlike the `analytics` and `notifications` keys deleted alongside the trim, this one is read.
+    /// Unlike the `notifications` key deleted alongside the trim, this one is read.
     static let crashReporting = "pref.crashReporting"
+    /// Product analytics collection (Firebase Analytics, §0) — default-ON with an opt-out toggle,
+    /// SEPARATE from crash reporting (see `Analytics`). Device-global like `crashReporting` — NOT reset
+    /// on sign-out. Android parity: `SettingsStore` KEY_ANALYTICS. A fresh key string (the pre-trim
+    /// `analytics` key was removed) so no stale value is resurrected.
+    static let analytics = "pref.analyticsEnabled"
     static let premium = "pref.premium"           // effective Premium flag (subscription OR comped account)
     /// Account-comp entitlement cache: the server-granted `premium` auth claim (see `CompEntitlement`,
     /// set by functions/tools/comp.js). Cached so a comped account shows Premium instantly on launch.
@@ -39,11 +44,16 @@ enum SettingsKey {
     static let scanAIConsent = "pref.scanAIConsent"
     /// Dismissed Wellbeing tips, as newline-separated "periodId|tipId" entries (see WellbeingTipsStore).
     static let dismissedWellbeingTips = "wellbeing.dismissedTips"
+    /// Dismissed buying-limit suggestions (§4.4), as newline-separated normalized keyword keys — a
+    /// rejected suggestion never returns (see `LimitSuggestionsStore`). Per-user (reset on sign-out).
+    /// Android parity: `SettingsStore` KEY_DISMISSED_LIMIT_SUGGESTIONS. Not a schema change.
+    static let dismissedLimitSuggestions = "limits.dismissedSuggestions"
     // ── End-of-period recap ──
     /// Whether the end-of-period recap interstitial is shown at all. Default on. Device-global (like
     /// appearance) — NOT reset on sign-out. See `RecapScheduler`.
     static let recapEnabled = "recap.enabled"
-    /// Which period(s) trigger a recap (`RecapFrequency` raw value). Default MONTHLY. Device-global.
+    /// Which period(s) trigger a recap (`RecapFrequency` raw value). Default BOTH (§1.1 — weekly on by
+    /// default, made safe by the in-story frequency control §1.4). Device-global.
     static let recapFrequency = "recap.frequency"
     /// ISO date (yyyy-MM-dd) of the start of the last weekly recap already shown; empty = none yet.
     /// Per-user timing — reset on sign-out so the next account gets fresh boundaries.
@@ -75,6 +85,7 @@ enum UserState {
         for key in [
             SettingsKey.quizPending,
             SettingsKey.dismissedWellbeingTips,
+            SettingsKey.dismissedLimitSuggestions,
             SettingsKey.appLockEnabled,
             SettingsKey.faceID,
             // Per-user recap timing (not the cadence preference, which is device-global like appearance):

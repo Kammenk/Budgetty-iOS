@@ -27,10 +27,16 @@ enum BuyingLimitTimeframe: String, Codable, CaseIterable, Identifiable {
     var id: String { rawValue }
 }
 
-/// Free tier allows one buying limit; Premium is unlimited (matches savings-1 / recurring-3 /
-/// widgets-2 caps).
+/// Free tier allows three buying limits; Premium is unlimited. Raised 1 → 3 (§4.5): one limit is too
+/// tight to build a habit portfolio, and the retention value outweighs the conversion value of the
+/// 2nd/3rd. Loosening a gate never needs a migration — existing free users silently gain capacity.
+/// Every quoted number derives from this constant (count pill, hints, paywall, gating).
 enum BuyingLimitQuota {
-    static let freeLimit = 1
+    static let freeLimit = 3
+
+    /// A free user already at the cap: the Add row locks and routes to the paywall (mirrors Android's
+    /// `BuyingLimitsUiState.atCap`). Premium never caps. Pure, so the gate is unit-testable.
+    static func isAtCap(count: Int, isPremium: Bool) -> Bool { !isPremium && count >= freeLimit }
 }
 
 @Model

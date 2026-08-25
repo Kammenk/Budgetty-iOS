@@ -18,6 +18,16 @@ struct RecapStoryView: View {
     let story: RecapStory
     var onClose: () -> Void
     var onSeeDetails: () -> Void
+    /// Analytics (§0): fired once when the story appears (scheduled interstitial only — the Insights
+    /// re-open passes the default no-ops, matching Android's `RecapStoryScreen` params).
+    var onShown: (RecapKind) -> Void = { _ in }
+    /// Analytics (§0): fired on exit with the highest card reached + 1, so a bare cover read (1) is
+    /// distinguishable from a full read.
+    var onCompleted: (RecapKind, Int) -> Void = { _, _ in }
+    /// Analytics (§0/§1): fired once per surfaced streak card when the story appears — the weekly `.streak`
+    /// card always (its best when it's a best-run fallback) and the monthly `.budgetStreak` card once its
+    /// run — or personal best — clears the ≥ 2 bar. Android parity: `RecapStoryScreen.onStreakSurfaced`.
+    var onStreakSurfaced: (StreakKind, Int) -> Void = { _, _ in }
 
     @State private var index: Int = {
         #if DEBUG
@@ -26,6 +36,8 @@ struct RecapStoryView: View {
         return 0
     }()
     @State private var forward = true
+    /// Highest card index the user reached, for `recap_completed`'s `cards_viewed` (Android parity).
+    @State private var highestCard = 0
 
     private var cards: [RecapCard] { story.cards }
     private var currentIndex: Int { min(index, max(0, cards.count - 1)) }
@@ -37,6 +49,36 @@ struct RecapStoryView: View {
             chrome
         }
         .background(Palette.groupedBackground.ignoresSafeArea())
+        // §0 analytics: count the story as shown once it appears, track how far the user gets, and — on
+        // any exit path (✕, Done, See details, or the gate un-mounting it) — report the highest card
+        // reached + 1. Mirrors Android's RecapStoryScreen DisposableEffect(onShown / onDispose→onCompleted).
+        .onChange(of: currentIndex) { _, new in if new > highestCard { highestCard = new } }
+        .task {
+            if currentIndex > highestCard { highestCard = currentIndex }
+            onShown(story.kind)
+            // Any surfaced streak card fires streak_surfaced once here (§0/§1 event set).
+            for card in cards {
+                if let (kind, length) = Self.streakSurface(card) { onStreakSurfaced(kind, length) }
+            }
+        }
+        .onDisappear { onCompleted(story.kind, highestCard + 1) }
+    }
+
+    /// The (kind, length) to log for a surfaced streak card, or nil when the card isn't a streak
+    /// surfacing. The weekly `.streak` card always counts (its best when it's a best-run fallback); the
+    /// monthly `.budgetStreak` counts only once its run — or its personal best — clears the ≥ 2 bar (§2.7).
+    /// Android parity: `RecapStoryScreen.streakSurfaceOf`.
+    static func streakSurface(_ card: RecapCard) -> (StreakKind, Int)? {
+        switch card {
+        case let .streak(_, kind, _, current, best, _, isBestRun):
+            return (kind, isBestRun ? best : current)
+        case let .budgetStreak(_, streakMonths, best, _, _, _, _, _):
+            if streakMonths >= StreakEngine.minToSurface { return (.budgetMonth, streakMonths) }
+            if best >= StreakEngine.minToSurface { return (.budgetMonth, best) }
+            return nil
+        default:
+            return nil
+        }
     }
 
     // MARK: - Card layer (per-card backdrop + centred content)
@@ -182,9 +224,13 @@ private struct RecapCardBody: View {
             case let .mover(_, category, dotColorArgb, delta, previousAmount, currentAmount, second):
                 MoverBody(category: category, dotColorArgb: dotColorArgb, delta: delta,
                           previousAmount: previousAmount, currentAmount: currentAmount, second: second)
-            case let .budgetStreak(_, streakMonths, underCount, scopeCount, segments, safeToSpend):
-                BudgetStreakBody(streakMonths: streakMonths, underCount: underCount, scopeCount: scopeCount,
-                                 segments: segments, safeToSpend: safeToSpend)
+            case let .budgetStreak(_, streakMonths, best, liveOnTrack, underCount, scopeCount, segments, safeToSpend):
+                BudgetStreakBody(streakMonths: streakMonths, best: best, liveOnTrack: liveOnTrack,
+                                 underCount: underCount, scopeCount: scopeCount, segments: segments,
+                                 safeToSpend: safeToSpend, nextMonthStart: story.nextMonthStart)
+            case let .streak(_, kind, scope, current, best, liveOnTrack, isBestRun):
+                StreakBody(kind: kind, scope: scope, current: current, best: best,
+                           liveOnTrack: liveOnTrack, isBestRun: isBestRun)
             case let .limits(_, underCount, totalCount, chips):
                 LimitsBody(underCount: underCount, totalCount: totalCount, chips: chips)
             case let .pace(_, spent, weeklyBudget, fractionUsed, _, remaining, deltaPercent):
@@ -365,10 +411,19 @@ private struct MoverBody: View {
 
 private struct BudgetStreakBody: View {
     let streakMonths: Int
+    let best: Int
+    let liveOnTrack: Bool
     let underCount: Int
     let scopeCount: Int
     let segments: [RecapSegStatus]
     let safeToSpend: Decimal
+    let nextMonthStart: Date
+
+    // §2.4/§2.6: de-flamed. A live current run (≥ 2) shows the motif + a "closed months · this month on
+    // track" caption; when the run is 0 but a past run exists, the muted best-run fallback shows instead;
+    // below that the report-card panel (under-count, segment bar, safe-to-spend) is unchanged.
+    private var showCurrent: Bool { streakMonths >= StreakEngine.minToSurface }
+    private var showBest: Bool { !showCurrent && best >= StreakEngine.minToSurface }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -377,6 +432,15 @@ private struct BudgetStreakBody: View {
             title
                 .font(.system(size: 28, weight: .heavy)).foregroundStyle(Palette.label)
                 .multilineTextAlignment(.center)
+            if showCurrent || showBest {
+                Spacer().frame(height: 12)
+                StreakMotif(filledCount: showCurrent ? streakMonths : best,
+                            showLive: showCurrent && liveOnTrack, muted: showBest)
+                Spacer().frame(height: 8)
+                caption
+                    .font(.footnote).foregroundStyle(Palette.label.opacity(0.7))
+                    .multilineTextAlignment(.center)
+            }
             Spacer().frame(height: 20)
             VStack(alignment: .leading, spacing: 0) {
                 Text("Under budget in \(underCount) of \(scopeCount) categories")
@@ -398,9 +462,73 @@ private struct BudgetStreakBody: View {
     }
 
     private var title: Text {
-        streakMonths > 1
-            ? Text("\(streakMonths) months under budget in a row") + Text(verbatim: " 🔥")
-            : Text("Under budget this month")
+        if showCurrent { return Text("\(streakMonths) months under budget in a row") }
+        if showBest { return Text("Best run: \(best) months") }
+        return Text("Under budget this month")
+    }
+
+    private var caption: Text {
+        if showCurrent {
+            let counted = Text("\(streakMonths) closed months")
+            return liveOnTrack
+                ? counted + Text(verbatim: " · ") + Text("\(RecapFormat.monthName(nextMonthStart)) on track so far")
+                : counted
+        }
+        return Text("Best in the last 24 months")   // showBest
+    }
+}
+
+// MARK: - Streak (weekly outcome streak, §1.3)
+
+private struct StreakBody: View {
+    let kind: StreakKind
+    let scope: String?
+    let current: Int
+    let best: Int
+    let liveOnTrack: Bool
+    let isBestRun: Bool
+
+    var body: some View {
+        VStack(spacing: 0) {
+            RecapKicker("BUDGET STREAK")
+            Spacer().frame(height: 12)
+            title
+                .font(.system(size: 28, weight: .heavy)).foregroundStyle(Palette.label)
+                .multilineTextAlignment(.center)
+            Spacer().frame(height: 28)
+            StreakMotif(filledCount: isBestRun ? best : current,
+                        showLive: !isBestRun && liveOnTrack, muted: isBestRun)
+            Spacer().frame(height: 28)
+            sub
+                .font(.title3).foregroundStyle(Palette.label.opacity(0.72))
+                .multilineTextAlignment(.center)
+        }
+    }
+
+    private var weeks: Bool { kind == .budgetWeek }
+
+    private var title: Text {
+        if isBestRun {
+            return weeks ? Text("Best run: \(best) weeks") : Text("Best run: \(best) months")
+        }
+        if weeks, let scope {
+            return Text("\(current) weeks under your \(Categories.displayName(scope)) budget")
+        }
+        if weeks { return Text("\(current) weeks under budget") }
+        return Text("\(current) months under budget in a row")
+    }
+
+    private var sub: Text {
+        if isBestRun, weeks, let scope {
+            return Text("\(Categories.displayName(scope)) · best in the last 24 weeks")
+        }
+        if isBestRun, weeks { return Text("Best in the last 24 weeks") }
+        if isBestRun { return Text("Best in the last 24 months") }
+        if weeks {
+            let counted = Text("\(current) closed weeks counted.")
+            return liveOnTrack ? counted + Text(verbatim: " ") + Text("This week is on track so far.") : counted
+        }
+        return Text("\(current) closed months")
     }
 }
 
@@ -429,16 +557,19 @@ private struct LimitsBody: View {
     }
 
     private func chipRow(_ chip: RecapLimitChip) -> some View {
-        HStack(spacing: 8) {
+        // §1.3 / no-loss-framing: under cap = good (green); AT or over cap = warm amber, never red — the
+        // state is "reached", not "failed" (the user set this number themselves). A neutral glass surface
+        // keeps it legible on the WARN band, with the good/warn accent carried by the label.
+        let accent = chip.under ? Palette.good : Palette.warn
+        return HStack(spacing: 8) {
             Text(chip.emoji).font(.title3)
             Text(verbatim: "\(chip.label) \(chip.bought)/\(chip.cap)")
-                .font(.subheadline).fontWeight(.medium).foregroundStyle(Palette.label)
+                .font(.subheadline).fontWeight(.semibold).foregroundStyle(accent)
             Spacer(minLength: 0)
         }
         .padding(.horizontal, 14).padding(.vertical, 10)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background((chip.under ? Palette.good : Palette.bad).opacity(0.15),
-                    in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
     }
 }
 
@@ -508,6 +639,10 @@ private struct FocusBody: View {
                 Text("Your score is unchanged — it updates monthly.")
                     .font(.subheadline).foregroundStyle(Palette.label.opacity(0.75))
                     .multilineTextAlignment(.center)
+                // §1.4: the in-story off-switch that makes weekly-by-default safe — low-emphasis, weekly
+                // only, NEVER on the monthly story. Writes settings immediately (see RecapFrequencyRow).
+                Spacer().frame(height: 32)
+                RecapFrequencyRow()
             }
         }
     }
@@ -527,6 +662,92 @@ private struct FocusBody: View {
         case .keepItUp:
             return Text("Keep it up — you are trending the right way.")
         }
+    }
+}
+
+// MARK: - In-story frequency control (§1.4)
+
+/// The low-emphasis "Weekly recaps · Change" row on the weekly Focus card. Tapping it opens the
+/// frequency picker sheet (a centred dialog on iPad). Choices write straight to the same @AppStorage
+/// keys Account → Recap reads, so the two always agree — and, because the RootView gate holds the built
+/// story in `@State` for the session, changing the cadence here never tears down the story mid-read (the
+/// new cadence applies on the next open). Android parity: `RecapFrequencyRow`. Discoverable but never
+/// shouty.
+private struct RecapFrequencyRow: View {
+    @State private var showSheet = false
+
+    var body: some View {
+        Button { showSheet = true } label: {
+            HStack(spacing: 0) {
+                Text("Weekly recaps").foregroundStyle(Palette.label.opacity(0.6))
+                Text(verbatim: " · ").foregroundStyle(Palette.label.opacity(0.35))
+                Text("Change").fontWeight(.semibold).underline().foregroundStyle(Palette.label.opacity(0.9))
+            }
+            .font(.subheadline)
+            .padding(.horizontal, 8).padding(.vertical, 4)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .sheet(isPresented: $showSheet) { RecapFrequencySheet() }
+    }
+}
+
+/// The four-option recap-frequency picker (Weekly / Monthly / Both / Off), presented as a compact glass
+/// sheet (a centred form sheet on iPad). Stateless beyond the two shared @AppStorage keys: `recapEnabled`
+/// + `recapFrequency` mark the current selection (Off when disabled). Picking a cadence writes enabled +
+/// that frequency; Off writes disabled and keeps the remembered cadence (so switching back on doesn't
+/// re-ask). Selecting dismisses; tap-away/swipe-down also dismiss. Android parity: `RecapFrequencySheetContent`.
+private struct RecapFrequencySheet: View {
+    @AppStorage(SettingsKey.recapEnabled) private var recapEnabled = true
+    @AppStorage(SettingsKey.recapFrequency) private var recapFrequencyRaw = RecapFrequency.both.rawValue
+    @Environment(\.dismiss) private var dismiss
+
+    private var frequency: RecapFrequency { RecapFrequency(rawValue: recapFrequencyRaw) ?? .both }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text("Recap frequency").font(.title3).fontWeight(.bold).foregroundStyle(Palette.label)
+            Spacer().frame(height: 4)
+            Text("When Budgetty shows you a recap.")
+                .font(.subheadline).foregroundStyle(Palette.secondaryLabel)
+            Spacer().frame(height: 16)
+            option(title: "Weekly", selected: recapEnabled && frequency == .weekly) { select(.weekly) }
+            option(title: "Monthly", selected: recapEnabled && frequency == .monthly) { select(.monthly) }
+            option(title: "Both", selected: recapEnabled && frequency == .both) { select(.both) }
+            option(title: "Off", selected: !recapEnabled) { turnOff() }
+        }
+        .padding(.horizontal, 24).padding(.top, 28).padding(.bottom, 12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .presentationDetents([.height(320)])
+        .presentationDragIndicator(.visible)
+        .presentationBackground(.regularMaterial)
+    }
+
+    private func option(title: LocalizedStringKey, selected: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: 12) {
+                Text(title).font(.body).foregroundStyle(Palette.label)
+                Spacer(minLength: 0)
+                if selected {
+                    Image(systemName: "checkmark").font(.body.weight(.semibold)).foregroundStyle(Palette.tint)
+                }
+            }
+            .padding(.vertical, 12)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func select(_ freq: RecapFrequency) {
+        recapEnabled = true
+        recapFrequencyRaw = freq.rawValue
+        dismiss()
+    }
+
+    /// Off keeps the remembered cadence and just turns the recap off (matches Android `onSelect(false, …)`).
+    private func turnOff() {
+        recapEnabled = false
+        dismiss()
     }
 }
 
@@ -653,8 +874,9 @@ extension RecapStory {
                 .mover(band: .neutral, category: "Restaurant & Dining", dotColorArgb: 0xFFE0795B,
                        delta: -40, previousAmount: 120, currentAmount: 80,
                        second: RecapSecondMover(category: "Groceries", delta: 25)),
-                .budgetStreak(band: .great, streakMonths: 3, underCount: 5, scopeCount: 6,
-                              segments: [.good, .good, .warn, .good, .good, .bad], safeToSpend: 60),
+                .budgetStreak(band: .great, streakMonths: 3, best: 6, liveOnTrack: true, underCount: 5,
+                              scopeCount: 6, segments: [.good, .good, .warn, .good, .good, .bad],
+                              safeToSpend: 60),
                 .limits(band: .warn, underCount: 3, totalCount: 4, chips: [
                     RecapLimitChip(emoji: "🥤", label: "Coke", bought: 2, cap: 4),
                     RecapLimitChip(emoji: "🍫", label: "Chocolate", bought: 5, cap: 3),
@@ -663,9 +885,36 @@ extension RecapStory {
                        isWeekly: false),
             ])
     }
+
+    /// A five-card weekly sample (Cover → Pace → Limits → Streak → Focus) matching the mockup's `w-*`
+    /// states — exercises the new §1.3 weekly Streak card + the §1.4 in-story frequency control.
+    static func debugWeeklySample() -> RecapStory {
+        RecapStory(
+            kind: .weekly,
+            monthStart: Date(timeIntervalSince1970: 1_753_401_600),
+            nextMonthStart: Date(timeIntervalSince1970: 1_753_401_600),
+            weekStart: Date(timeIntervalSince1970: 1_752_796_800),  // Mon 18 Jul 2025
+            weekEnd: Date(timeIntervalSince1970: 1_753_315_200),    // Sun 24 Jul 2025
+            cards: [
+                .cover(band: .primary),
+                .pace(band: .good, spent: 280, weeklyBudget: 300, fractionUsed: 0.93,
+                      paceFraction: 1, remaining: 20, deltaPercent: -8),
+                .limits(band: .warn, underCount: 3, totalCount: 4, chips: [
+                    RecapLimitChip(emoji: "🥤", label: "Coke", bought: 2, cap: 4),
+                    RecapLimitChip(emoji: "🍕", label: "Takeaway", bought: 4, cap: 4),
+                ]),
+                .streak(band: .secondary, kind: .budgetWeek, scope: "Groceries",
+                        current: 3, best: 4, liveOnTrack: true, isBestRun: false),
+                .focus(band: .primary, focus: .watchCategory(category: "Restaurant & Dining"), isWeekly: true),
+            ])
+    }
 }
 
 #Preview("Recap · Monthly") {
     RecapStoryView(story: .debugMonthlySample(), onClose: {}, onSeeDetails: {})
+}
+
+#Preview("Recap · Weekly") {
+    RecapStoryView(story: .debugWeeklySample(), onClose: {}, onSeeDetails: {})
 }
 #endif

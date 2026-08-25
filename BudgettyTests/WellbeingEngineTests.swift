@@ -237,4 +237,158 @@ struct WellbeingEngineTests {
         #expect(WellbeingEngine.subscriptionsComponentScore(
             inputs(subsSharePercent: 10, subsCount: 2, monthsTracked: 1)) == 45)
     }
+
+    // MARK: §3.5 Band-up nudge
+
+    @Test func bandUpFiresOnlyWithinThreePointsBelowABoundary() {
+        #expect(WellbeingEngine.bandUp(57) == BandUp(pointsAway: 3, nextBand: .healthy))
+        #expect(WellbeingEngine.bandUp(59) == BandUp(pointsAway: 1, nextBand: .healthy))
+        #expect(WellbeingEngine.bandUp(38) == BandUp(pointsAway: 2, nextBand: .gettingThere))
+        #expect(WellbeingEngine.bandUp(78) == BandUp(pointsAway: 2, nextBand: .thriving))
+        // Suppressed away from a boundary (a healthy 72), exactly on one (40), and at the top (80).
+        #expect(WellbeingEngine.bandUp(72) == nil)
+        #expect(WellbeingEngine.bandUp(40) == nil)
+        #expect(WellbeingEngine.bandUp(80) == nil)
+    }
+
+    // MARK: §3.3 Projection math per tip type
+
+    /// Inputs where BUDGET is the only scored component, so the aggregate delta equals the budget-score
+    /// delta — lets each projection be pinned to a concrete number.
+    private func budgetOnly(overCount: Int, overspend: String, budgetedCount: Int, budgeted: String) -> WellbeingInputs {
+        inputs(hasIncome: false, hasAnyBudget: true, budgetedCount: budgetedCount, overCount: overCount,
+               overspendTotal: overspend, budgetedTotal: budgeted, trendPercent: nil,
+               subsSharePercent: nil, subsCount: 0, goals: [], monthsTracked: 1)
+    }
+
+    @Test func overBudgetProjectionRemovesOneOverAndItsAverageOverspend() {
+        // base budgetScore(4,2,200,1000)=38 → projected budgetScore(4,1,100,1000)=69 → +31.
+        let i = budgetOnly(overCount: 2, overspend: "200", budgetedCount: 4, budgeted: "1000")
+        let tip = WellbeingTip(type: .overBudget, id: "over_budget", tone: .alert, amount: d("200"), count: 2)
+        #expect(WellbeingEngine.aggregate(WellbeingEngine.components(i)) == 38)
+        #expect(WellbeingEngine.projectedGain(i, tip) == 31)
+        #expect(WellbeingEngine.showsProjectedGain(31))
+    }
+
+    @Test func missingBudgetProjectionAddsAWithinPlanScope() {
+        // base budgetScore(2,1,100,400)=30 → projected budgetScore(3,1,100,600)=53 → +23.
+        let i = budgetOnly(overCount: 1, overspend: "100", budgetedCount: 2, budgeted: "400")
+        let tip = WellbeingTip(type: .missingBudget, id: "m", tone: .opportunity, amount: d("200"), label: "Dining")
+        #expect(WellbeingEngine.projectedGain(i, tip) == 23)
+    }
+
+    @Test func subscriptionCostProjectionDropsTheShareProportionally() {
+        // Subscriptions the only scored component. share 9 → cancel 1 of 3 → newShare round(9*2/3)=6.
+        // subscriptionsScore(9)=56 → subscriptionsScore(6)=89 → +33.
+        let i = inputs(hasIncome: false, hasAnyBudget: false, trendPercent: nil,
+                       subsSharePercent: 9, subsMonthly: "67", subsCount: 3, goals: [], monthsTracked: 6)
+        let tip = WellbeingTip(type: .subscriptionCost, id: "s", tone: .caution, amount: d("67"), percent: 9, count: 3)
+        #expect(WellbeingEngine.aggregate(WellbeingEngine.components(i)) == 56)
+        #expect(WellbeingEngine.projectedGain(i, tip) == 33)
+    }
+
+    @Test func goalOffTrackProjectionBringsThatGoalOnPace() {
+        // Goals the only scored component: one behind goal 40 → 100 → +60.
+        let i = inputs(hasIncome: false, hasAnyBudget: false, trendPercent: nil,
+                       subsSharePercent: nil, subsCount: 0,
+                       goals: [GoalPace(name: "Vacation", reached: false, behind: true)], monthsTracked: 1)
+        let tip = WellbeingTip(type: .goalOffTrack, id: "g", tone: .opportunity, label: "Vacation")
+        #expect(WellbeingEngine.aggregate(WellbeingEngine.components(i)) == 40)
+        #expect(WellbeingEngine.projectedGain(i, tip) == 60)
+    }
+
+    @Test func winToneTipsAndUnactionableTipsHaveNoProjection() {
+        let i = inputs()
+        #expect(WellbeingEngine.projectedGain(i, WellbeingTip(type: .savingsWin, id: "w", tone: .win)) == nil)
+        #expect(WellbeingEngine.projectedGain(i, WellbeingTip(type: .categorySpike, id: "c", tone: .caution)) == nil)
+        #expect(WellbeingEngine.projectedGain(i, WellbeingTip(type: .negativeCashflow, id: "n", tone: .alert)) == nil)
+    }
+
+    // MARK: §3.3 The renormalisation-negative guard (the pinned case)
+
+    @Test func noGoalProjectionIsNonPositiveWhenTheBaseIsAlreadyMaxed_andIsSuppressed() {
+        // The renormalisation trap: goals ENTERS the mean at 100. When the only other scored component is
+        // already 100 (savings at a 25% rate), the maxed base can't move — the modelled delta is 0, NOT a
+        // gain. showsProjectedGain must drop it so no "+0" pill is ever rendered. Pins the ≤ 0 case.
+        let maxed = inputs(hasIncome: true, savingsRatePercent: 25, hasAnyBudget: false, trendPercent: nil,
+                           subsSharePercent: nil, subsCount: 0, goals: [], monthsTracked: 1)
+        let noGoal = WellbeingTip(type: .noGoal, id: "no_goal", tone: .opportunity)
+        #expect(WellbeingEngine.aggregate(WellbeingEngine.components(maxed)) == 100)
+        #expect(WellbeingEngine.projectedGain(maxed, noGoal) == 0)
+        #expect(WellbeingEngine.showsProjectedGain(WellbeingEngine.projectedGain(maxed, noGoal)) == false)
+
+        // The same guard drops any noise or a hypothetical negative — never a "+1", "+0" or "−N".
+        #expect(WellbeingEngine.showsProjectedGain(0) == false)
+        #expect(WellbeingEngine.showsProjectedGain(1) == false)
+        #expect(WellbeingEngine.showsProjectedGain(-3) == false)
+        #expect(WellbeingEngine.showsProjectedGain(2))
+        #expect(WellbeingEngine.showsProjectedGain(nil) == false)
+    }
+
+    @Test func noGoalProjectionIsAGenuineGainWhenTheBaseHasRoom() {
+        // Same tip, base 50 (savings at a 5% rate) → goals enters at 100 → aggregate 72 → +22, shown.
+        let room = inputs(hasIncome: true, savingsRatePercent: 5, hasAnyBudget: false, trendPercent: nil,
+                          subsSharePercent: nil, subsCount: 0, goals: [], monthsTracked: 1)
+        let noGoal = WellbeingTip(type: .noGoal, id: "no_goal", tone: .opportunity)
+        #expect(WellbeingEngine.aggregate(WellbeingEngine.components(room)) == 50)
+        #expect(WellbeingEngine.projectedGain(room, noGoal) == 22)
+        #expect(WellbeingEngine.showsProjectedGain(22))
+    }
+
+    @Test func projectionIsNilWhenThereIsNoTotalToMoveAgainst() {
+        // No scored component at all (first-run-ish): base aggregate is nil, so there's no delta to model.
+        let unscored = inputs(hasIncome: false, hasAnyBudget: false, trendPercent: nil,
+                              subsSharePercent: nil, subsCount: 0, goals: [], monthsTracked: 1)
+        #expect(WellbeingEngine.aggregate(WellbeingEngine.components(unscored)) == nil)
+        #expect(WellbeingEngine.projectedGain(unscored, WellbeingTip(type: .noGoal, id: "no_goal", tone: .opportunity)) == nil)
+    }
+
+    // MARK: §3.4 Rank by projected gain (secondary key)
+
+    @Test func rankSecondarySortsByProjectedGainWithinATone() {
+        let tips = [
+            WellbeingTip(type: .missingBudget, id: "m", tone: .opportunity, projectedGain: 1),
+            WellbeingTip(type: .goalOffTrack, id: "g", tone: .opportunity, projectedGain: 6),
+        ]
+        // Same tone → the bigger modelled gain leads (§3.4).
+        #expect(WellbeingEngine.rank(tips, cap: 5).map(\.id) == ["g", "m"])
+    }
+
+    @Test func rankStillPutsToneSeverityBeforeGain() {
+        let tips = [
+            WellbeingTip(type: .missingBudget, id: "m", tone: .opportunity, projectedGain: 6),
+            WellbeingTip(type: .overBudget, id: "a", tone: .alert, projectedGain: 0),
+        ]
+        // A high-gain opportunity never outranks an alert — gain is only the SECONDARY key.
+        #expect(WellbeingEngine.rank(tips, cap: 5).first?.id == "a")
+    }
+
+    @Test func tipsAttachProjectedGainOnceScored() {
+        // An over-budget month that IS scored: the OVER_BUDGET tip carries a positive modelled gain.
+        let i = inputs(budgetedCount: 6, overCount: 3, overspendTotal: "214", budgetedTotal: "1200",
+                       receiptsLogged: 18, monthsTracked: 6)
+        let over = WellbeingEngine.tips(i).first { $0.type == .overBudget }
+        #expect(over?.projectedGain != nil)
+        #expect((over?.projectedGain ?? 0) > 0)
+    }
+
+    // MARK: §2.6 Budget-streak evidence surfacing
+
+    @Test func budgetStreakEvidenceSurfacesLongestFirstCappedAndAboveTheFloor() {
+        let streaks = [
+            Streak(kind: .budgetMonth, label: "Groceries", current: 4, best: 5, periodsChecked: 6, liveOnTrack: true),
+            Streak(kind: .budgetMonth, label: "Household", current: 2, best: 3, periodsChecked: 6, liveOnTrack: true),
+            Streak(kind: .budgetMonth, label: "Transport", current: 1, best: 2, periodsChecked: 6, liveOnTrack: false),
+            Streak(kind: .budgetMonth, label: "Dining", current: 6, best: 6, periodsChecked: 6, liveOnTrack: true),
+        ]
+        let ev = WellbeingEngine.budgetStreakEvidence(streaks)
+        // current < 2 dropped (Transport), longest current first, capped at maxStreakEvidence (2).
+        #expect(ev.count == WellbeingEngine.maxStreakEvidence)
+        #expect(ev.map(\.label) == ["Dining", "Groceries"])
+    }
+
+    @Test func budgetStreakEvidenceIsEmptyWhenNothingClearsTheFloor() {
+        let streaks = [Streak(kind: .budgetMonth, label: "A", current: 1, best: 1, periodsChecked: 3, liveOnTrack: false)]
+        #expect(WellbeingEngine.budgetStreakEvidence(streaks).isEmpty)
+    }
 }

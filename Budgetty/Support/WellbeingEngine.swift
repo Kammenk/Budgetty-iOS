@@ -111,6 +111,12 @@ struct WellbeingScore {
 
 /// One ranked tip. `type` selects the localized copy in the UI, `id` is the stable dismissal key,
 /// and the loosely-typed payload carries the real figures the copy quotes.
+///
+/// `projectedGain` (§3.3) is the modelled "+N to your score" — how much acting on this one tip would
+/// move the total, computed by `WellbeingEngine.projectedGain`. It is a MODELLED delta under an explicit
+/// assumption, NOT a promise, and it is only shown when it clears `WellbeingEngine.showsProjectedGain`
+/// (≥ `minProjectedGain`); a non-positive value is never rendered. Nil for tips with nothing to act on
+/// (win-tone) or for the weekly tactical tips.
 struct WellbeingTip: Identifiable, Equatable {
     let type: TipType
     let id: String
@@ -120,6 +126,16 @@ struct WellbeingTip: Identifiable, Equatable {
     var percent: Int? = nil
     var count: Int? = nil
     var label: String? = nil
+    var projectedGain: Int? = nil
+}
+
+/// The band-up nudge (§3.5): the score sits within `WellbeingEngine.bandUpWindow` points below the next
+/// band boundary (40 / 60 / 80), so a concrete near-term target is worth showing — "3 points to Healthy".
+/// Nil (no nudge) whenever the score isn't close to a boundary. Pure data; the surface renders it in the
+/// accessible warn tone (never the bright band hue) for legibility.
+struct BandUp: Equatable {
+    let pointsAway: Int
+    let nextBand: WellbeingBand
 }
 
 private extension Decimal {
@@ -149,11 +165,29 @@ enum WellbeingEngine {
     static let monthlyTipCap = 5
     static let weeklyTipCap = 3
 
+    /// How close (in points) to a band boundary the score must be for the band-up nudge to show (§3.5).
+    static let bandUpWindow = 3
+
+    /// Below this a modelled "+N to your score" is noise (or a renormalisation artefact) and is hidden (§3.3).
+    static let minProjectedGain = 2
+
+    /// Up to this many budget streaks show as evidence under the Budget component (§2.6).
+    static let maxStreakEvidence = 2
+
+    private static let bandBoundaries = [40, 60, 80]
+
     static func band(_ score: Int) -> WellbeingBand {
         if score >= 80 { return .thriving }
         if score >= 60 { return .healthy }
         if score >= 40 { return .gettingThere }
         return .needsWork
+    }
+
+    /// The band-up nudge target (§3.5): the next band boundary (40 / 60 / 80) when the score sits within
+    /// `bandUpWindow` points below it, else nil. "57 → 3 points to Healthy"; suppressed at e.g. 72.
+    static func bandUp(_ score: Int) -> BandUp? {
+        guard let boundary = bandBoundaries.first(where: { $0 > score && $0 - score <= bandUpWindow }) else { return nil }
+        return BandUp(pointsAway: boundary - score, nextBand: band(boundary))
     }
 
     /// Bar/label tier for a single component sub-score: ≥70 good, 40–69 careful, <40 over.
@@ -256,8 +290,17 @@ enum WellbeingEngine {
     }
 
     /// Ranks candidates alert→caution→opportunity, caps the list, always keeping one win when available.
+    /// Secondary key (§3.4): within the same tone, a larger modelled `projectedGain` leads, so the top
+    /// tip is both important AND impactful. Tips with no gain sort as 0; ties keep insertion order (the
+    /// `offset` tiebreaker makes the sort stable, matching Kotlin's `sortedWith(compareBy…thenBy…)`).
     static func rank(_ candidates: [WellbeingTip], cap: Int) -> [WellbeingTip] {
-        let ordered = candidates.sorted { severity($0.tone) < severity($1.tone) }
+        let ordered = candidates.enumerated().sorted { a, b in
+            let sa = severity(a.element.tone), sb = severity(b.element.tone)
+            if sa != sb { return sa < sb }
+            let ga = a.element.projectedGain ?? 0, gb = b.element.projectedGain ?? 0
+            if ga != gb { return ga > gb }
+            return a.offset < b.offset
+        }.map(\.element)
         let wins = ordered.filter { $0.tone == .win }
         let others = ordered.filter { $0.tone != .win }
         if others.isEmpty { return Array(wins.prefix(cap)) }
@@ -265,7 +308,17 @@ enum WellbeingEngine {
         return Array(others.prefix(max(1, cap - 1))) + Array(wins.prefix(1))
     }
 
-    static func tips(_ inputs: WellbeingInputs) -> [WellbeingTip] { rank(monthlyCandidates(inputs), cap: monthlyTipCap) }
+    static func tips(_ inputs: WellbeingInputs) -> [WellbeingTip] {
+        // A "+N to your score" pill only makes sense once there IS a score to move (§3.3); in the
+        // first-run "—" state (too few receipts / no scored component) no gain is attached.
+        let scored = inputs.receiptsLogged >= minReceiptsToScore && aggregate(components(inputs)) != nil
+        let withGains = monthlyCandidates(inputs).map { tip -> WellbeingTip in
+            var t = tip
+            t.projectedGain = scored ? projectedGain(inputs, tip) : nil
+            return t
+        }
+        return rank(withGains, cap: monthlyTipCap)
+    }
 
     static func weeklyTips(_ week: WeeklyInputs) -> [WellbeingTip] { rank(weeklyCandidates(week), cap: weeklyTipCap) }
 
@@ -331,5 +384,94 @@ enum WellbeingEngine {
             out.append(WellbeingTip(type: .underPaceWin, id: "under:\(u.name)", tone: .win, amount: u.under, label: u.name))
         }
         return out
+    }
+
+    // ── Attributable tips: "what this is worth" (§3.3) ──────────────────────────────
+
+    /// The tip types with a modelled single-action projection (per the §3.3 table). Others get no pill.
+    private static let actionableProjection: Set<TipType> = [
+        .missingBudget, .overBudget, .subscriptionCost, .noGoal, .goalOffTrack,
+    ]
+
+    /// Whether a tip's `projectedGain` clears the display floor and its pill may be shown. Suppresses
+    /// noise (< 2) AND — critically — any non-positive projection from the renormalisation trap (see
+    /// `projectedGain`); a "+1", "+0" or "−N" pill is never rendered. A single predicate does both,
+    /// since anything ≤ 0 is also < `minProjectedGain`.
+    static func showsProjectedGain(_ gain: Int?) -> Bool {
+        guard let gain else { return false }
+        return gain >= minProjectedGain
+    }
+
+    /// The modelled "+N to your score" for an actionable `tip` (§3.3): the delta if the user took exactly
+    /// that one action, computed by re-running `aggregate` with the affected component's sub-score replaced
+    /// by its post-action value (per the §3.3 table). Nil for tips with nothing to act on (win-tone, and
+    /// the alert/spike tips that have no clean single-component model), or when there is no current total
+    /// to move against.
+    ///
+    /// This is a MODELLED delta under an EXPLICIT ASSUMPTION (the action lands exactly as described) — NOT
+    /// a promise.
+    ///
+    /// ⚠️ Renormalisation trap: `aggregate` is a weight-renormalising mean, so an action that ADDS a
+    /// previously-nil component (`noGoal`, or `missingBudget` for a user with no budgets at all) shifts the
+    /// denominator. When the entering component sits below the current renormalised mean, the total can
+    /// move by nothing — or, in principle, DOWNWARD. The returned delta may therefore be zero or negative;
+    /// callers MUST gate display through `showsProjectedGain`, which drops everything below
+    /// `minProjectedGain` so a "−N" is never shown next to correct advice.
+    static func projectedGain(_ inputs: WellbeingInputs, _ tip: WellbeingTip) -> Int? {
+        guard actionableProjection.contains(tip.type) else { return nil }
+        guard let base = aggregate(components(inputs)),
+              let projected = aggregate(projectedComponents(inputs, tip)) else { return nil }
+        return projected - base
+    }
+
+    /// The component list after modelling `tip`'s single action (§3.3 table); unaffected components unchanged.
+    private static func projectedComponents(_ inputs: WellbeingInputs, _ tip: WellbeingTip) -> [WellbeingComponent] {
+        var comps = components(inputs)
+        func replace(_ key: WellbeingComponentKey, _ newScore: Int) {
+            guard let i = comps.firstIndex(where: { $0.key == key }) else { return }
+            comps[i] = WellbeingComponent(key: comps[i].key, weight: comps[i].weight, score: newScore)
+        }
+        switch tip.type {
+        // Add a budget for the named category, assumed within plan → budgetedCount + 1, overspend as-is.
+        case .missingBudget:
+            let newBudget = tip.amount ?? .zero
+            replace(.budget, budgetScore(budgetedCount: inputs.budgetedCount + 1, overCount: inputs.overCount,
+                                         overspend: inputs.overspendTotal, budgeted: inputs.budgetedTotal + newBudget))
+        // Bring one over-budget scope back in line → overCount − 1 and its (average) overspend removed.
+        case .overBudget:
+            if inputs.overCount > 0 {
+                let perOver = SubscriptionDetector.round2(inputs.overspendTotal / Decimal(inputs.overCount))
+                replace(.budget, budgetScore(budgetedCount: inputs.budgetedCount, overCount: inputs.overCount - 1,
+                                             overspend: max(inputs.overspendTotal - perOver, 0), budgeted: inputs.budgetedTotal))
+            }
+        // Cancel one subscription → the share falls proportionally (same spend denominator).
+        case .subscriptionCost:
+            if let share = inputs.subsSharePercent {
+                let count = max(inputs.subsCount, 1)
+                let newShare = Int((Double(share) * Double(count - 1) / Double(count)).rounded())
+                replace(.subscriptions, subscriptionsScore(sharePercent: newShare))
+            }
+        // Create a goal, on pace → goals enters the mean at 100 (the renormalisation case).
+        case .noGoal:
+            replace(.goals, 100)
+        // Bring the off-track goal back on pace → its mark 40 → 100.
+        case .goalOffTrack:
+            let fixed = inputs.goals.map { g -> GoalPace in
+                (g.name == tip.label && g.behind && !g.reached) ? GoalPace(name: g.name, reached: g.reached, behind: false, monthsLate: g.monthsLate) : g
+            }
+            if let s = goalsScore(fixed) { replace(.goals, s) }
+        default:
+            break
+        }
+        return comps
+    }
+
+    // ── Streak evidence (§2.6) ──────────────────────────────────────────────────────
+
+    /// The up-to-`maxStreakEvidence` budget streaks to list as evidence under the Budget component (§2.6):
+    /// only those already surfaced (current ≥ `StreakEngine.minToSurface`), longest current run first.
+    /// Keeps the "which streaks to show" decision in a pure, testable seam.
+    static func budgetStreakEvidence(_ streaks: [Streak]) -> [Streak] {
+        Array(StreakEngine.surfaced(streaks).sorted { $0.current > $1.current }.prefix(maxStreakEvidence))
     }
 }

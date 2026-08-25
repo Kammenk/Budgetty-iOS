@@ -41,11 +41,13 @@ final class BuyingLimitNudgeCenter {
 /// the save flow as its own collaborator so this logic (window + substring counting) is testable in
 /// isolation and mirrors 1:1 on Android.
 ///
-/// A limit qualifies when the just-saved rows contributed at least one matching unit within its
-/// current window AND the window's total now meets or exceeds the cap; the most-over limit wins (ties
-/// broken by the higher count, then the most-recently-created). Counts sum quantity on the same
-/// normalized substring rule the management screen uses, so card and nudge always agree. Non-blocking:
-/// the receipt is already saved regardless.
+/// Restraint (§4.6): at most ONE nudge per receipt save (the single most-over limit wins), and never a
+/// re-nudge for a limit that was ALREADY at/over its cap BEFORE this receipt — only the save that
+/// actually crosses the line nudges. A limit qualifies when the just-saved rows contributed ≥ 1 matching
+/// unit in its current window AND the window's total now meets/exceeds the cap AND the window was NOT
+/// already at/over before this receipt. The most-over limit wins (ties: higher count, then most-recently
+/// created). Counts sum quantity on the same normalized substring rule the management screen uses, so
+/// card and nudge always agree. Non-blocking: the receipt is already saved regardless.
 enum BuyingLimitNudger {
     /// `savedItems` = the rows the just-finalized receipt persisted (name, quantity, `createdAt`).
     @MainActor
@@ -57,16 +59,31 @@ enum BuyingLimitNudger {
         guard !limits.isEmpty else { return nil }
         let allItems = ((try? context.fetch(FetchDescriptor<LineItem>())) ?? [])
             .map { CountableItem(name: $0.name, quantity: $0.quantity, timestamp: $0.createdAt) }
+        return selectNudge(limits: limits, allItems: allItems, savedItems: savedItems,
+                           today: today, startDay: startDay)
+    }
 
+    /// The one nudge (if any) a just-saved receipt should raise (§4.6). Pure — no SwiftData fetch, so it
+    /// unit-tests deterministically with a fixed calendar. Mirrors Android's `BuyingLimitNudger.selectNudge`.
+    static func selectNudge(limits: [BuyingLimit],
+                            allItems: [CountableItem],
+                            savedItems: [CountableItem],
+                            today: Date,
+                            startDay: Int,
+                            firstWeekday: Int = BuyingLimitCounter.localeFirstWeekday(),
+                            calendar: Calendar = .current) -> BuyingLimitNudge? {
         var candidates: [(limit: BuyingLimit, countAfter: Int)] = []
         for limit in limits {
             let keywords = limit.keywords
             guard !keywords.isEmpty else { continue }
-            let window = BuyingLimitCounter.window(limit.timeframe, today: today, startDay: startDay)
+            let window = BuyingLimitCounter.window(limit.timeframe, today: today, startDay: startDay,
+                                                   firstWeekday: firstWeekday, calendar: calendar)
             let contributed = BuyingLimitCounter.countInWindow(savedItems, keywords: keywords, window: window)
             guard contributed > 0 else { continue }
             let countAfter = BuyingLimitCounter.countInWindow(allItems, keywords: keywords, window: window)
             guard countAfter >= limit.count else { continue }
+            // Already at/over BEFORE this receipt → they know; don't re-nudge in the same window (§4.6).
+            guard countAfter - contributed < limit.count else { continue }
             candidates.append((limit, countAfter))
         }
 

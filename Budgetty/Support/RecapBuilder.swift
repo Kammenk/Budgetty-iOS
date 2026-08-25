@@ -52,6 +52,51 @@ enum RecapBuilder {
     private static let trailingMonths = 6
     private static let niceStep = 10
 
+    // ── Pure weekly-streak sourcing (§1.3) — top-level so they unit-test standalone (parity with the
+    //    Android `weeklyShareOf` / `pickWeekStreak` top-level functions). ─────────────────────────────
+
+    /// A monthly budget amount sliced to one week for the weekly streak comparison (§1.3). Category and
+    /// whole-budget amounts in Budgetty are monthly; a month is `52 ⁄ 12` weeks, so a week's allowance is
+    /// `monthly × 12 ⁄ 52`, rounded HALF_UP to 2 dp. An explicitly-set WEEKLY budget is already per-week
+    /// and used as-is (never passed here).
+    static func weeklyShareOf(_ monthly: Decimal) -> Decimal {
+        (monthly as NSDecimalNumber)
+            .multiplying(by: NSDecimalNumber(value: 12))
+            .dividing(by: NSDecimalNumber(value: 52), withBehavior: weekShareRounding)
+            .decimalValue
+    }
+
+    /// Picks the single scope for the weekly Streak card (§1.3): the strongest live current run (highest
+    /// `current`, then `best`) among those clearing the `minToSurface` ≥ 2 floor; failing that, the
+    /// strongest best-run fallback (highest `best` ≥ 2). Ties break on label for determinism. Nil when
+    /// nothing qualifies, so the card drops out.
+    static func pickWeekStreak(_ streaks: [Streak]) -> Streak? {
+        if let live = StreakEngine.surfaced(streaks).max(by: { a, b in
+            if a.current != b.current { return a.current < b.current }
+            if a.best != b.best { return a.best < b.best }
+            return a.label < b.label
+        }) {
+            return live
+        }
+        return streaks.filter { $0.best >= StreakEngine.minToSurface }.max(by: { a, b in
+            if a.best != b.best { return a.best < b.best }
+            return a.label < b.label
+        })
+    }
+
+    /// Maps a chosen `Streak` to the calm secondary-band `.streak` card (best-run when `current < 2`).
+    static func streakCard(_ streak: Streak) -> RecapCard {
+        .streak(band: .secondary, kind: streak.kind, scope: streak.label.isEmpty ? nil : streak.label,
+                current: streak.current, best: streak.best, liveOnTrack: streak.liveOnTrack,
+                isBestRun: streak.current < StreakEngine.minToSurface)
+    }
+
+    /// HALF_UP-to-2-dp rounding for `weeklyShareOf` (matches Kotlin `divide(52, 2, HALF_UP)`; budgets are
+    /// positive, where `.plain` rounds ties up).
+    private static let weekShareRounding = NSDecimalNumberHandler(
+        roundingMode: .plain, scale: 2, raiseOnExactness: false, raiseOnOverflow: false,
+        raiseOnUnderflow: false, raiseOnDivideByZero: false)
+
     /// Holds the fetched data + params for one build; mirrors the Android `RecapProvider` instance.
     private struct Engine {
         let receipts: [Receipt]
@@ -113,7 +158,8 @@ enum RecapBuilder {
             let spend = paidSpend(monthReceipts)
             let prevSpend = paidSpend(prevReceipts)
 
-            let guardResult = RecapDataGuard.evaluate(totalReceipts: receipts.count,
+            let guardResult = RecapDataGuard.evaluate(kind: .monthly, totalReceipts: receipts.count,
+                                                      periodReceipts: monthReceipts.count,
                                                       periodHasSpend: spend > 0,
                                                       priorPeriodHasSpend: prevSpend > 0)
             guard case let .show(withComparison) = guardResult else { return nil }
@@ -168,12 +214,14 @@ enum RecapBuilder {
                                         : nil))
             }
             if budget.hasBudget {
-                cards.append(.budgetStreak(band: .great, streakMonths: streakMonths(endOffset: offset),
+                let ms = monthStreak(endOffset: offset)
+                cards.append(.budgetStreak(band: .great, streakMonths: ms.current, best: ms.best,
+                                           liveOnTrack: ms.liveOnTrack,
                                            underCount: budget.underCount, scopeCount: budget.scopeCount,
                                            segments: budget.segments, safeToSpend: budget.safeToSpend))
             }
             if !limits.isEmpty {
-                let outcome = limitOutcomes(monthWindow: window)
+                let outcome = limitOutcomes(window: window)
                 cards.append(.limits(band: .warn, underCount: outcome.filter(\.under).count,
                                      totalCount: outcome.count, chips: outcome))
             }
@@ -212,7 +260,8 @@ enum RecapBuilder {
             let spend = paidSpend(weekReceipts)
             let prevSpend = paidSpend(prevReceipts)
 
-            let guardResult = RecapDataGuard.evaluate(totalReceipts: receipts.count,
+            let guardResult = RecapDataGuard.evaluate(kind: .weekly, totalReceipts: receipts.count,
+                                                      periodReceipts: weekReceipts.count,
                                                       periodHasSpend: spend > 0,
                                                       priorPeriodHasSpend: prevSpend > 0)
             guard case let .show(withComparison) = guardResult else { return nil }
@@ -227,12 +276,23 @@ enum RecapBuilder {
             let onTrack = weeklyBudget == nil || fractionUsed <= 1
             let movers = withComparison ? topMovers(current: weekItems, previous: prevReceipts.flatMap(\.items)) : []
 
-            let cards: [RecapCard] = [
+            // §1.3: a fuller weekly story — Cover → Pace → Limits (if any) → Streak (if any) → Focus.
+            // Both the Limits and Streak cards drop out entirely when there's nothing to show, so a bare
+            // week stays Cover → Pace → Focus (3 cards) and never pads.
+            var cards: [RecapCard] = [
                 .cover(band: .primary),
                 .pace(band: onTrack ? .good : .warn, spent: spend, weeklyBudget: weeklyBudget,
                       fractionUsed: fractionUsed, paceFraction: 1, remaining: remaining, deltaPercent: delta),
-                .focus(band: .secondary, focus: deriveWeeklyFocus(movers: movers), isWeekly: true),
             ]
+            if !limits.isEmpty {
+                let outcome = limitOutcomes(window: window, weekly: true)
+                cards.append(.limits(band: .warn, underCount: outcome.filter(\.under).count,
+                                     totalCount: outcome.count, chips: outcome))
+            }
+            if let streak = weekStreak(endOffset: offset) {
+                cards.append(RecapBuilder.streakCard(streak))
+            }
+            cards.append(.focus(band: .primary, focus: deriveWeeklyFocus(movers: movers), isWeekly: true))
             return RecapStory(kind: .weekly, monthStart: weekEnd, nextMonthStart: weekEnd,
                               weekStart: weekStart, weekEnd: weekEnd, cards: cards)
         }
@@ -313,36 +373,109 @@ enum RecapBuilder {
             return .good
         }
 
-        /// Consecutive closed months under budget, ending with `endOffset`; 0 if that month wasn't under.
-        private func streakMonths(endOffset: Int) -> Int {
-            var count = 0
-            var off = endOffset
-            while count < maxStreak {
-                let rcpts = receipts(in: monthInterval(off))
+        /// The all-scopes month streak (§2.1): consecutive CLOSED pay-cycle months where EVERY budgeted
+        /// scope stayed under, ending with `endOffset`, plus its personal best and whether the current
+        /// OPEN month is on track. Feeds the de-flamed monthly `budgetStreak` card (§2.4/§2.6).
+        ///
+        /// Re-sourced from `StreakEngine.allScopesStreak` so the recap's every-scope streak is the one
+        /// shared implementation — the same object the Budget row and Wellbeing evidence read. Each closed
+        /// month's line items are tagged with a period index (0 = `endOffset`, increasing into the past);
+        /// the OPEN month (one cycle after `endOffset`) becomes the `LiveBudgetPeriod` that only ever feeds
+        /// `liveOnTrack`, never counted (§2.3). A month with no receipts is "no data" and breaks the run;
+        /// per-category caps use net line spend; the monthly-only scope carries each month's paid
+        /// adjustment (tax/fees − discount), exactly as `budgetOutcome` did.
+        private func monthStreak(endOffset: Int) -> Streak {
+            var txns: [StreakTxn] = []
+            var adjustment: [Int: Decimal] = [:]
+            for idx in 0..<maxStreak {
+                let rcpts = receipts(in: monthInterval(endOffset - idx))
                 let items = rcpts.flatMap(\.items)
-                let outcome = budgetOutcome(monthItems: items, spend: paidSpend(rcpts))
-                let under = outcome.hasBudget && outcome.underCount == outcome.scopeCount && !items.isEmpty
-                if !under { break }
-                count += 1
-                off -= 1
+                guard !items.isEmpty else { continue }   // empty month → no data at this index (breaks the run)
+                txns.append(contentsOf: items.map {
+                    StreakTxn(periodIndex: idx, category: $0.category, amount: $0.lineTotal)
+                })
+                adjustment[idx] = paidSpend(rcpts) - netSpend(items)
             }
-            return count
+            var catBudgets: [String: Decimal] = [:]
+            for b in budgets where b.key.hasPrefix("CAT:") { catBudgets[String(b.key.dropFirst(4))] = b.amount }
+            let monthlyBudget = budgets.first { $0.key == Budget.monthlyKey }?.amount
+            return StreakEngine.allScopesStreak(BudgetStreakInput(
+                transactions: txns, categoryBudgets: catBudgets, monthlyBudget: monthlyBudget,
+                kind: .budgetMonth, monthlyLabel: Budget.monthlyKey,
+                monthlyAdjustmentByPeriod: adjustment, live: livePeriod(monthInterval(endOffset + 1))))
+        }
+
+        /// The best per-scope WEEK streak to surface on the weekly Streak card (§1.3), or nil when there's
+        /// nothing worth showing. Per-category when any category budget is set — each monthly category
+        /// budget sliced to a week via `weeklyShareOf` — else the single whole-budget scope (an explicit
+        /// WEEKLY budget as-is, or the monthly budget sliced). `pickWeekStreak` chooses one scope: a live
+        /// current run first, else a best-run fallback, both gated at the `minToSurface` ≥ 2 floor. Closed
+        /// weeks are tagged 0 = `endOffset` increasing into the past; the OPEN week (`endOffset + 1`) feeds
+        /// `liveOnTrack` only.
+        private func weekStreak(endOffset: Int) -> Streak? {
+            var catBudgetsRaw: [String: Decimal] = [:]
+            for b in budgets where b.key.hasPrefix("CAT:") { catBudgetsRaw[String(b.key.dropFirst(4))] = b.amount }
+            let weeklyBudget = budgets.first { $0.key == Budget.weeklyKey }?.amount
+            let monthlyBudget = budgets.first { $0.key == Budget.monthlyKey }?.amount
+            let categoryBudgets: [String: Decimal]
+            let wholeBudget: Decimal?
+            if !catBudgetsRaw.isEmpty {
+                categoryBudgets = catBudgetsRaw.mapValues { RecapBuilder.weeklyShareOf($0) }
+                wholeBudget = nil
+            } else if let wb = weeklyBudget {
+                categoryBudgets = [:]
+                wholeBudget = wb
+            } else if let mb = monthlyBudget {
+                categoryBudgets = [:]
+                wholeBudget = RecapBuilder.weeklyShareOf(mb)
+            } else {
+                return nil
+            }
+            var txns: [StreakTxn] = []
+            var adjustment: [Int: Decimal] = [:]
+            for idx in 0..<maxStreak {
+                let rcpts = receipts(in: weekInterval(endOffset - idx))
+                let items = rcpts.flatMap(\.items)
+                guard !items.isEmpty else { continue }
+                txns.append(contentsOf: items.map {
+                    StreakTxn(periodIndex: idx, category: $0.category, amount: $0.lineTotal)
+                })
+                adjustment[idx] = paidSpend(rcpts) - netSpend(items)
+            }
+            let streaks = StreakEngine.budgetStreaks(BudgetStreakInput(
+                transactions: txns, categoryBudgets: categoryBudgets, monthlyBudget: wholeBudget,
+                kind: .budgetWeek, monthlyLabel: "",
+                monthlyAdjustmentByPeriod: adjustment, live: livePeriod(weekInterval(endOffset + 1))))
+            return RecapBuilder.pickWeekStreak(streaks)
+        }
+
+        /// The in-flight (open) period's line items as a `LiveBudgetPeriod` (§2.3): net per category plus
+        /// the whole-budget paid adjustment. Feeds `Streak.liveOnTrack` only — never counted.
+        private func livePeriod(_ interval: DateInterval) -> LiveBudgetPeriod {
+            let rcpts = receipts(in: interval)
+            let items = rcpts.flatMap(\.items)
+            return LiveBudgetPeriod(
+                transactions: items.map { StreakTxn(periodIndex: 0, category: $0.category, amount: $0.lineTotal) },
+                monthlyAdjustment: paidSpend(rcpts) - netSpend(items))
         }
 
         // ── Buying-limits outcome ──────────────────────────────────────────────────
 
-        private func limitOutcomes(monthWindow: DateInterval) -> [RecapLimitChip] {
+        /// The limit chips for a recap window. In a `weekly` story the window IS a single week, so every
+        /// limit is simply counted within it against its cap (§1.3 — weekly limits pair naturally with the
+        /// weekly recap). In the monthly story a monthly cap counts over the whole month, while a weekly
+        /// cap asks "did you keep every week under it" via the worst week's count.
+        private func limitOutcomes(window: DateInterval, weekly: Bool = false) -> [RecapLimitChip] {
             let items = receipts.flatMap(\.items).map {
                 CountableItem(name: $0.name, quantity: $0.quantity, timestamp: $0.createdAt)
             }
             return limits.map { limit in
                 let bought: Int
-                switch limit.timeframe {
-                case .monthly:
-                    bought = BuyingLimitCounter.countInWindow(items, keywords: limit.keywords, window: monthWindow)
-                case .weekly:
+                if weekly || limit.timeframe == .monthly {
+                    bought = BuyingLimitCounter.countInWindow(items, keywords: limit.keywords, window: window)
+                } else {
                     // A weekly cap over a month is "did you keep every week under it": the worst week's count.
-                    bought = worstWeekCount(items: items, keywords: limit.keywords, monthWindow: monthWindow)
+                    bought = worstWeekCount(items: items, keywords: limit.keywords, monthWindow: window)
                 }
                 return RecapLimitChip(emoji: limit.emoji.isEmpty ? "🏷️" : limit.emoji,
                                       label: limit.displayTitle, bought: bought, cap: limit.count)

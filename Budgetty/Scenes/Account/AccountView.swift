@@ -23,8 +23,9 @@ struct AccountView: View {
     @AppStorage(SettingsKey.appLockEnabled) private var appLockEnabled = false
     @AppStorage(SettingsKey.autoLockMinutes) private var autoLockMinutes = 0
     @AppStorage(SettingsKey.recapEnabled) private var recapEnabled = true
-    @AppStorage(SettingsKey.recapFrequency) private var recapFrequencyRaw = RecapFrequency.monthly.rawValue
+    @AppStorage(SettingsKey.recapFrequency) private var recapFrequencyRaw = RecapFrequency.both.rawValue
     @AppStorage(SettingsKey.crashReporting) private var crashReporting = true
+    @AppStorage(SettingsKey.analytics) private var analyticsEnabled = true
     @AppStorage(SettingsKey.premium) private var premium = false
     private let theme = AppTheme.shared
 
@@ -302,7 +303,7 @@ struct AccountView: View {
                 VStack(alignment: .leading, spacing: 12) {
                     GlassSegmentedControl(options: RecapFrequency.allCases,
                                           selection: recapFrequencyBinding) { recapTitle($0) }
-                    Text(recapHint(RecapFrequency(rawValue: recapFrequencyRaw) ?? .monthly))
+                    Text(recapHint(RecapFrequency(rawValue: recapFrequencyRaw) ?? .both))
                         .font(.caption).foregroundStyle(Palette.secondaryLabel)
                 }
                 .padding(.horizontal, 16).padding(.vertical, 12)
@@ -321,7 +322,7 @@ struct AccountView: View {
     }
 
     private var recapFrequencyBinding: Binding<RecapFrequency> {
-        Binding(get: { RecapFrequency(rawValue: recapFrequencyRaw) ?? .monthly },
+        Binding(get: { RecapFrequency(rawValue: recapFrequencyRaw) ?? .both },
                 set: { recapFrequencyRaw = $0.rawValue })
     }
 
@@ -402,6 +403,16 @@ struct AccountView: View {
             .tint(Palette.good)
             .padding(.vertical, 8).padding(.horizontal, 16)
             .onChange(of: crashReporting) { _, enabled in CrashReporting.setEnabled(enabled) }
+            divider
+            // Product analytics — a SEPARATE opt-out beside crash reporting (§0, Android parity). The
+            // stored preference is the source of truth — push every change straight to the SDK.
+            Toggle(isOn: $analyticsEnabled) {
+                label("account_analytics", "chart.bar.xaxis", Color(argb: 0xFFFF9500),
+                      subtitle: "account_analytics_sub")
+            }
+            .tint(Palette.good)
+            .padding(.vertical, 8).padding(.horizontal, 16)
+            .onChange(of: analyticsEnabled) { _, enabled in Analytics.setEnabled(enabled) }
         }
         .contentCard(cornerRadius: 14)
     }
@@ -491,6 +502,18 @@ struct AccountView: View {
         HStack(spacing: 12) {
             SettingsIcon(symbol: symbol, background: tint)
             Text(title).foregroundStyle(Palette.label)
+        }
+    }
+
+    /// A toggle label with a secondary caption under the title (used by the analytics row, §0).
+    private func label(_ title: LocalizedStringKey, _ symbol: String, _ tint: Color,
+                       subtitle: LocalizedStringKey) -> some View {
+        HStack(spacing: 12) {
+            SettingsIcon(symbol: symbol, background: tint)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title).foregroundStyle(Palette.label)
+                Text(subtitle).font(.caption).foregroundStyle(Palette.secondaryLabel)
+            }
         }
     }
 

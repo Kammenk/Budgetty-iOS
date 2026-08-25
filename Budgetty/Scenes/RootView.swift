@@ -73,7 +73,7 @@ struct RootView: View {
     // on app open once the lock (if any) has cleared; the story loads only when a boundary is due, and
     // is hosted as a full-screen cover over the live shell (the dock stays untouched).
     @AppStorage(SettingsKey.recapEnabled) private var recapEnabled = true
-    @AppStorage(SettingsKey.recapFrequency) private var recapFrequencyRaw = RecapFrequency.monthly.rawValue
+    @AppStorage(SettingsKey.recapFrequency) private var recapFrequencyRaw = RecapFrequency.both.rawValue
     @AppStorage(SettingsKey.recapLastShownWeek) private var recapLastShownWeek = ""
     @AppStorage(SettingsKey.recapLastShownMonth) private var recapLastShownMonth = ""
     @State private var recapStory: RecapStory?
@@ -96,7 +96,10 @@ struct RootView: View {
         .fullScreenCover(isPresented: $showScan) { ScanFlowView().coversFloatingDock() }
         .fullScreenCover(isPresented: $showRecap) {
             if let story = recapStory {
-                RecapStoryView(story: story, onClose: closeRecap, onSeeDetails: openRecapDetails)
+                RecapStoryView(story: story, onClose: closeRecap, onSeeDetails: openRecapDetails,
+                               onShown: { Analytics.logRecapShown($0) },
+                               onCompleted: { Analytics.logRecapCompleted($0, cardsViewed: $1) },
+                               onStreakSurfaced: { Analytics.logStreakSurfaced($0, length: $1) })
             }
         }
         .task { await maybeShowRecap() }
@@ -163,7 +166,7 @@ struct RootView: View {
         // stamp-on-skip exactly like Android.
         guard !receipts.isEmpty else { return }
         recapChecked = true
-        let frequency = RecapFrequency(rawValue: recapFrequencyRaw) ?? .monthly
+        let frequency = RecapFrequency(rawValue: recapFrequencyRaw) ?? .both
         guard let due = RecapScheduler.due(
             enabled: recapEnabled, frequency: frequency,
             lastShownWeek: recapLastShownWeek, lastShownMonth: recapLastShownMonth,
@@ -415,13 +418,14 @@ struct RootView: View {
         case "memory": DebugMemorySheet()
         case "buyinglimits": NavigationStack { DebugBuyingLimits() }
         case "recap": RecapStoryView(story: .debugMonthlySample(), onClose: {}, onSeeDetails: {})
+        case "recap-weekly": RecapStoryView(story: .debugWeeklySample(), onClose: {}, onSeeDetails: {})
         default: EmptyView().hidden()
         }
     }
 
     private var hasDebugPreview: Bool {
         ["account", "paywall", "receipt", "category", "review",
-         "notifications", "support", "widgets", "lock", "memory", "buyinglimits", "recap"]
+         "notifications", "support", "widgets", "lock", "memory", "buyinglimits", "recap", "recap-weekly"]
             .contains(ProcessInfo.processInfo.environment["SHOW_SCREEN"] ?? "")
     }
     #endif
@@ -479,8 +483,9 @@ private struct DebugMemorySheet: View {
 #endif
 
 #if DEBUG
-/// Seeds three buying limits (on-track / at-limit / over) plus matching line items, for the
-/// SHOW_SCREEN=buyinglimits screenshot hook — the screen derives its counts off real line items.
+/// Seeds three buying limits (on-track / at-limit / over) plus matching line items — including a few
+/// weeks of history — for the SHOW_SCREEN=buyinglimits screenshot hook, so the §4.2 streak caption,
+/// §4.3 history strip and a §4.4 suggestion all render. The screen derives everything off real line items.
 private struct DebugBuyingLimits: View {
     @Environment(\.modelContext) private var context
     @Query private var limits: [BuyingLimit]
@@ -492,13 +497,26 @@ private struct DebugBuyingLimits: View {
     private func seed() {
         guard limits.isEmpty else { return }
         let now = Date()
-        let receipt = Receipt(createdAt: now, store: "Debug", date: now)
-        context.insert(receipt)
-        for (name, qty) in [("Red Bull 250ml", 1), ("Coffee latte", 5),
-                            ("Coca-Cola 1L", 2), ("Fanta Orange", 2)] {
-            let li = LineItem(name: name, createdAt: now, price: 1, quantity: qty)
-            li.receipt = receipt
-            context.insert(li)
+        let cal = Calendar.current
+        func addReceipt(_ date: Date, _ rows: [(String, Int)]) {
+            let r = Receipt(createdAt: date, store: "Debug", date: date)
+            context.insert(r)
+            for (name, qty) in rows {
+                let li = LineItem(name: name, createdAt: date, price: 1, quantity: qty)
+                li.receipt = r
+                context.insert(li)
+            }
+        }
+        // Current window: on-track (Red Bull 1/2) · at-limit (Coffee 5/5) · over (Fizzy 4/3 → "Over by 1").
+        addReceipt(now, [("Red Bull 250ml", 1), ("Coffee latte", 5), ("Coca-Cola 1L", 2), ("Fanta Orange", 2)])
+        // Past weeks: a mostly-under run for the weekly Energy-drinks limit → §4.2 streak + §4.3 strip
+        // (one over week at k=4 gives a mixed met/not-met strip).
+        for k in 1...6 {
+            addReceipt(cal.date(byAdding: .day, value: -7 * k, to: now)!, [("Red Bull 250ml", k == 4 ? 3 : 1)])
+        }
+        // A frequently-bought, uncapped item across recent weeks → a §4.4 suggestion row.
+        for k in 0...3 {
+            addReceipt(cal.date(byAdding: .day, value: -7 * k, to: now)!, [("Crisps", 3)])
         }
         context.insert(BuyingLimit(emoji: "⚡", label: "Energy drinks",
                                    keywords: ["red bull", "monster"], timeframe: .weekly, count: 2))

@@ -51,6 +51,9 @@ enum FirebaseBootstrap {
         // Point Crashlytics at the user's stored choice immediately after configure(), so collection
         // reflects an opt-out before any code that could crash runs. Default-on — see CrashReporting.
         CrashReporting.applyStoredPreference()
+        // Same for product analytics: apply the persisted opt-out (separate toggle, default-on) to the
+        // Analytics SDK at startup so collection follows the user's choice before any event fires (§0).
+        Analytics.applyStoredPreference()
 
         // Migration: earlier builds used anonymous sessions, which are no longer supported. Sign out
         // any lingering anonymous user so they land on the login screen like Android.

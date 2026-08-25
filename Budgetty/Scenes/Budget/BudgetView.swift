@@ -108,7 +108,10 @@ struct BudgetView: View {
 
     /// One column on every size class. Capped/centered on iPad by the caller.
     private var compactStack: some View {
-        VStack(spacing: 16) {
+        // §2.6: derive the per-category monthly budget streaks once per body, then thread the map down
+        // so a category card can caption "· N months under" without recomputing the 24-month walk per card.
+        let catStreaks = categoryStreaks
+        return VStack(spacing: 16) {
             periodPicker
             overallCard
             rolloverToggle
@@ -116,7 +119,7 @@ struct BudgetView: View {
             recurringSection
             savingsSection
             activeSubBudgetsSection
-            categorySection
+            categorySection(catStreaks)
         }
     }
 
@@ -153,6 +156,43 @@ struct BudgetView: View {
 
     private var income: [Recurring] { recurring.filter(\.isIncome) }
     private var bills: [Recurring] { recurring.filter { !$0.isIncome } }
+
+    // MARK: - Category streaks (§2.6)
+
+    /// §2.6 the 4th streak surface: per-category monthly budget streaks (category name → surfaced
+    /// `Streak`), so a category card can carry a quiet "· N months under" caption. Only surfaced runs
+    /// (current ≥ 2) are kept; a category with no run isn't in the map, so the card shows nothing — it
+    /// costs a card nothing when there's no run. Per-category scopes use net line prices (the paid
+    /// adjustment applies only to the whole-budget scope, which never captions a category card), so no
+    /// receipt totals are needed. Each closed pay-cycle month's items are tagged with a period index
+    /// (0 = the just-closed month, increasing into the past); the OPEN month feeds only `liveOnTrack`
+    /// (§2.3). Re-sourced from `StreakEngine` like Recap/Wellbeing — one streak implementation. Mirrors
+    /// Android's `BudgetViewModel.surfacedCategoryStreaks`.
+    private var categoryStreaks: [String: Streak] {
+        var catBudgets: [String: Decimal] = [:]
+        for b in budgets where b.key.hasPrefix("CAT:") && b.amount > 0 {
+            catBudgets[String(b.key.dropFirst(4))] = b.amount
+        }
+        guard !catBudgets.isEmpty else { return [:] }
+        let cal = Calendar.current
+        var txns: [StreakTxn] = []
+        for idx in 0..<StreakEngine.maxStreak {
+            let interval = PayCycle.monthInterval(startDay: monthStartDay, offset: -(idx + 1), calendar: cal)
+            let monthItems = allItems.filter { interval.contains($0.createdAt) }
+            guard !monthItems.isEmpty else { continue }   // empty month → no data at this index (breaks a run)
+            txns.append(contentsOf: monthItems.map {
+                StreakTxn(periodIndex: idx, category: $0.category, amount: $0.lineTotal)
+            })
+        }
+        let liveInterval = PayCycle.monthInterval(startDay: monthStartDay, offset: 0, calendar: cal)
+        let live = LiveBudgetPeriod(transactions: allItems
+            .filter { liveInterval.contains($0.createdAt) }
+            .map { StreakTxn(periodIndex: 0, category: $0.category, amount: $0.lineTotal) })
+        let streaks = StreakEngine.budgetStreaks(BudgetStreakInput(
+            transactions: txns, categoryBudgets: catBudgets, monthlyBudget: nil,
+            kind: .budgetMonth, live: live))
+        return Dictionary(StreakEngine.surfaced(streaks).map { ($0.label, $0) }, uniquingKeysWith: { a, _ in a })
+    }
 
     // MARK: - Rollover
 
@@ -534,7 +574,7 @@ struct BudgetView: View {
 
     // MARK: - Category budgets
 
-    private var categorySection: some View {
+    private func categorySection(_ streaks: [String: Streak]) -> some View {
         VStack(spacing: 0) {
             sectionHeader("Category Budgets")
             // 2 columns on iPhone; 3 within the readable single column on iPad.
@@ -542,7 +582,7 @@ struct BudgetView: View {
                                                    isRegular: hSize == .regular, spacing: 10),
                       spacing: 10) {
                 ForEach(budgetGroups, id: \.self) { g in
-                    categoryCard(g)
+                    categoryCard(g, streak: streaks[g])
                 }
             }
         }
@@ -563,7 +603,7 @@ struct BudgetView: View {
         }
     }
 
-    private func categoryCard(_ group: String) -> some View {
+    private func categoryCard(_ group: String, streak: Streak?) -> some View {
         let key = Budget.categoryKey(group)
         let own = budgets.first { $0.key == key }?.amount ?? 0
         let carried = carriedFor(key)
@@ -595,6 +635,13 @@ struct BudgetView: View {
                 }
                 if subCount > 0 {
                     Text("\(subCount) sub-budget\(subCount == 1 ? "" : "s")")
+                        .font(.caption2).foregroundStyle(Palette.secondaryLabel)
+                }
+                // §2.6: a quiet "· N months under" caption on a category with a surfaced streak. Kept
+                // minimal (text only, no motif) to fit the compact 2-up grid cell — the design's "tiny
+                // row inset"; the Limits/Wellbeing streak evidence carries the richer motif treatment.
+                if let streak {
+                    Text("· \(streak.current) months under")
                         .font(.caption2).foregroundStyle(Palette.secondaryLabel)
                 }
             }

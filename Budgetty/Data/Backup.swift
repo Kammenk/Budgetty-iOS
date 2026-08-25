@@ -29,6 +29,10 @@ struct BackupFile: Codable {
     /// `CategoryDTO.parent` is). `BackupService.restore` reads it with `?? []`; buying limits carry no
     /// child rows → no id remap.
     var buyingLimits: [BuyingLimitDTO]? = []
+    /// Wellbeing score history (§3.1). Optional for the same forward-compat reason. On restore a
+    /// periodId clash keeps the on-device row (IGNORE), so a backup never overwrites the honest,
+    /// first-computed snapshot — mirrors Android's `WellbeingScoreDao.insertAll(onConflict = IGNORE)`.
+    var wellbeingScores: [WellbeingScoreDTO]? = []
 
     var itemCount: Int { receipts.reduce(0) { $0 + $1.items.count } }
 }
@@ -137,6 +141,18 @@ struct BuyingLimitDTO: Codable {
     }
 }
 
+struct WellbeingScoreDTO: Codable {
+    var periodId: String
+    var score: Int
+    var band: String
+    var componentsJson: String
+    var computedAt: Date
+    init(_ e: WellbeingScoreEntity) {
+        periodId = e.periodId; score = e.score; band = e.band
+        componentsJson = e.componentsJson; computedAt = e.computedAt
+    }
+}
+
 // MARK: - Service
 
 enum BackupService {
@@ -172,7 +188,8 @@ enum BackupService {
             rules: try context.fetch(FetchDescriptor<CategoryRule>()).map(RuleDTO.init),
             categories: try context.fetch(FetchDescriptor<Category>()).filter(\.isCustom).map(CategoryDTO.init),
             savingsGoals: try context.fetch(FetchDescriptor<SavingsGoal>()).map(SavingsGoalDTO.init),
-            buyingLimits: try context.fetch(FetchDescriptor<BuyingLimit>()).map(BuyingLimitDTO.init)
+            buyingLimits: try context.fetch(FetchDescriptor<BuyingLimit>()).map(BuyingLimitDTO.init),
+            wellbeingScores: try context.fetch(FetchDescriptor<WellbeingScoreEntity>()).map(WellbeingScoreDTO.init)
         )
         return try encoder().encode(file)
     }
@@ -195,6 +212,7 @@ enum BackupService {
             for c in try context.fetch(FetchDescriptor<Category>()) where c.isCustom { context.delete(c) }
             for g in try context.fetch(FetchDescriptor<SavingsGoal>()) { context.delete(g) } // cascades to contributions
             for l in try context.fetch(FetchDescriptor<BuyingLimit>()) { context.delete(l) }
+            for s in try context.fetch(FetchDescriptor<WellbeingScoreEntity>()) { context.delete(s) }
             try context.save() // flush deletes before re-inserting unique-keyed rows
         }
 
@@ -262,6 +280,16 @@ enum BackupService {
                                        keywords: BuyingLimit.normalizedKeywords(dto.keywords),
                                        timeframe: BuyingLimitTimeframe(rawValue: dto.timeframeRaw) ?? .monthly,
                                        count: dto.count, createdAt: dto.createdAt))
+        }
+
+        // Wellbeing score history — unique `periodId`. IGNORE a clash: keep the on-device snapshot (the
+        // honest, first-computed record) rather than letting a backup overwrite it — Android's
+        // `insertAll(onConflict = IGNORE)`. On `.replace` the table was cleared above, so nothing clashes.
+        // `?? []` absorbs a pre-history backup that omits the field entirely.
+        var seenPeriods = Set(try context.fetch(FetchDescriptor<WellbeingScoreEntity>()).map(\.periodId))
+        for dto in file.wellbeingScores ?? [] where seenPeriods.insert(dto.periodId).inserted {
+            context.insert(WellbeingScoreEntity(periodId: dto.periodId, score: dto.score, band: dto.band,
+                                                componentsJson: dto.componentsJson, computedAt: dto.computedAt))
         }
 
         try context.save()

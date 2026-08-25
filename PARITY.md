@@ -1336,3 +1336,320 @@ screenshots confirm OFF (with nudge), ON Breakdown (wedge + badge + "Spent / + �
 (stacked caps, capless early months), both explainer sheets, and the Customize Layers toggle — all
 matching the iOS mockup. `Localizable.xcstrings` +23 keys × 16 locales (pulled from Android's shipped
 translations). LEFT: push + open PR.
+
+---
+
+## Android → iOS — Retention foundation §2 StreakEngine (pure) — 2026-08-25
+
+Port of Android's `ui/streaks/StreakEngine.kt` + `StreakModel.kt` + `StreakEngineTest.kt` (retention
+spec §2). Ported from the Kotlin **logic**, not UI — this is a pure object with no SwiftUI/SwiftData.
+
+- **`Support/StreakEngine.swift`** (new) — 1:1 with the Kotlin. `StreakKind {budgetMonth, budgetWeek,
+  limit}` (with a `token` for the future `streak_surfaced` analytics param); `Streak(kind, label,
+  current, best, periodsChecked, liveOnTrack)`; `StreakTxn` / `LiveBudgetPeriod` / `BudgetStreakInput`
+  / `LimitWindow` / `LimitStreakInput`. Public API `budgetStreaks`, `allScopesStreak`, `limitStreak`,
+  `surfaced` (current ≥ `minToSurface` = 2). Money is `Decimal`. Following the `WellbeingEngine.swift`
+  precedent, the model types (Android's separate `StreakModel.kt`) live in the same file as the engine.
+- **Invariants preserved:** one-pass grouping by (periodIndex, category); closed periods only (open
+  period → `liveOnTrack`, never `current`); strict reset on a miss with `best` always computed within
+  the 24-period window; the **NO_DATA vs MET** distinction (an empty period breaks a run; a budgeted
+  scope with zero spend in a *data-bearing* period is MET); per-category budgets take precedence over
+  the monthly scope; the whole-budget scope carries the per-period paid adjustment. Caller owns the
+  timestamp → periodIndex mapping.
+- **Recap re-source:** `RecapBuilder`'s `streakMonths(endOffset:)` (the recap monthly `budgetStreak`
+  card's number) is re-sourced from `StreakEngine.allScopesStreak` — one implementation shared with the
+  Budget row / Wellbeing evidence, matching Android's `RecapProvider` re-source. Behaviour-preserving:
+  months tagged 0 = endOffset increasing into the past, empty month = no data (was the `!items.isEmpty`
+  break), per-category caps use net line spend, monthly scope carries the month's paid adjustment.
+- **Tests:** `BudgettyTests/StreakEngineTests.swift` ports the full Android matrix case-for-case
+  (consecutive, strict reset, best-in-window, `liveOnTrack` never counted, no-budget, empty-period vs
+  zero-spend-with-data, per-scope independence, category-precedence, monthly + paid adjustment,
+  all-scopes aggregate, limit windows, `surfaced` bar).
+
+**Status:** BUILD SUCCEEDED (iPhone 17 Pro sim, iOS 26). Full suite green — 208 tests / 25 suites,
+incl. new `StreakEngineTests` and the unchanged `RecapSchedulerTests` (recap re-source verified
+behaviour-preserving). Not yet surfaced in any UI (Budget row / Wellbeing evidence / recap Streak card
+are §1/§3 UI work, deferred).
+
+---
+
+## Android → iOS — Retention foundation §3.1 Wellbeing score history (SwiftData) — 2026-08-25
+
+Port of Android's `WellbeingScoreEntity` + `WellbeingScoreDao` + `WellbeingScoreRepository` +
+`WellbeingHistory` + the `WellbeingProvider` upsert (retention spec §3.1). The only new persistence.
+
+- **`Model/WellbeingScoreEntity.swift`** (new) — `@Model` with `@Attribute(.unique) periodId` ("yyyy-MM"),
+  `score: Int`, `band: String`, `componentsJson: String`, `computedAt: Date`. Plus `WellbeingScoreStore`
+  (`@MainActor`), the DAO/repository analog: an idempotent `upsert` (fetch-by-periodId → update-in-place
+  else insert; Android's `@Upsert`) and the closed-month-only `record` the surfaces call.
+- **`Support/WellbeingHistory.swift`** (new, pure) — `periodId(today, monthStartDay, offset)` via
+  `PayCycle` → "yyyy-MM"; `closedSnapshot(closedPeriodId, closedScore, computedAt) -> WellbeingScoreEntity?`
+  (nil when the closed month can't be scored); `encodeComponents`/`decodeComponents` — a stable
+  `{componentKey: sub-score?}` object with **explicit nulls** kept (hand-built to match Android's Gson
+  `serializeNulls` order + nulls); plus the §3.2 `trend(...)` model (`WellbeingTrend`/`WellbeingTrendPoint`/
+  `YearMonth`) and `minTrendMonths = 2`. Stable `WellbeingComponentKey.serialKey` / `WellbeingBand.name`
+  identifiers added (parity with Kotlin `enum.name`).
+- **Schema bump** — `WellbeingScoreEntity.self` added to `UserStore.models` (Android Room v25 → v26). iOS
+  has no numeric schema version; the model set IS the schema, and this is a purely additive model, so
+  SwiftData's default lightweight migration creates the table on next open (no migration plan needed).
+- **Upsert site** — `WellbeingScan.run` now scores the FULL just-closed month (`closedScore`) and exposes
+  `closedScore` + `closedPeriodId` on `WellbeingSummary`. `WellbeingScoreStore.record` upserts it from the
+  Home banner (`.task`) and the Wellbeing screen (`.task(id:closedPeriodId)`): **closed month ONLY** (never
+  the in-flight month — enforced by `closedSnapshot`), **idempotent** (unique periodId), **no backfill**.
+  Android upserts from the one shared provider flow; iOS records from the two primary surfaces that already
+  score the previous cycle (Home is near-always visited; Wellbeing is where the §3.2 trend will render).
+- **Backup** — `wellbeingScores` added to `BackupFile` (optional, forward-compat like `buyingLimits`),
+  exported, and restored with **IGNORE-on-periodId-clash** (keep the on-device snapshot — the honest,
+  first-computed record), matching Android's `insertAll(onConflict = IGNORE)`; `.replace` clears the table
+  first.
+- **Tests:** `WellbeingHistoryTests.swift` (periodId identity calendar+pay-cycle+year-rollover, closed-vs-
+  in-flight guard, nil-when-unscored, componentsJson order + explicit-null round-trip, trend model) +
+  `WellbeingScoreStoreTests.swift` (upsert idempotence, `record` closed-month guard, backup IGNORE-on-clash,
+  export→wipe→replace round-trip, pre-history backup imports cleanly).
+
+**Justified iOS deviations:** `computedAt` is a `Date` (Android stores epoch-millis `Long`) — iOS-idiomatic
+and audit-only, never scored. No numeric schema version (SwiftData model-set = schema). No DAO/repository
+layer — reads are `@Query`; the DAO's idempotent upsert + IGNORE-restore live in `WellbeingScoreStore` and
+`BackupService`.
+
+**Status:** BUILD SUCCEEDED (iPhone 17 Pro sim, iOS 26). Full suite green — 224 tests / 27 suites, incl.
+the two new suites. Trend sparkline UI (§3.2) is deferred; the history it reads is now being recorded.
+
+---
+
+## Android → iOS — Retention foundation §0 Firebase Analytics — 2026-08-25
+
+Port of Android's `analytics/Analytics.kt` + `AppSettings.analyticsEnabled` + `SettingsStore`
+(KEY_ANALYTICS) + `BudgettyApplication` gating + the `AccountScreen` row (retention spec §0). The
+measurement baseline that lands before the mechanics.
+
+- **`FirebaseAnalytics` product linked** — the target linked Core/Auth/Crashlytics but not Analytics;
+  added the `FirebaseAnalytics` package product (same already-resolved `firebase-ios-sdk`) to the app
+  target in the pbxproj (build file + Frameworks phase + `packageProductDependencies` + product dep).
+- **`Support/Analytics.swift`** (new) — one typed method per event with the **identical** Android names +
+  params: `recap_shown{kind}`, `recap_completed{kind,cards_viewed}`, `streak_surfaced{kind,length}`,
+  `tip_acted{type}`, `tip_projected_gain{type,gain}`, `limit_created{source}`. Event names + param keys
+  live only in private `Event`/`Param` enums; param values are enum `token`s = the Android
+  `enum.name.lowercase()` (RecapKind/TipType tokens added here, StreakKind/LimitSource carry their own).
+  **Only enums + ints — no PII** (no category/item/store name, amount, or email). Firebase's `Analytics`
+  type is module-qualified (`FirebaseAnalytics.Analytics`) to avoid a name clash with this wrapper.
+- **Opt-out toggle** — `SettingsKey.analytics` (fresh key `pref.analyticsEnabled`, default true, opt-out,
+  device-global, NOT reset on sign-out — mirrors `crashReporting`). Applied at launch in
+  `FirebaseBootstrap.configure` right after the Crashlytics line, and on every toggle change. A dedicated
+  Account "Usage analytics" row beside Crash reporting (title + subtitle, orange bar-chart icon).
+- **Strings** — `account_analytics` + `account_analytics_sub` spliced into `Localizable.xcstrings` in all
+  16 locales (English matches Android's copy; translations pulled from Android's shipped `strings.xml`).
+  873 → 875 keys; semantic key-diff = exactly +2 added, 0 removed, 0 existing keys modified.
+- **Events wired now:** `recap_shown` (on the scheduled interstitial's appear) + `recap_completed` (on
+  dismiss, `cards_viewed` = highest card reached + 1) via new `RecapStoryView` callbacks that RootView
+  passes (the Insights re-open keeps the default no-ops — not a "scheduled recap"); `tip_acted` on a
+  Wellbeing tip CTA; `limit_created(.manual)` on a new-limit save. **Stubbed** (event shape fixed, wired
+  when §1/§3/§4 UI lands): `streak_surfaced`, `tip_projected_gain`, `limit_created(.suggestion)`.
+- **No ATT / no AD_ID:** default Firebase Analytics collects no IDFA (no `AdSupport` linked), so no App
+  Tracking Transparency prompt is added; iOS has no Android AD_ID manifest concern.
+
+**Justified iOS deviations:** `Analytics` is a static `enum` (like `CrashReporting`), not a Koin-injected
+class. Crash reporting on iOS had no subtitle; the analytics row adds a subtitle-aware `label` overload.
+
+**Store follow-ups (not code):** the App Store Connect App Privacy label must declare the analytics data
+(not linked, not tracking) + a privacy-policy line — the iOS equivalent of Android's Play Data-safety
+update.
+
+**Status:** BUILD SUCCEEDED (iPhone 17 Pro sim, iOS 26) with FirebaseAnalytics linked. Full suite green —
+224 tests / 27 suites. Simulator screenshot of Account → Privacy & Security confirms the "Usage
+analytics" toggle (title + subtitle + orange chart icon) beside Crash reporting, matching Android.
+
+---
+
+## Android → iOS — Retention §1 Weekly Recap as a rhythm + streak surfacing — 2026-08-25
+
+Port of Android's `§1` (commit `98083ce`): the weekly recap becomes the default cadence, the story grows
+into a fuller Cover → Pace → Limits → Streak → Focus sequence, both recap streak cards de-flame onto the
+shared `StreakMotif`, and an in-story frequency control makes weekly-by-default safe. Ported from the
+Android ViewModels/provider + `RETENTION_GAMIFICATION_SPEC.md` §1 + the `RetentionRecapCard.dc.html`
+mockup (the `.rc.ios` palette), never from Compose.
+
+- **`StreakMotif` (new, `Scenes/Streaks/StreakMotif.swift`)** — SwiftUI port of `ui/streaks/StreakMotif.kt`:
+  a row of ~24×8 rounded pills, all in the one budget-good tone. `filledCount` solid; one **dashed** ghost
+  @ 60% when `showLive` (open period on track); `muted` = all solid @ 55% no dash (best-run). No
+  flames/red/amber. General + stateless, so §3/§4 reuse it. **API:** `StreakMotif(filledCount:showLive:muted:maxSegments:tone:)`
+  — only `filledCount` is required; `tone` defaults to `Palette.good`.
+- **Default BOTH (§1.1)** — `recapFrequency` default flipped `.monthly` → `.both` at every read site
+  (`RecapModel.current`, RootView, AccountView, `Settings.swift` doc). Existing users who never chose get
+  weekly too — safe only because the in-story control ships with it.
+- **Weekly data floor (§1.2)** — `RecapDataGuard.evaluate` gains `kind:` + `periodReceipts:`;
+  `minWeekReceipts = 3`. A weekly recap under the floor is `.skip`-ped (and marked shown by the gate);
+  monthly ignores it. Both `RecapBuilder` call sites pass the in-window receipt count.
+- **Weekly sequence (§1.3)** — `RecapBuilder.buildWeekly` now appends Limits (week window,
+  `limitOutcomes(window:weekly:true)` — every cap counted within the week) and a Streak card when present;
+  a bare week stays Cover → Pace → Focus. Weekly Focus band corrected `.secondary` → `.primary` (matches
+  Android §1). New `.streak` card + `budgetStreak` extended with `best`/`liveOnTrack`.
+- **Weekly Streak sourcing** — `weekStreak(endOffset:)` from `StreakEngine.budgetStreaks(.budgetWeek)`:
+  category budgets sliced to a week via `weeklyShareOf` (× 12⁄52, HALF_UP 2dp), an explicit weekly budget
+  as-is, else the monthly budget sliced; open week feeds `liveOnTrack` only. `pickWeekStreak` chooses one
+  scope — a live current run (≥ 2) first, else the best-run fallback (best ≥ 2). Both are pure `static`
+  on `RecapBuilder` (parity with Android's top-level funcs), unit-tested.
+- **De-flamed monthly (§2.4/§2.6)** — monthly `budgetStreak` re-sourced from `StreakEngine.allScopesStreak`
+  for `best` + `liveOnTrack`; the 🔥 is gone, replaced by the motif + "N closed months · <month> on track
+  so far" (best-run fallback below 2). The under-count / segment-bar / safe-to-spend panel is untouched.
+- **In-story frequency control (§1.4)** — a low-emphasis "Weekly recaps · Change" row on the **weekly**
+  Focus card only (never monthly) opens a compact glass sheet (Weekly / Monthly / Both / Off; a centred
+  form sheet on iPad). It writes the shared `recapEnabled`/`recapFrequency` @AppStorage keys immediately
+  (Off ⇒ disabled, cadence remembered), so it stays in sync with Account → Recap with no extra wiring; the
+  RootView gate holds the built story in `@State`, so a mid-read cadence change never tears it down.
+- **No-backfill (§1.5)** — documented in `RecapScheduler.justClosedWeekId` KDoc (one weekly recap for the
+  just-closed week, never a queue).
+- **Analytics (§0/§1)** — `RecapStoryView` gains an `onStreakSurfaced` callback; on appear it fires
+  `Analytics.logStreakSurfaced(kind, length)` per surfaced streak card (weekly `.streak` always — its best
+  when a best-run fallback; monthly `.budgetStreak` once its run or best clears ≥ 2). RootView wires it;
+  the Insights re-open keeps the default no-op.
+- **Parity fix** — `RecapLimitChip.under` was `bought <= cap`; corrected to strictly `< cap` (at-cap reads
+  warn, never a kept limit). Limit chips recoloured to the no-loss framing: good/warn on the label over a
+  neutral glass surface (never red), matching the mockup + Android.
+- **Strings** — 17 new §1 keys spliced into `Localizable.xcstrings` in all 15 non-English locales (English
+  = the key; translations pulled from Android's shipped `strings.xml`, `%1$d`→`%1$lld` / `%2$s`→`%2$@`).
+  875 → 892 keys; semantic key-diff = exactly +17 added, 0 removed, 0 existing modified.
+
+**Justified iOS deviations:** the frequency control reads/writes @AppStorage directly rather than
+threading `recapEnabled`/`recapFrequency`/`onChange` through the view tree (Android does the latter through
+Compose params) — same keys, so the two surfaces stay in lock-step; simpler and idiomatic. The frequency
+picker is a native `.sheet` (`presentationDetents` + `.regularMaterial`) rather than a custom AdaptiveSheet.
+
+**Status:** BUILD SUCCEEDED (iPhone 17 Pro sim, iOS 26). Full suite green — 236 tests / 28 suites (+12:
+the new `RecapWeekStreakTests` + weekly-floor guard cases). Simulator screenshots confirm the weekly
+Streak card (motif + "3 weeks under your Groceries budget"), the weekly Focus card with the "Weekly
+recaps · Change" row, and the de-flamed monthly card (motif + "3 closed months · August on track so far",
+no flame) — all matching the mockup's `w-streak` / `w-focus` / `m-streak-new` states.
+
+---
+
+## Android → iOS — Retention §3 Wellbeing score as meta-progression — 2026-08-25
+
+Port of Android's `§3` (commit `b685845`): the Wellbeing screen gains a trend sparkline, attributable
+"+N to your score" tip pills, gain-ranked tips, a band-up nudge, budget-streak evidence, and the win
+de-flame. Ported from the Android `WellbeingEngine`/`WellbeingProvider`/`WellbeingScreen` +
+`RETENTION_GAMIFICATION_SPEC.md` §3 (3.2–3.5) + §2.6 + the `RetentionWellbeing.dc.html` mockup notes,
+never from Compose. Reuses the §1 `StreakMotif` and the §3.1 `WellbeingHistory.trend` / `WellbeingScoreStore`.
+
+- **§3.2 Trend sparkline** — new `TrendSparkline` in `WellbeingView.swift`, hand-rolled with SwiftUI
+  `Canvas` (no chart lib): the last-6 CLOSED months as a solid `Palette.tint` polyline + dots, then a
+  dashed ghost segment to a **hollow** dot for the in-flight live score. "LAST SIX CLOSED MONTHS" label,
+  first/last-or-ghost month x-labels, "Up N since <month>." caption. Reads `WellbeingHistory.trend` off a
+  new `@Query` of `WellbeingScoreEntity` (`.suffix(6)` = Android `getRecent(6)`, oldest→newest); the
+  `.task` records the just-closed month first, so `@Query` re-fetches it in. **Replaces** the old
+  "vs last month" chip; renders **nothing** below 2 stored months (the thin state). It sits on a nested
+  `Palette.tertiaryBackground` panel (the ghost hole is knocked with that same colour).
+- **§3.3 Attributable tip pills** — `projectedGain: Int?` added to `WellbeingTip`; computed in
+  `WellbeingEngine.projectedGain` by re-running `aggregate()` with the affected component's sub-score
+  replaced per the §3.3 table (MISSING_BUDGET budgetedCount+1; OVER_BUDGET overCount−1 + averaged
+  overspend removed via `SubscriptionDetector.round2`; SUBSCRIPTION_COST proportional share after one
+  cancel; NO_GOAL goals→100 *entering* the mean; GOAL_OFF_TRACK that goal 40→100; win/other tones → nil).
+  Rendered as a small green "+N to your score" pill (`Palette.good` on a good wash). `tips()` attaches the
+  gain only on scored months.
+- **The renormalisation guard** — `showsProjectedGain(_ gain: Int?) -> Bool` = `gain != nil && gain >= 2`
+  (a single predicate covering both the <2 noise floor and any non-positive renormalisation delta). Entering
+  a previously-nil component (NO_GOAL / no-budget MISSING_BUDGET) at its assumed-100 mark can only move a
+  maxed base by ≤ 0, so a "+0"/"−N" is never rendered. **Pinned** by
+  `noGoalProjectionIsNonPositiveWhenTheBaseIsAlreadyMaxed_andIsSuppressed` (base 100 → gain 0 → suppressed),
+  contrasted with `noGoalProjectionIsAGenuineGainWhenTheBaseHasRoom` (base 50 → +22 → shown).
+- **§3.4 Rank by gain** — `WellbeingEngine.rank` gains a secondary key: within a tone, larger
+  `projectedGain` leads; ties keep insertion order via an explicit `enumerated().offset` tiebreaker (Swift
+  `sorted` isn't stable — this reproduces Kotlin's `compareBy{severity}.thenByDescending{gain}`).
+- **§3.5 Band-up nudge** — `WellbeingEngine.bandUp(score)` → `BandUp?` (within 3 below 40/60/80). Rendered
+  as an accessible warn-tone pill (`Palette.warn` content on a warn wash, up-arrow) just under the ring; a
+  true xcstrings plural (`%lld points to %@`) so "1 point to Healthy" reads correctly.
+- **§2.6 Streak evidence** — `WellbeingEngine.budgetStreakEvidence` (surfaced ≥ 2, longest-first, cap 2)
+  fed by a `budgetMonthStreaks` helper in `WellbeingScan` that tags closed pay-cycle months by index and
+  calls `StreakEngine.budgetStreaks(.budgetMonth)` (mirrors Android's provider + `RecapBuilder.monthStreak`;
+  `monthlyLabel: ""` → "Overall budget"). Rendered under the Budget row only: the reused **`StreakMotif`**
+  (`maxSegments: 6`) + "<scope> — N months under". No flames.
+- **Win de-flame** — the saving-win emoji `🔥` → `📈` in `WellbeingScan.winEmoji` (§2.4).
+- **Analytics** — `WellbeingView` fires `Analytics.logTipProjectedGain(type, gain)` per visible gain pill
+  and `logStreakSurfaced(kind, length)` per surfaced streak, once per unique monthly content via
+  `.onChange(of: impressionKey, initial: true)` (parity with Android's keyed `LaunchedEffect`); `tip_acted`
+  was already wired.
+- **Data plumbing** — `WellbeingSummary` gains `trend`/`bandUp`/`budgetStreaks`; `WellbeingScan.run` gains
+  a defaulted `storedHistory:` param (the full screen passes the `@Query`; Home/Insights leave it empty, so
+  they never render the trend). All new logic stays in the pure engine/history/StreakEngine seams.
+- **Strings** — 8 new §3 keys spliced into `Localizable.xcstrings` across all 16 locales (English = the
+  key; 15 translations pulled from Android's shipped `strings.xml`, `%1$d`→`%1$lld` / `%1$s`→`%1$@`).
+  892 → 900 keys; semantic key-diff = exactly +8, 0 removed, 0 existing modified. `band_up` is the only
+  plural (English one/other; non-English single-form per the shipped `%lld days left` convention);
+  `streak_under` is single-form (always ≥ 2, matching the shipped Recap streak copy).
+
+**Justified iOS deviations:** the trend is threaded through `WellbeingScan.run(storedHistory:)` from a
+SwiftData `@Query` rather than an Android-style `Flow` that reads `getRecent(6)` after the upsert — same
+data, SwiftData-idiomatic (the `.task` write triggers the `@Query` re-fetch). The band-up / gain pills map
+to the app's `Palette.warn` / `Palette.good` washes (the app has no dedicated `--warnfg`/`--goodc` tokens)
+— consistent with the existing Wellbeing screen's caution/good tones. `streak_under` is a single (non-plural)
+localized form, matching the sibling Recap streak strings already shipped on iOS.
+
+**Status:** BUILD SUCCEEDED (iPhone 17 Pro sim, iOS 26). Full suite green — **250 tests / 28 suites** (+14
+new `WellbeingEngineTests`: projection math per tip type, the renormalisation-negative guard, band-up
+thresholds, gain-ranking, streak-evidence surfacing; the sparkline "< 2 months → nothing" stays covered by
+`WellbeingHistoryTests`). Simulator screenshots confirm the sparkline (polyline + dashed ghost + hollow dot
++ "Up N since April."), the "1 point to Healthy" band-up pill, "+10 / +9 to your score" gain pills
+(suppressed on the spike + win tips), the ranked feed, the 📈 saving-win chip, and the StreakMotif evidence
+rows with correct live-ghost behaviour (present for on-track Transportation, dropped for over-budget Dining)
+— all matching the mockup. On `feat/retention-ios`, unpushed.
+
+## Android → iOS — Retention §4 Buying limits as opt-in challenges + §2.6 Budget caption — 2026-08-25
+
+Port of Android's `§4` (merge `1542612`): the Buying limits screen becomes a calm challenge board and the
+Budget screen gains the 4th streak surface. Ported from the Android `BuyingLimitsViewModel` /
+`BuyingLimitCounter` / `BuyingLimitSuggestions` / `BuyingLimitNudger` / `BudgetViewModel` +
+`RETENTION_GAMIFICATION_SPEC.md` §4 / §2.6 + the `RetentionLimits.dc.html` mockup notes, never from Compose.
+Reuses the §1 `StreakMotif` and the §2 `StreakEngine.limitStreak`.
+
+- **§4.1 Over/at-cap warm (never red)** — `BuyingLimitsView.bandColor` maps `.atLimit` AND `.over` to
+  `Palette.warn`; the status chip reads ✓ "On track" (good) / ✓ "At limit" (warm) / ! "Over by N" (warm).
+  `Pips` refined: filled band up to `bought`, muted rest, and over-cap pips drawn transparent with an inset
+  `Palette.warn` ring, set apart after a 6-pt gap at the cap.
+- **§4.2 Per-limit streak caption** — `StreakMotif` (`maxSegments: 6`, calm good tone, live ghost) + copy:
+  current run "· N weeks/months under" (≥ 2), else muted best-run "Best run: N …" (best ≥ 2). No flames.
+- **§4.3 History strip** — new `BuyingLimitCounter.closedWindow` / `closedWindows(…, windowCount: 8)` →
+  `[LimitWindow]`, rendered as 8 squares met(good)/not-met(warn)/no-data(outline) + "N of the last 8 …".
+  **The same 8-window list feeds both the strip and `StreakEngine.limitStreak`** (derived once per card in
+  `LimitCardData`), so they can't disagree; the best-run caption is bounded to those 8 (no "last 24" subtext,
+  matching Android's honest copy).
+- **§4.4 Suggestions** — new `BuyingLimitSuggestions.suggest` (60-day window, total ≥ 6, recent-30-day
+  activity, excludes existing-limit keywords + `dismissedLimitSuggestions`, ranked by last-month count,
+  weekly cap = floor(count·7/30), top 3). Empty-state "Most bought lately · last 60 days" section + one
+  dismissible row above the list; ✕ persists to the new `SettingsKey.dismissedLimitSuggestions` pref (newline
+  set, per-user, reset on sign-out — not a schema change). Tap → editor pre-filled as a NEW limit
+  (`BuyingLimitEditorSheet.prefill`); on save it logs `limit_created(.suggestion)`.
+- **§4.5 Free tier 1 → 3** — `BuyingLimitQuota.freeLimit = 3` + new pure `isAtCap(count:isPremium:)`; all
+  quoted numbers derive from it (count pill, "3 limits free", "The free plan includes 3…", the
+  `PremiumBenefits` "Free plan includes 3" line — already constant-derived).
+- **§2.6 Budget caption** — `BudgetView.categoryStreaks` tags closed pay-cycle months by index and calls
+  `StreakEngine.budgetStreaks(.budgetMonth)` (category budgets only, net line prices, live = open month),
+  surfaced (≥ 2), keyed by category; the category card shows "· N months under". Derived once per body and
+  threaded to the grid (no per-card recompute).
+- **§4.6 Nudge restraint** — `BuyingLimitNudger.selectNudge` extracted pure (deterministic tests); adds the
+  guard `countAfter − contributed < cap` so a limit already at/over BEFORE the receipt never re-nudges; still
+  one nudge per save (most-over wins).
+- **Analytics** — a suggestion-created limit logs `limit_created{source=suggestion}` (editor stays
+  `.manual`); `logStreakSurfaced(.limit, length)` fires per surfaced caption via `.task(id:)` on a stable
+  signature (parity with Android's keyed `LaunchedEffect`).
+- **Strings** — 12 new §4 keys spliced into `Localizable.xcstrings` across all 16 locales (English = the key;
+  15 translations pulled from Android's shipped `strings.xml`, `%1$d`→`%1$lld` / `%1$s`→`%1$@`, positional
+  preserved so reordering locales like `de` stay correct). 900 → 912 keys; semantic key-diff = exactly +12,
+  0 removed, 0 existing modified. `Best run: %lld weeks/months` were already present from §1 and are reused.
+
+**Justified iOS deviations:** the §2.6 budget caption is **text-only** (no `StreakMotif`) — the design notes
+mark the motif "optional / keep it minimal (a tiny row inset)" for this surface, and the compact 2-up
+category grid on iPhone can't fit up to six 24-pt segments without overflow; the §4.2 limits card (full
+width) keeps the full motif. The over-cap pip ring uses `Palette.warn` (the app has no dedicated `--warnOn`
+token) — still warm and set apart from the solid in-cap pips. New §4 caption/history strings are plain
+single-form `%lld` keys (not String-Catalog plurals), matching the §1/§3 retention convention already shipped
+on iOS (surfaces are gated at N ≥ 2 / count-of-8, so English always reads plural). Category budgets are
+filtered to `amount > 0` (iOS clears zero budgets rather than persisting them as Android can).
+
+**Status:** BUILD SUCCEEDED (iPhone 17 Pro sim, iOS 26). Full suite green — **266 tests / 31 suites** (+16
+new: `BuyingLimitSuggestionsTests` ×6 ranking/dismissal, `BuyingLimitNudgerTests` ×4 §4.6 de-dup,
+`BuyingLimitsGatingTests` ×3 free-tier-3, plus 3 `closedWindows` cases in `BuyingLimitCounterTests`).
+Simulator screenshot (SHOW_SCREEN=buyinglimits) confirms the warm "Over by 1" / "At limit" chips (not red),
+the over-cap transparent-ring pips, the green `StreakMotif` + live ghost + "· N weeks under", the
+met/not-met/no-data history squares + "N of the last 8 weeks met", and the "You bought **Crisps** 12× last
+month — cap it? / Suggest 2" dismissible suggestion row — all matching the mockup. On `feat/retention-ios`,
+unpushed.
