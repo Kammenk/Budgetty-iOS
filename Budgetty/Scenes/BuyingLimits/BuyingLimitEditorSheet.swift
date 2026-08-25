@@ -18,9 +18,16 @@ struct BuyingLimitEditorSheet: View {
 
     /// nil = create a new limit; non-nil = edit.
     var existing: BuyingLimit?
+    /// Seeds a brand-new limit from a tapped suggestion (§4.4): the keyword chip, cap and timeframe are
+    /// pre-filled, but the sheet stays "New limit" and the created limit logs `.suggestion` (not `.manual`).
+    /// Ignored when `existing != nil`.
+    var prefill: LimitPrefill?
     /// Saved line items, for the live match preview (counts quantity, not rows).
     let items: [CountableItem]
     let monthStartDay: Int
+
+    /// A suggestion's seed for a NEW limit (§4.4). Not a `BuyingLimit` so no unattached `@Model` is minted.
+    struct LimitPrefill { let keyword: String; let count: Int; let timeframe: BuyingLimitTimeframe }
 
     @State private var emoji = ""
     @State private var label = ""
@@ -290,9 +297,13 @@ struct BuyingLimitEditorSheet: View {
     private func loadExisting() {
         guard !loaded else { return }
         loaded = true
-        guard let e = existing else { return }
-        emoji = e.emoji; label = e.label; keywords = e.keywords
-        timeframe = e.timeframe; count = e.count
+        if let e = existing {
+            emoji = e.emoji; label = e.label; keywords = e.keywords
+            timeframe = e.timeframe; count = e.count
+        } else if let p = prefill {
+            // A suggestion-seeded NEW limit: one keyword chip + the suggested weekly cap (§4.4).
+            keywords = [p.keyword]; count = p.count; timeframe = p.timeframe
+        }
     }
 
     private func save() {
@@ -307,9 +318,9 @@ struct BuyingLimitEditorSheet: View {
         } else {
             context.insert(BuyingLimit(emoji: trimmedEmoji, label: trimmedLabel, keywords: normalized,
                                        timeframe: timeframe, count: max(count, 1)))
-            // §0 analytics: a brand-new limit from the editor. Suggestion-sourced creation (§4.4) will
-            // pass .suggestion when that flow lands; the editor is always .manual.
-            Analytics.logLimitCreated(.manual)
+            // §0/§4.4 analytics: a brand-new limit is `.suggestion` when it came from a tapped suggestion
+            // (a prefill was passed), else `.manual` from the editor's own Add flow.
+            Analytics.logLimitCreated(prefill != nil ? .suggestion : .manual)
         }
         try? context.save()
         dismiss()

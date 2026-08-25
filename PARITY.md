@@ -1592,3 +1592,64 @@ thresholds, gain-ranking, streak-evidence surfacing; the sparkline "< 2 months �
 (suppressed on the spike + win tips), the ranked feed, the 📈 saving-win chip, and the StreakMotif evidence
 rows with correct live-ghost behaviour (present for on-track Transportation, dropped for over-budget Dining)
 — all matching the mockup. On `feat/retention-ios`, unpushed.
+
+## Android → iOS — Retention §4 Buying limits as opt-in challenges + §2.6 Budget caption — 2026-08-25
+
+Port of Android's `§4` (merge `1542612`): the Buying limits screen becomes a calm challenge board and the
+Budget screen gains the 4th streak surface. Ported from the Android `BuyingLimitsViewModel` /
+`BuyingLimitCounter` / `BuyingLimitSuggestions` / `BuyingLimitNudger` / `BudgetViewModel` +
+`RETENTION_GAMIFICATION_SPEC.md` §4 / §2.6 + the `RetentionLimits.dc.html` mockup notes, never from Compose.
+Reuses the §1 `StreakMotif` and the §2 `StreakEngine.limitStreak`.
+
+- **§4.1 Over/at-cap warm (never red)** — `BuyingLimitsView.bandColor` maps `.atLimit` AND `.over` to
+  `Palette.warn`; the status chip reads ✓ "On track" (good) / ✓ "At limit" (warm) / ! "Over by N" (warm).
+  `Pips` refined: filled band up to `bought`, muted rest, and over-cap pips drawn transparent with an inset
+  `Palette.warn` ring, set apart after a 6-pt gap at the cap.
+- **§4.2 Per-limit streak caption** — `StreakMotif` (`maxSegments: 6`, calm good tone, live ghost) + copy:
+  current run "· N weeks/months under" (≥ 2), else muted best-run "Best run: N …" (best ≥ 2). No flames.
+- **§4.3 History strip** — new `BuyingLimitCounter.closedWindow` / `closedWindows(…, windowCount: 8)` →
+  `[LimitWindow]`, rendered as 8 squares met(good)/not-met(warn)/no-data(outline) + "N of the last 8 …".
+  **The same 8-window list feeds both the strip and `StreakEngine.limitStreak`** (derived once per card in
+  `LimitCardData`), so they can't disagree; the best-run caption is bounded to those 8 (no "last 24" subtext,
+  matching Android's honest copy).
+- **§4.4 Suggestions** — new `BuyingLimitSuggestions.suggest` (60-day window, total ≥ 6, recent-30-day
+  activity, excludes existing-limit keywords + `dismissedLimitSuggestions`, ranked by last-month count,
+  weekly cap = floor(count·7/30), top 3). Empty-state "Most bought lately · last 60 days" section + one
+  dismissible row above the list; ✕ persists to the new `SettingsKey.dismissedLimitSuggestions` pref (newline
+  set, per-user, reset on sign-out — not a schema change). Tap → editor pre-filled as a NEW limit
+  (`BuyingLimitEditorSheet.prefill`); on save it logs `limit_created(.suggestion)`.
+- **§4.5 Free tier 1 → 3** — `BuyingLimitQuota.freeLimit = 3` + new pure `isAtCap(count:isPremium:)`; all
+  quoted numbers derive from it (count pill, "3 limits free", "The free plan includes 3…", the
+  `PremiumBenefits` "Free plan includes 3" line — already constant-derived).
+- **§2.6 Budget caption** — `BudgetView.categoryStreaks` tags closed pay-cycle months by index and calls
+  `StreakEngine.budgetStreaks(.budgetMonth)` (category budgets only, net line prices, live = open month),
+  surfaced (≥ 2), keyed by category; the category card shows "· N months under". Derived once per body and
+  threaded to the grid (no per-card recompute).
+- **§4.6 Nudge restraint** — `BuyingLimitNudger.selectNudge` extracted pure (deterministic tests); adds the
+  guard `countAfter − contributed < cap` so a limit already at/over BEFORE the receipt never re-nudges; still
+  one nudge per save (most-over wins).
+- **Analytics** — a suggestion-created limit logs `limit_created{source=suggestion}` (editor stays
+  `.manual`); `logStreakSurfaced(.limit, length)` fires per surfaced caption via `.task(id:)` on a stable
+  signature (parity with Android's keyed `LaunchedEffect`).
+- **Strings** — 12 new §4 keys spliced into `Localizable.xcstrings` across all 16 locales (English = the key;
+  15 translations pulled from Android's shipped `strings.xml`, `%1$d`→`%1$lld` / `%1$s`→`%1$@`, positional
+  preserved so reordering locales like `de` stay correct). 900 → 912 keys; semantic key-diff = exactly +12,
+  0 removed, 0 existing modified. `Best run: %lld weeks/months` were already present from §1 and are reused.
+
+**Justified iOS deviations:** the §2.6 budget caption is **text-only** (no `StreakMotif`) — the design notes
+mark the motif "optional / keep it minimal (a tiny row inset)" for this surface, and the compact 2-up
+category grid on iPhone can't fit up to six 24-pt segments without overflow; the §4.2 limits card (full
+width) keeps the full motif. The over-cap pip ring uses `Palette.warn` (the app has no dedicated `--warnOn`
+token) — still warm and set apart from the solid in-cap pips. New §4 caption/history strings are plain
+single-form `%lld` keys (not String-Catalog plurals), matching the §1/§3 retention convention already shipped
+on iOS (surfaces are gated at N ≥ 2 / count-of-8, so English always reads plural). Category budgets are
+filtered to `amount > 0` (iOS clears zero budgets rather than persisting them as Android can).
+
+**Status:** BUILD SUCCEEDED (iPhone 17 Pro sim, iOS 26). Full suite green — **266 tests / 31 suites** (+16
+new: `BuyingLimitSuggestionsTests` ×6 ranking/dismissal, `BuyingLimitNudgerTests` ×4 §4.6 de-dup,
+`BuyingLimitsGatingTests` ×3 free-tier-3, plus 3 `closedWindows` cases in `BuyingLimitCounterTests`).
+Simulator screenshot (SHOW_SCREEN=buyinglimits) confirms the warm "Over by 1" / "At limit" chips (not red),
+the over-cap transparent-ring pips, the green `StreakMotif` + live ghost + "· N weeks under", the
+met/not-met/no-data history squares + "N of the last 8 weeks met", and the "You bought **Crisps** 12× last
+month — cap it? / Suggest 2" dismissible suggestion row — all matching the mockup. On `feat/retention-ios`,
+unpushed.

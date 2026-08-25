@@ -79,6 +79,48 @@ enum BuyingLimitCounter {
         }
     }
 
+    /// The CLOSED `[start, nextStart)` window for `timeframe`, `closedIndex` periods back: index 0 = the
+    /// most recent closed window (last week / last pay-cycle month), increasing into the past. The
+    /// current OPEN window is `window(_:)`; this is only the finished ones. Mirrors Android's `closedWindow`.
+    static func closedWindow(_ timeframe: BuyingLimitTimeframe,
+                             closedIndex: Int,
+                             today: Date = .now,
+                             startDay: Int = PayCycle.startDay,
+                             firstWeekday: Int = BuyingLimitCounter.localeFirstWeekday(),
+                             calendar: Calendar = .current) -> DateInterval {
+        switch timeframe {
+        case .monthly:
+            return PayCycle.monthInterval(today, startDay: startDay,
+                                          offset: -(closedIndex + 1), calendar: calendar)
+        case .weekly:
+            // The week `closedIndex + 1` weeks before the one containing `today`; adding weeks is
+            // firstWeekday-independent, so shift then resolve the week span with `window(_:)`.
+            let shifted = calendar.date(byAdding: .weekOfYear, value: -(closedIndex + 1), to: today) ?? today
+            return window(.weekly, today: shifted, firstWeekday: firstWeekday, calendar: calendar)
+        }
+    }
+
+    /// The last `windowCount` CLOSED `timeframe` windows as `LimitWindow`s, MOST-RECENT FIRST (index 0 =
+    /// the last closed window). Each carries the matched quantity in that window and whether the window
+    /// held ANY receipts at all (`hasData` — any item, not just matching ones — so an empty window reads
+    /// as "no data", never a met window). A single derivation feeds BOTH the §4.3 history strip and
+    /// `StreakEngine.limitStreak`, so the two can never disagree. Pure; mirrors Android's `closedWindows`.
+    static func closedWindows(_ allItems: [CountableItem],
+                              keywords: [String],
+                              timeframe: BuyingLimitTimeframe,
+                              windowCount: Int,
+                              today: Date = .now,
+                              startDay: Int = PayCycle.startDay,
+                              firstWeekday: Int = BuyingLimitCounter.localeFirstWeekday(),
+                              calendar: Calendar = .current) -> [LimitWindow] {
+        (0..<max(windowCount, 0)).map { idx in
+            let w = closedWindow(timeframe, closedIndex: idx, today: today, startDay: startDay,
+                                 firstWeekday: firstWeekday, calendar: calendar)
+            return LimitWindow(count: countInWindow(allItems, keywords: keywords, window: w),
+                               hasData: allItems.contains { w.contains($0.timestamp) })
+        }
+    }
+
     /// Convenience: the count bought against `timeframe`'s current window.
     static func count(_ items: [CountableItem], keywords: [String], timeframe: BuyingLimitTimeframe,
                       today: Date = .now,

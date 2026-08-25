@@ -44,6 +44,10 @@ enum SettingsKey {
     static let scanAIConsent = "pref.scanAIConsent"
     /// Dismissed Wellbeing tips, as newline-separated "periodId|tipId" entries (see WellbeingTipsStore).
     static let dismissedWellbeingTips = "wellbeing.dismissedTips"
+    /// Dismissed buying-limit suggestions (§4.4), as newline-separated normalized keyword keys — a
+    /// rejected suggestion never returns (see `LimitSuggestionsStore`). Per-user (reset on sign-out).
+    /// Android parity: `SettingsStore` KEY_DISMISSED_LIMIT_SUGGESTIONS. Not a schema change.
+    static let dismissedLimitSuggestions = "limits.dismissedSuggestions"
     // ── End-of-period recap ──
     /// Whether the end-of-period recap interstitial is shown at all. Default on. Device-global (like
     /// appearance) — NOT reset on sign-out. See `RecapScheduler`.
@@ -81,6 +85,7 @@ enum UserState {
         for key in [
             SettingsKey.quizPending,
             SettingsKey.dismissedWellbeingTips,
+            SettingsKey.dismissedLimitSuggestions,
             SettingsKey.appLockEnabled,
             SettingsKey.faceID,
             // Per-user recap timing (not the cadence preference, which is device-global like appearance):
