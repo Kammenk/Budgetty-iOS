@@ -1458,3 +1458,65 @@ update.
 **Status:** BUILD SUCCEEDED (iPhone 17 Pro sim, iOS 26) with FirebaseAnalytics linked. Full suite green —
 224 tests / 27 suites. Simulator screenshot of Account → Privacy & Security confirms the "Usage
 analytics" toggle (title + subtitle + orange chart icon) beside Crash reporting, matching Android.
+
+---
+
+## Android → iOS — Retention §1 Weekly Recap as a rhythm + streak surfacing — 2026-08-25
+
+Port of Android's `§1` (commit `98083ce`): the weekly recap becomes the default cadence, the story grows
+into a fuller Cover → Pace → Limits → Streak → Focus sequence, both recap streak cards de-flame onto the
+shared `StreakMotif`, and an in-story frequency control makes weekly-by-default safe. Ported from the
+Android ViewModels/provider + `RETENTION_GAMIFICATION_SPEC.md` §1 + the `RetentionRecapCard.dc.html`
+mockup (the `.rc.ios` palette), never from Compose.
+
+- **`StreakMotif` (new, `Scenes/Streaks/StreakMotif.swift`)** — SwiftUI port of `ui/streaks/StreakMotif.kt`:
+  a row of ~24×8 rounded pills, all in the one budget-good tone. `filledCount` solid; one **dashed** ghost
+  @ 60% when `showLive` (open period on track); `muted` = all solid @ 55% no dash (best-run). No
+  flames/red/amber. General + stateless, so §3/§4 reuse it. **API:** `StreakMotif(filledCount:showLive:muted:maxSegments:tone:)`
+  — only `filledCount` is required; `tone` defaults to `Palette.good`.
+- **Default BOTH (§1.1)** — `recapFrequency` default flipped `.monthly` → `.both` at every read site
+  (`RecapModel.current`, RootView, AccountView, `Settings.swift` doc). Existing users who never chose get
+  weekly too — safe only because the in-story control ships with it.
+- **Weekly data floor (§1.2)** — `RecapDataGuard.evaluate` gains `kind:` + `periodReceipts:`;
+  `minWeekReceipts = 3`. A weekly recap under the floor is `.skip`-ped (and marked shown by the gate);
+  monthly ignores it. Both `RecapBuilder` call sites pass the in-window receipt count.
+- **Weekly sequence (§1.3)** — `RecapBuilder.buildWeekly` now appends Limits (week window,
+  `limitOutcomes(window:weekly:true)` — every cap counted within the week) and a Streak card when present;
+  a bare week stays Cover → Pace → Focus. Weekly Focus band corrected `.secondary` → `.primary` (matches
+  Android §1). New `.streak` card + `budgetStreak` extended with `best`/`liveOnTrack`.
+- **Weekly Streak sourcing** — `weekStreak(endOffset:)` from `StreakEngine.budgetStreaks(.budgetWeek)`:
+  category budgets sliced to a week via `weeklyShareOf` (× 12⁄52, HALF_UP 2dp), an explicit weekly budget
+  as-is, else the monthly budget sliced; open week feeds `liveOnTrack` only. `pickWeekStreak` chooses one
+  scope — a live current run (≥ 2) first, else the best-run fallback (best ≥ 2). Both are pure `static`
+  on `RecapBuilder` (parity with Android's top-level funcs), unit-tested.
+- **De-flamed monthly (§2.4/§2.6)** — monthly `budgetStreak` re-sourced from `StreakEngine.allScopesStreak`
+  for `best` + `liveOnTrack`; the 🔥 is gone, replaced by the motif + "N closed months · <month> on track
+  so far" (best-run fallback below 2). The under-count / segment-bar / safe-to-spend panel is untouched.
+- **In-story frequency control (§1.4)** — a low-emphasis "Weekly recaps · Change" row on the **weekly**
+  Focus card only (never monthly) opens a compact glass sheet (Weekly / Monthly / Both / Off; a centred
+  form sheet on iPad). It writes the shared `recapEnabled`/`recapFrequency` @AppStorage keys immediately
+  (Off ⇒ disabled, cadence remembered), so it stays in sync with Account → Recap with no extra wiring; the
+  RootView gate holds the built story in `@State`, so a mid-read cadence change never tears it down.
+- **No-backfill (§1.5)** — documented in `RecapScheduler.justClosedWeekId` KDoc (one weekly recap for the
+  just-closed week, never a queue).
+- **Analytics (§0/§1)** — `RecapStoryView` gains an `onStreakSurfaced` callback; on appear it fires
+  `Analytics.logStreakSurfaced(kind, length)` per surfaced streak card (weekly `.streak` always — its best
+  when a best-run fallback; monthly `.budgetStreak` once its run or best clears ≥ 2). RootView wires it;
+  the Insights re-open keeps the default no-op.
+- **Parity fix** — `RecapLimitChip.under` was `bought <= cap`; corrected to strictly `< cap` (at-cap reads
+  warn, never a kept limit). Limit chips recoloured to the no-loss framing: good/warn on the label over a
+  neutral glass surface (never red), matching the mockup + Android.
+- **Strings** — 17 new §1 keys spliced into `Localizable.xcstrings` in all 15 non-English locales (English
+  = the key; translations pulled from Android's shipped `strings.xml`, `%1$d`→`%1$lld` / `%2$s`→`%2$@`).
+  875 → 892 keys; semantic key-diff = exactly +17 added, 0 removed, 0 existing modified.
+
+**Justified iOS deviations:** the frequency control reads/writes @AppStorage directly rather than
+threading `recapEnabled`/`recapFrequency`/`onChange` through the view tree (Android does the latter through
+Compose params) — same keys, so the two surfaces stay in lock-step; simpler and idiomatic. The frequency
+picker is a native `.sheet` (`presentationDetents` + `.regularMaterial`) rather than a custom AdaptiveSheet.
+
+**Status:** BUILD SUCCEEDED (iPhone 17 Pro sim, iOS 26). Full suite green — 236 tests / 28 suites (+12:
+the new `RecapWeekStreakTests` + weekly-floor guard cases). Simulator screenshots confirm the weekly
+Streak card (motif + "3 weeks under your Groceries budget"), the weekly Focus card with the "Weekly
+recaps · Change" row, and the de-flamed monthly card (motif + "3 closed months · August on track so far",
+no flame) — all matching the mockup's `w-streak` / `w-focus` / `m-streak-new` states.

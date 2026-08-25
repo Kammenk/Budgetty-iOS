@@ -73,7 +73,7 @@ struct RootView: View {
     // on app open once the lock (if any) has cleared; the story loads only when a boundary is due, and
     // is hosted as a full-screen cover over the live shell (the dock stays untouched).
     @AppStorage(SettingsKey.recapEnabled) private var recapEnabled = true
-    @AppStorage(SettingsKey.recapFrequency) private var recapFrequencyRaw = RecapFrequency.monthly.rawValue
+    @AppStorage(SettingsKey.recapFrequency) private var recapFrequencyRaw = RecapFrequency.both.rawValue
     @AppStorage(SettingsKey.recapLastShownWeek) private var recapLastShownWeek = ""
     @AppStorage(SettingsKey.recapLastShownMonth) private var recapLastShownMonth = ""
     @State private var recapStory: RecapStory?
@@ -98,7 +98,8 @@ struct RootView: View {
             if let story = recapStory {
                 RecapStoryView(story: story, onClose: closeRecap, onSeeDetails: openRecapDetails,
                                onShown: { Analytics.logRecapShown($0) },
-                               onCompleted: { Analytics.logRecapCompleted($0, cardsViewed: $1) })
+                               onCompleted: { Analytics.logRecapCompleted($0, cardsViewed: $1) },
+                               onStreakSurfaced: { Analytics.logStreakSurfaced($0, length: $1) })
             }
         }
         .task { await maybeShowRecap() }
@@ -165,7 +166,7 @@ struct RootView: View {
         // stamp-on-skip exactly like Android.
         guard !receipts.isEmpty else { return }
         recapChecked = true
-        let frequency = RecapFrequency(rawValue: recapFrequencyRaw) ?? .monthly
+        let frequency = RecapFrequency(rawValue: recapFrequencyRaw) ?? .both
         guard let due = RecapScheduler.due(
             enabled: recapEnabled, frequency: frequency,
             lastShownWeek: recapLastShownWeek, lastShownMonth: recapLastShownMonth,
@@ -417,13 +418,14 @@ struct RootView: View {
         case "memory": DebugMemorySheet()
         case "buyinglimits": NavigationStack { DebugBuyingLimits() }
         case "recap": RecapStoryView(story: .debugMonthlySample(), onClose: {}, onSeeDetails: {})
+        case "recap-weekly": RecapStoryView(story: .debugWeeklySample(), onClose: {}, onSeeDetails: {})
         default: EmptyView().hidden()
         }
     }
 
     private var hasDebugPreview: Bool {
         ["account", "paywall", "receipt", "category", "review",
-         "notifications", "support", "widgets", "lock", "memory", "buyinglimits", "recap"]
+         "notifications", "support", "widgets", "lock", "memory", "buyinglimits", "recap", "recap-weekly"]
             .contains(ProcessInfo.processInfo.environment["SHOW_SCREEN"] ?? "")
     }
     #endif

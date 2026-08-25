@@ -15,7 +15,9 @@ enum RecapKind { case monthly, weekly }
 
 /// How often the end-of-period recap interstitial appears. The 0–100 wellbeing score is a monthly
 /// measure, so `.weekly` is a lighter momentum check with no score; `.monthly` is the full report card;
-/// `.both` shows each on its own boundary. Default is `.monthly` (weekly off). Stored as its raw string
+/// `.both` shows each on its own boundary. Default is `.both` (§1.1) — the weekly recap is the app's
+/// strongest retention asset, so it runs by default; made safe by the in-story frequency control (§1.4)
+/// that puts its own off-switch on the very first weekly recap a user sees. Stored as its raw string
 /// (device-global, like appearance — NOT reset on sign-out). Android parity: `RecapFrequency`.
 enum RecapFrequency: String, CaseIterable, Identifiable {
     case weekly = "WEEKLY"
@@ -24,10 +26,10 @@ enum RecapFrequency: String, CaseIterable, Identifiable {
 
     var id: String { rawValue }
 
-    /// The stored cadence, defaulting to `.monthly` when unset (matches the Android default).
+    /// The stored cadence, defaulting to `.both` when unset (matches the Android §1.1 default).
     static var current: RecapFrequency {
         RecapFrequency(rawValue: UserDefaults.standard.string(forKey: SettingsKey.recapFrequency) ?? "")
-            ?? .monthly
+            ?? .both
     }
 }
 
@@ -43,14 +45,17 @@ enum RecapPillTone { case good, warn, neutral }
 /// Traffic-light state of one budget scope, for the budget card's segment bar.
 enum RecapSegStatus { case good, warn, bad }
 
-/// One buying-limit outcome chip: emoji + label + how many were bought against the `cap`.
+/// One buying-limit outcome chip: emoji + label + how many were bought against the `cap`. `under` is
+/// STRICTLY under the cap (green + counted in "stayed under N of M"); at or over the cap is the warm
+/// "reached" state (never red, never counted) — matching the mockup, where 4-of-4 reads as warn, not as
+/// a kept limit (§1.3 / no-loss-framing). Android parity: `RecapLimitChip.under = bought < cap`.
 struct RecapLimitChip: Identifiable {
     let emoji: String
     let label: String
     let bought: Int
     let cap: Int
 
-    var under: Bool { bought <= cap }
+    var under: Bool { bought < cap }
     var id: String { "\(label)|\(emoji)|\(cap)" }
 }
 
@@ -93,9 +98,23 @@ enum RecapCard {
                previousAmount: Decimal, currentAmount: Decimal, second: RecapSecondMover?)
 
     /// Budget adherence + streak, with the per-scope segment bar and safe-to-spend at the close.
-    /// `streakMonths` is consecutive closed months under budget, ending with this one (≥ 1 on this card).
-    case budgetStreak(band: RecapBand, streakMonths: Int, underCount: Int, scopeCount: Int,
-                      segments: [RecapSegStatus], safeToSpend: Decimal)
+    /// `streakMonths` is consecutive closed months where every budgeted scope stayed under, ending with
+    /// the just-closed one (0 when it wasn't all-under). The hero de-flames per §2.4 (no 🔥) and shows the
+    /// streak `StreakMotif` once `streakMonths` ≥ 2 (§2.7); `best` (personal-best run within the 24-month
+    /// window) drives the best-run fallback (§2.5); `liveOnTrack` is whether the open month is on track —
+    /// the motif's dotted ghost segment.
+    case budgetStreak(band: RecapBand, streakMonths: Int, best: Int, liveOnTrack: Bool,
+                      underCount: Int, scopeCount: Int, segments: [RecapSegStatus], safeToSpend: Decimal)
+
+    /// Outcome-streak card (§1.3 / §2): one scope's run of consecutive CLOSED periods met, on the calm
+    /// secondary band. Sourced from `StreakEngine`; only ever built when there is something worth showing
+    /// — a current run (`current` ≥ 2, `isBestRun` = false) or, when the current run is 0, the
+    /// personal-best fallback (`best` ≥ 2, `isBestRun` = true). Never padded: when neither holds the card
+    /// is dropped entirely (a bare week stays Cover → Pace → Focus). `scope` is a category name for a
+    /// per-category run, or nil for the whole-budget scope ("under budget"). `liveOnTrack` = whether the
+    /// open period is on track to extend the run (the motif's dotted ghost segment).
+    case streak(band: RecapBand, kind: StreakKind, scope: String?, current: Int, best: Int,
+                liveOnTrack: Bool, isBestRun: Bool)
 
     /// Buying-limits outcome: how many stayed under, plus a chip per limit. Dropped when the user has none.
     case limits(band: RecapBand, underCount: Int, totalCount: Int, chips: [RecapLimitChip])
@@ -117,7 +136,8 @@ enum RecapCard {
         case let .total(band, _, _, _, _, _): band
         case let .score(band, _, _, _, _): band
         case let .mover(band, _, _, _, _, _, _): band
-        case let .budgetStreak(band, _, _, _, _, _): band
+        case let .budgetStreak(band, _, _, _, _, _, _, _): band
+        case let .streak(band, _, _, _, _, _, _): band
         case let .limits(band, _, _, _): band
         case let .pace(band, _, _, _, _, _, _): band
         case let .focus(band, _, _): band

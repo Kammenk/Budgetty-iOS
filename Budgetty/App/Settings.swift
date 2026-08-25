@@ -48,7 +48,8 @@ enum SettingsKey {
     /// Whether the end-of-period recap interstitial is shown at all. Default on. Device-global (like
     /// appearance) — NOT reset on sign-out. See `RecapScheduler`.
     static let recapEnabled = "recap.enabled"
-    /// Which period(s) trigger a recap (`RecapFrequency` raw value). Default MONTHLY. Device-global.
+    /// Which period(s) trigger a recap (`RecapFrequency` raw value). Default BOTH (§1.1 — weekly on by
+    /// default, made safe by the in-story frequency control §1.4). Device-global.
     static let recapFrequency = "recap.frequency"
     /// ISO date (yyyy-MM-dd) of the start of the last weekly recap already shown; empty = none yet.
     /// Per-user timing — reset on sign-out so the next account gets fresh boundaries.

@@ -163,27 +163,60 @@ struct RecapSchedulerTests {
     // ── Data guard ───────────────────────────────────────────────────────────────
 
     @Test func guard_underReceiptFloor_skips() {
-        #expect(RecapDataGuard.evaluate(totalReceipts: 4, periodHasSpend: true, priorPeriodHasSpend: true) == .skip)
+        #expect(RecapDataGuard.evaluate(kind: .monthly, totalReceipts: 4, periodReceipts: 4,
+                                        periodHasSpend: true, priorPeriodHasSpend: true) == .skip)
     }
 
     @Test func guard_periodHadNoSpend_skips() {
-        #expect(RecapDataGuard.evaluate(totalReceipts: 30, periodHasSpend: false, priorPeriodHasSpend: true) == .skip)
+        #expect(RecapDataGuard.evaluate(kind: .monthly, totalReceipts: 30, periodReceipts: 12,
+                                        periodHasSpend: false, priorPeriodHasSpend: true) == .skip)
     }
 
     @Test func guard_noPriorPeriod_showsPartial() {
-        #expect(RecapDataGuard.evaluate(totalReceipts: 8, periodHasSpend: true, priorPeriodHasSpend: false)
+        #expect(RecapDataGuard.evaluate(kind: .monthly, totalReceipts: 8, periodReceipts: 8,
+                                        periodHasSpend: true, priorPeriodHasSpend: false)
                 == .show(withComparison: false))
     }
 
     @Test func guard_enoughDataWithPrior_showsFull() {
-        #expect(RecapDataGuard.evaluate(totalReceipts: 40, periodHasSpend: true, priorPeriodHasSpend: true)
+        #expect(RecapDataGuard.evaluate(kind: .monthly, totalReceipts: 40, periodReceipts: 15,
+                                        periodHasSpend: true, priorPeriodHasSpend: true)
                 == .show(withComparison: true))
     }
 
     @Test func guard_floorMatchesWellbeing() {
         // Exactly at the floor is enough (5 = minReceipts).
-        #expect(RecapDataGuard.evaluate(totalReceipts: RecapDataGuard.minReceipts,
+        #expect(RecapDataGuard.evaluate(kind: .monthly, totalReceipts: RecapDataGuard.minReceipts,
+                                        periodReceipts: 5, periodHasSpend: true, priorPeriodHasSpend: true)
+                == .show(withComparison: true))
+    }
+
+    // ── Weekly data floor (§1.2) ─────────────────────────────────────────────────
+
+    @Test func guard_weekly_underWeekFloor_skips_evenWithLifetimeData() {
+        // Clears the lifetime floor and had spend, but only 2 receipts fell in the week → hollow, skip.
+        #expect(RecapDataGuard.evaluate(kind: .weekly, totalReceipts: 40,
+                                        periodReceipts: RecapDataGuard.minWeekReceipts - 1,
+                                        periodHasSpend: true, priorPeriodHasSpend: true) == .skip)
+    }
+
+    @Test func guard_weekly_atWeekFloor_shows() {
+        #expect(RecapDataGuard.evaluate(kind: .weekly, totalReceipts: 40,
+                                        periodReceipts: RecapDataGuard.minWeekReceipts,
                                         periodHasSpend: true, priorPeriodHasSpend: true)
                 == .show(withComparison: true))
+    }
+
+    @Test func guard_monthly_ignoresWeekFloor() {
+        // The same low period-receipt count that skips a weekly recap still shows the monthly report card.
+        #expect(RecapDataGuard.evaluate(kind: .monthly, totalReceipts: 40, periodReceipts: 1,
+                                        periodHasSpend: true, priorPeriodHasSpend: true)
+                == .show(withComparison: true))
+    }
+
+    @Test func guard_weekly_belowLifetimeFloor_skips_regardlessOfWeekCount() {
+        #expect(RecapDataGuard.evaluate(kind: .weekly, totalReceipts: RecapDataGuard.minReceipts - 1,
+                                        periodReceipts: 10, periodHasSpend: true, priorPeriodHasSpend: true)
+                == .skip)
     }
 }
