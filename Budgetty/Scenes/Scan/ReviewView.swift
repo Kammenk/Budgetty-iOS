@@ -164,6 +164,15 @@ struct ReviewView: View {
 
     // MARK: - Store + date
 
+    /// A just-scanned receipt's purchase date is almost always the current year. A different year is
+    /// usually a misread (the model picked a copyright/loyalty/expiry year off the receipt), so we tint
+    /// the Date field in the alert colour to prompt the user to check it before saving. Mirrors Android's
+    /// DateCard off-year highlight; the native picker already shows the year itself.
+    private var dateYearLooksOff: Bool {
+        Calendar.current.component(.year, from: draft.date)
+            != Calendar.current.component(.year, from: .now)
+    }
+
     private var storeAndDate: some View {
         HStack(spacing: 10) {
             HStack(spacing: 10) {
@@ -184,9 +193,10 @@ struct ReviewView: View {
                         in: RoundedRectangle(cornerRadius: 12, style: .continuous))
 
             VStack(alignment: .leading, spacing: 2) {
-                fieldLabel("Date")
+                fieldLabel("Date", color: dateYearLooksOff ? Palette.bad : Palette.secondaryLabel)
                 DatePicker("", selection: $draft.date, displayedComponents: .date)
                     .labelsHidden()
+                    .tint(dateYearLooksOff ? Palette.bad : nil)
             }
             .padding(.vertical, 12).padding(.horizontal, 14)
             .frame(maxHeight: .infinity, alignment: .leading)
