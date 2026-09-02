@@ -202,6 +202,15 @@ struct ReviewView: View {
             .frame(maxHeight: .infinity, alignment: .leading)
             .background(Palette.tertiaryBackground,
                         in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+            // The compact DatePicker keeps its value text neutral at rest, so the red label alone is
+            // a soft cue. Outline the whole field in the alert colour when the year is off, matching
+            // the strength of Android's red date text.
+            .overlay {
+                if dateYearLooksOff {
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .strokeBorder(Palette.bad, lineWidth: 1.5)
+                }
+            }
         }
         .fixedSize(horizontal: false, vertical: true)
     }
