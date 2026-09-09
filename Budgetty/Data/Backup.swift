@@ -33,6 +33,12 @@ struct BackupFile: Codable {
     /// periodId clash keeps the on-device row (IGNORE), so a backup never overwrites the honest,
     /// first-computed snapshot — mirrors Android's `WellbeingScoreDao.insertAll(onConflict = IGNORE)`.
     var wellbeingScores: [WellbeingScoreDTO]? = []
+    /// The user's DISPLAY / DATA-INTERPRETATION preferences (currency, month-start day, theme, …), so a
+    /// full `.replace` restore reproduces the account faithfully on a new device — most importantly the
+    /// currency (the app appends a symbol and never converts amounts, so the same numbers under the wrong
+    /// symbol are simply wrong). Optional so a backup written before this change still decodes and leaves
+    /// the current device's preferences untouched. Applied on `.replace` ONLY (see `SettingsDTO`).
+    var settings: SettingsDTO? = nil
 
     var itemCount: Int { receipts.reduce(0) { $0 + $1.items.count } }
 }
@@ -153,6 +159,100 @@ struct WellbeingScoreDTO: Codable {
     }
 }
 
+/// The user's DISPLAY / DATA-INTERPRETATION preferences, carried in the backup so a full `.replace`
+/// restore reproduces the account faithfully on a new device.
+///
+/// Every field is optional so that (a) an OLD backup with no `settings` block still decodes and leaves
+/// the current device's preferences untouched, and (b) a partially-populated block applies only the
+/// fields it actually carries. Values are the exact strings the app persists in `UserDefaults` (the
+/// enums' raw values, which are also their case names), so an iOS→iOS round-trip reads back cleanly and
+/// an unrecognized value falls back to the on-device default on read.
+///
+/// JSON keys and string-case enum encoding mirror the Android backup for cross-platform parity:
+/// `currency, dateFormat, language, themeMode, accent, monthStartDay, budgetRolloverEnabled,
+/// hiddenHomeSections, hiddenInsightsSections, homeSectionOrder, insightsSectionOrder, recapEnabled,
+/// recapFrequency`. (`themeMode` is the on-disk name for the iOS `pref.appearance` key.)
+///
+/// DELIBERATELY EXCLUDED — never written into a shareable, plaintext backup file:
+///  • App lock — the PIN / its hash (Keychain, not UserDefaults), biometric-enabled, auto-lock minutes.
+///    A passcode must never travel in a file the user can hand to anyone. (SECURITY.)
+///  • Consent flags — crash-reporting and analytics opt-in. Device/person-scoped consent that is not the
+///    account's to carry; an import must never silently flip a device's consent.
+///  • Transient gate / timing state — recap "last shown" markers, onboarding-seen, insights-quiz-pending,
+///    dismissed Wellbeing tips / limit suggestions, the overlay nudge-dismissed flag, scan-AI consent /
+///    quota, and the premium / comp entitlement cache.
+struct SettingsDTO: Codable, Equatable {
+    var currency: String? = nil
+    var dateFormat: String? = nil
+    var language: String? = nil
+    var themeMode: String? = nil            // iOS: SettingsKey.appearance (AppearancePref raw)
+    var accent: String? = nil
+    var monthStartDay: Int? = nil
+    var budgetRolloverEnabled: Bool? = nil
+    var hiddenHomeSections: [String]? = nil
+    var hiddenInsightsSections: [String]? = nil
+    var homeSectionOrder: [String]? = nil
+    var insightsSectionOrder: [String]? = nil
+    var recapEnabled: Bool? = nil
+    var recapFrequency: String? = nil
+
+    /// Snapshot the current effective preferences. Reads the same defaults the app's `@AppStorage`
+    /// declarations use, so a user who never touched a setting still exports the value they actually see
+    /// (e.g. `UserDefaults.integer` yields 0 for an absent `monthStartDay`, but the app treats it as 1).
+    /// The accent is read from its persisted key rather than `AppTheme.shared` so this stays a pure,
+    /// injectable read; `AppTheme` writes that same key on every change, and an absent key means the
+    /// violet default.
+    static func current(from d: UserDefaults = .standard) -> SettingsDTO {
+        func int(_ key: String, _ fallback: Int) -> Int { d.object(forKey: key) == nil ? fallback : d.integer(forKey: key) }
+        func flag(_ key: String, _ fallback: Bool) -> Bool { d.object(forKey: key) == nil ? fallback : d.bool(forKey: key) }
+        func list(_ raw: String) -> [String] { raw.split(separator: ",").map(String.init) }
+        return SettingsDTO(
+            currency: d.string(forKey: SettingsKey.currency) ?? "EUR",
+            dateFormat: d.string(forKey: SettingsKey.dateFormat) ?? DateFormatOption.system.rawValue,
+            language: d.string(forKey: SettingsKey.language) ?? "system",
+            themeMode: d.string(forKey: SettingsKey.appearance) ?? AppearancePref.system.rawValue,
+            accent: d.string(forKey: SettingsKey.accent) ?? AccentOption.violet.rawValue,
+            monthStartDay: int(SettingsKey.monthStartDay, 1),
+            budgetRolloverEnabled: flag(SettingsKey.budgetRolloverEnabled, false),
+            hiddenHomeSections: list(d.string(forKey: HomeLayoutStore.hiddenKey) ?? HomeLayoutStore.defaultHidden),
+            hiddenInsightsSections: list(d.string(forKey: InsightsLayoutStore.hiddenKey) ?? ""),
+            homeSectionOrder: list(d.string(forKey: HomeLayoutStore.orderKey) ?? ""),
+            insightsSectionOrder: list(d.string(forKey: InsightsLayoutStore.orderKey) ?? ""),
+            recapEnabled: flag(SettingsKey.recapEnabled, true),
+            recapFrequency: d.string(forKey: SettingsKey.recapFrequency) ?? RecapFrequency.both.rawValue
+        )
+    }
+
+    /// Write back only the fields this block actually carries (a `nil` field is left as-is). The section
+    /// order/hidden lists rejoin the CSV shape the layout stores keep in UserDefaults; `@AppStorage`-bound
+    /// screens observe these keys and re-render live. Language mirrors the settings UI by also setting the
+    /// `AppleLanguages` override (takes effect on next launch, exactly as picking a language does). The
+    /// accent's cached live tint (`AppTheme`, read from ~80 view bodies) is nudged in step — but only for
+    /// the real shared store, never a test's injected defaults.
+    func apply(into d: UserDefaults = .standard) {
+        if let currency { d.set(currency, forKey: SettingsKey.currency) }
+        if let dateFormat { d.set(dateFormat, forKey: SettingsKey.dateFormat) }
+        if let language {
+            d.set(language, forKey: SettingsKey.language)
+            if language == "system" { d.removeObject(forKey: "AppleLanguages") }
+            else { d.set([language], forKey: "AppleLanguages") }
+        }
+        if let themeMode { d.set(themeMode, forKey: SettingsKey.appearance) }
+        if let accent { d.set(accent, forKey: SettingsKey.accent) }
+        if let monthStartDay { d.set(monthStartDay, forKey: SettingsKey.monthStartDay) }
+        if let budgetRolloverEnabled { d.set(budgetRolloverEnabled, forKey: SettingsKey.budgetRolloverEnabled) }
+        if let hiddenHomeSections { d.set(hiddenHomeSections.joined(separator: ","), forKey: HomeLayoutStore.hiddenKey) }
+        if let homeSectionOrder { d.set(homeSectionOrder.joined(separator: ","), forKey: HomeLayoutStore.orderKey) }
+        if let hiddenInsightsSections { d.set(hiddenInsightsSections.joined(separator: ","), forKey: InsightsLayoutStore.hiddenKey) }
+        if let insightsSectionOrder { d.set(insightsSectionOrder.joined(separator: ","), forKey: InsightsLayoutStore.orderKey) }
+        if let recapEnabled { d.set(recapEnabled, forKey: SettingsKey.recapEnabled) }
+        if let recapFrequency { d.set(recapFrequency, forKey: SettingsKey.recapFrequency) }
+        if d === UserDefaults.standard, let accent, let option = AccentOption(rawValue: accent) {
+            AppTheme.shared.accent = option
+        }
+    }
+}
+
 // MARK: - Service
 
 enum BackupService {
@@ -189,7 +289,8 @@ enum BackupService {
             categories: try context.fetch(FetchDescriptor<Category>()).filter(\.isCustom).map(CategoryDTO.init),
             savingsGoals: try context.fetch(FetchDescriptor<SavingsGoal>()).map(SavingsGoalDTO.init),
             buyingLimits: try context.fetch(FetchDescriptor<BuyingLimit>()).map(BuyingLimitDTO.init),
-            wellbeingScores: try context.fetch(FetchDescriptor<WellbeingScoreEntity>()).map(WellbeingScoreDTO.init)
+            wellbeingScores: try context.fetch(FetchDescriptor<WellbeingScoreEntity>()).map(WellbeingScoreDTO.init),
+            settings: SettingsDTO.current()
         )
         return try encoder().encode(file)
     }
@@ -203,7 +304,12 @@ enum BackupService {
 
     /// Restore a decoded backup. `.replace` wipes existing user data first; `.merge` keeps it,
     /// upserting keyed rows (budgets/rules/custom categories) and appending receipts + recurring.
-    static func restore(_ file: BackupFile, into context: ModelContext, mode: ImportMode) throws {
+    ///
+    /// Display / interpretation preferences (`file.settings`) are applied on `.replace` ONLY — a merge is
+    /// additive and must never clobber the current device's currency, theme, layout, etc. `defaults` is
+    /// injectable so tests can exercise the apply against an isolated store instead of `.standard`.
+    static func restore(_ file: BackupFile, into context: ModelContext, mode: ImportMode,
+                        defaults: UserDefaults = .standard) throws {
         if mode == .replace {
             for r in try context.fetch(FetchDescriptor<Receipt>()) { context.delete(r) }
             for b in try context.fetch(FetchDescriptor<Budget>()) { context.delete(b) }
@@ -293,6 +399,11 @@ enum BackupService {
         }
 
         try context.save()
+
+        // Display / interpretation preferences ride along ONLY on a full replace, and apply only the
+        // fields actually present. A pre-settings backup (`file.settings == nil`) or a merge leaves every
+        // on-device preference untouched.
+        if mode == .replace { file.settings?.apply(into: defaults) }
     }
 }
 
