@@ -1653,3 +1653,62 @@ the over-cap transparent-ring pips, the green `StreakMotif` + live ghost + "· N
 met/not-met/no-data history squares + "N of the last 8 weeks met", and the "You bought **Crisps** 12× last
 month — cap it? / Suggest 2" dismissible suggestion row — all matching the mockup. On `feat/retention-ios`,
 unpushed.
+
+---
+
+## Android → iOS — Data backup round-trips display preferences — 2026-09-09
+
+Implemented on both platforms in lockstep (not Android-first-then-port). The full-data JSON
+backup/restore (Account → Export / Import) carried every data entity but none of the user's
+preferences, so a restore on a new device dropped the user's currency, date format, month-start day
+and so on. Currency is the worst case: the app **appends** a currency symbol rather than converting
+amounts, so restored numbers rendered under the wrong symbol. Ported from the Android **data layer**
+(`BackupData` / `BackupManager` / `SettingsStore`), not any UI. iOS branch
+`feat/backup-includes-preferences` off `main`.
+
+- **Curated settings block** — `SettingsDTO` on `BackupFile` (`Budgetty/Data/Backup.swift`) mirrors
+  Android's `BackupSettings` on `BackupData`: 13 keys, all optional, enums encoded as their string
+  case names — `currency, dateFormat, language, themeMode, accent, monthStartDay,
+  budgetRolloverEnabled, hiddenHomeSections, hiddenInsightsSections, homeSectionOrder,
+  insightsSectionOrder, recapEnabled, recapFrequency`. `SettingsDTO.current(from:)` snapshots on
+  export; `apply(into:)` writes back only the fields present. Android parity:
+  `BackupManager.currentBackupSettings()` / `applySettings()`.
+- **Replace-only apply** — preferences are applied on a full **`.replace` restore only**, never a
+  merge (a merge is additive and must not clobber the current device's currency/theme/layout),
+  after the data import. A pre-settings backup (`settings == nil`) leaves every on-device pref
+  untouched. Android parity: `if (replace) data.settings?.let { applySettings(it) }`, applied
+  outside the Room transaction.
+- **Backward compatible** — the block is optional/absent-tolerant on both (Swift optional `Codable`;
+  Kotlin nullable + Gson leaves an absent field null), so a backup written before this change still
+  imports and keeps the current prefs; an unrecognized enum value is skipped/fallback, not applied.
+- **Excluded by design (SECURITY / consent / transient)** — identical on both and must stay
+  excluded: app-lock PIN hash + biometric + auto-lock (never write a passcode into a shareable
+  plaintext file), crash + analytics consent (device/person-scoped), and transient gate/timing state
+  (recap last-shown, onboarding-seen, quiz-pending, dismissed nudges/tips, scan consent/quota,
+  premium/comp cache). Android has a JVM guard test (`BackupSettingsTest`) that fails if
+  `BackupSettings` ever widens; iOS covers the same in `BackupSettingsRoundTripTests`.
+
+**Justified iOS deviations from Android:**
+- **`themeMode`** is the on-disk JSON key for iOS's internal `SettingsKey.appearance`
+  (`AppearancePref`); the `system/light/dark` values match Android's `ThemeMode`.
+- **Section lists are JSON arrays** of case-name strings on both, but iOS stores them internally as a
+  CSV string, so the DTO splits on export and rejoins on import; unknown section ids are dropped
+  (`compactMap`).
+- **`apply(into:)` also sets the iOS-only `AppleLanguages` override** (mirrors the language picker;
+  effective next launch) and nudges the cached live accent tint (`AppTheme.shared`) — but only for
+  the real `.standard` store, never a test's injected defaults. `restore` gained an injectable
+  `defaults: UserDefaults = .standard` for hermetic tests; the default keeps the `AccountView` caller
+  unchanged (internal, not part of the file format). `BackupFile.version` left at `1`.
+- **Cross-platform restore degrades, by design.** Same-platform restore is fully faithful, but an
+  Android backup imported on iOS (or vice-versa) does NOT map `dateFormat` (Android
+  `DAY_MONTH_YEAR/DMY_SLASH/MDY_SLASH/ISO` vs iOS `system/dmy/mdy/dots`), `accent` option names, or
+  platform-specific section ids — those fall back to the on-device default / are dropped. `currency`,
+  `themeMode`, `recapFrequency`, `monthStartDay` and the booleans DO line up. The data entities
+  themselves (Room vs SwiftData DTOs) were never verified as cross-importable either. Cross-platform
+  backup portability is a separate task (align enum vocabularies + verify entity JSON parity) — not
+  attempted here.
+
+**Status:** BOTH built + verified. Android `feat/backup-includes-preferences` `24341b8` —
+`:app:testDebugUnitTest` + `:app:detekt` green. iOS `feat/backup-includes-preferences` `18a9ddd` —
+`xcodebuild build` + `test` succeeded (12 tests, 0 failures). Both branches pushed to origin
+2026-09-09, awaiting user-opened PR.
