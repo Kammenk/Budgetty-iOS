@@ -164,13 +164,13 @@ struct ReviewView: View {
 
     // MARK: - Store + date
 
-    /// A just-scanned receipt's purchase date is almost always the current year. A different year is
-    /// usually a misread (the model picked a copyright/loyalty/expiry year off the receipt), so we tint
-    /// the Date field in the alert colour to prompt the user to check it before saving. Mirrors Android's
-    /// DateCard off-year highlight; the native picker already shows the year itself.
-    private var dateYearLooksOff: Bool {
-        Calendar.current.component(.year, from: draft.date)
-            != Calendar.current.component(.year, from: .now)
+    /// A just-scanned receipt's purchase date is almost always within the last few weeks. When it lands
+    /// in the future or well in the past it's usually a misread — a wrong month (8 Sep read as 8 Apr), or
+    /// a copyright/loyalty/expiry date lifted off the receipt — so we tint the Date field in the alert
+    /// colour to prompt the user to check it before saving. Mirrors Android's DateCard review flag
+    /// (`ReceiptDateReview`); the native picker already shows the year. Highlight only — never rewritten.
+    private var dateNeedsReview: Bool {
+        ReceiptDateReview.needsReview(draft.date)
     }
 
     private var storeAndDate: some View {
@@ -193,20 +193,20 @@ struct ReviewView: View {
                         in: RoundedRectangle(cornerRadius: 12, style: .continuous))
 
             VStack(alignment: .leading, spacing: 2) {
-                fieldLabel("Date", color: dateYearLooksOff ? Palette.bad : Palette.secondaryLabel)
+                fieldLabel("Date", color: dateNeedsReview ? Palette.bad : Palette.secondaryLabel)
                 DatePicker("", selection: $draft.date, displayedComponents: .date)
                     .labelsHidden()
-                    .tint(dateYearLooksOff ? Palette.bad : nil)
+                    .tint(dateNeedsReview ? Palette.bad : nil)
             }
             .padding(.vertical, 12).padding(.horizontal, 14)
             .frame(maxHeight: .infinity, alignment: .leading)
             .background(Palette.tertiaryBackground,
                         in: RoundedRectangle(cornerRadius: 12, style: .continuous))
             // The compact DatePicker keeps its value text neutral at rest, so the red label alone is
-            // a soft cue. Outline the whole field in the alert colour when the year is off, matching
+            // a soft cue. Outline the whole field in the alert colour when the date looks off, matching
             // the strength of Android's red date text.
             .overlay {
-                if dateYearLooksOff {
+                if dateNeedsReview {
                     RoundedRectangle(cornerRadius: 12, style: .continuous)
                         .strokeBorder(Palette.bad, lineWidth: 1.5)
                 }
