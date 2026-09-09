@@ -149,8 +149,9 @@ enum AppearancePref: String, CaseIterable, Identifiable {
 }
 
 /// Currencies offered in the picker (code, symbol, name). Europe-only cut (matches Android): kept
-/// EUR/GBP/CHF/SEK/NOK and the home currencies of the other supported markets (DKK/PLN/CZK/RON).
-/// Bulgaria uses EUR. EUR default; a removed currency saved by an existing user falls back to EUR.
+/// EUR/GBP/CHF/SEK/NOK and the home currencies of the other supported markets
+/// (DKK/ISK/PLN/CZK/RON/HUF). Bulgaria uses EUR. EUR default; a removed currency saved by an
+/// existing user falls back to EUR.
 enum CurrencyOption {
     static let all: [(code: String, symbol: String, name: String)] = [
         ("EUR", "€", "Euro"),
@@ -159,9 +160,11 @@ enum CurrencyOption {
         ("SEK", "kr", "Swedish Krona"),
         ("NOK", "kr", "Norwegian Krone"),
         ("DKK", "kr", "Danish Krone"),
+        ("ISK", "kr", "Icelandic Króna"),
         ("PLN", "zł", "Polish Złoty"),
         ("CZK", "Kč", "Czech Koruna"),
         ("RON", "lei", "Romanian Leu"),
+        ("HUF", "Ft", "Hungarian Forint"),
     ]
     /// Symbol for a stored code; unknown/removed codes fall back to the euro (Android parity).
     static func symbol(_ code: String) -> String {
