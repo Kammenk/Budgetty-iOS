@@ -216,6 +216,41 @@ enum Palette {
     static let warn = Color(uiColor: .systemOrange)
     static let bad = Color(uiColor: .systemRed)
 
+    // MARK: - Needs / Wants / Savings bucket accents (the Insights 50/30/20 split)
+    //
+    // Three hues at one lightness and chroma (oklch L.48 C.075, hues 255 / 35 / 155; dark lifts to
+    // L.80 C.085), deliberately deeper and less saturated than the category pie palette so a bucket
+    // never reads as a category. Byte-identical to Android's BucketNeeds/Wants/Savings so the split
+    // renders the same hues on both platforms. `…Soft` is the accent at the mockup's tonal-container
+    // alpha (13% light / 20% dark). `bucketLeftover` is the "not counted" track (mockup `--lft`).
+
+    static let bucketNeeds = dynamic(light: 0xFF405F87, dark: 0xFF99C1F4)
+    static let bucketWants = dynamic(light: 0xFF824E40, dark: 0xFFEFAA99)
+    static let bucketSavings = dynamic(light: 0xFF386A4B, dark: 0xFF91CEA6)
+    static let bucketNeedsSoft = dynamic(light: 0x21405F87, dark: 0x3399C1F4)
+    static let bucketWantsSoft = dynamic(light: 0x21824E40, dark: 0x33EFAA99)
+    static let bucketSavingsSoft = dynamic(light: 0x21386A4B, dark: 0x3391CEA6)
+    /// The "leftover" track — income counted in neither Needs, Wants nor Savings (mockup `--lft`).
+    static let bucketLeftover = dynamic(light: 0xFFC6C2CE, dark: 0xFF4A4658)
+
+    /// The accent colour for a bucket.
+    static func bucketColor(_ bucket: CategoryBucket) -> Color {
+        switch bucket {
+        case .need: bucketNeeds
+        case .want: bucketWants
+        case .savings: bucketSavings
+        }
+    }
+
+    /// The tonal-container colour for a bucket (its accent at low alpha over the card).
+    static func bucketSoft(_ bucket: CategoryBucket) -> Color {
+        switch bucket {
+        case .need: bucketNeedsSoft
+        case .want: bucketWantsSoft
+        case .savings: bucketSavingsSoft
+        }
+    }
+
     /// Soft violet-tinted drop shadow that lifts content cards off the canvas (mockup:
     /// `0 10px 28px rgba(25,12,60,.1)`).
     static let cardShadow = Color(argb: 0x1A190C3C)

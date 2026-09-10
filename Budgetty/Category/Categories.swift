@@ -228,6 +228,70 @@ enum Categories {
         parentOf(name) ?? name
     }
 
+    // MARK: - Needs / Wants / Savings buckets (the Insights 50/30/20 split)
+
+    /// Default `CategoryBucket` per top-level group (lower-cased keys). A category with no explicit
+    /// entry in `categoryBucketDefault` inherits its group's bucket here; anything unmapped (including
+    /// a brand-new custom category) falls back to `.want`. Needs = the bills you'd keep paying in a
+    /// lean month; Wants = discretionary; Savings = money set aside. Ported 1:1 from Android's
+    /// `Categories.groupBucketDefault`.
+    private static let groupBucketDefault: [String: CategoryBucket] = [
+        "groceries": .need,
+        "household & personal": .need,
+        "health & wellness": .need,
+        "transportation": .need,
+        "services & subscriptions": .need,
+        "bills & finance": .need,
+        "dining & entertainment": .want,
+        "shopping & lifestyle": .want,
+        "other": .want,
+    ]
+
+    /// Per-category bucket defaults that differ from their group's `groupBucketDefault` (lower-cased
+    /// keys): the discretionary members of otherwise-essential groups (travel, subscriptions, gifts,
+    /// one-off services, beauty) and the two money-set-aside categories that anchor the Savings
+    /// bucket. All remain user-overridable in Manage categories. Ported from Android.
+    private static let categoryBucketDefault: [String: CategoryBucket] = [
+        "travel & accommodation": .want,
+        "subscriptions": .want,
+        "gifts & charitable donations": .want,
+        "services": .want,
+        "beauty": .want,
+        "savings": .savings,
+        "investments": .savings,
+    ]
+
+    /// The code-defined 50/30/20 bucket for `name` (case-insensitive), ignoring any user override: an
+    /// explicit per-category default wins, else the category's group default (keyed by its
+    /// `defaultParentOf` group or itself when top-level), else `.want`. Mirrors Android's
+    /// `Categories.defaultBucketOf`.
+    static func defaultBucket(of name: String) -> CategoryBucket {
+        if let b = categoryBucketDefault[name.lowercased()] { return b }
+        let group = (defaultParentOf(name) ?? name).lowercased()
+        return groupBucketDefault[group] ?? .want
+    }
+
+    /// The *effective* Needs/Wants/Savings bucket of `name`, given the stored `Category` rows
+    /// (`byName`, keyed by lower-cased name): an explicit tag on the category wins, else a non-nil
+    /// tag on its effective parent — so a sub-category inherits its group's bucket — else the code
+    /// default. Reads live from the rows, so re-tagging a category reclassifies its past months.
+    /// Ported 1:1 from Android's `effectiveBucketOf(name, byName)`.
+    static func effectiveBucket(of name: String, in byName: [String: Category]) -> CategoryBucket {
+        let row = byName[name.lowercased()]
+        if let raw = row?.bucket, let b = CategoryBucket(rawValue: raw) { return b }
+        let parent = (row?.parent).flatMap { $0.isEmpty ? nil : $0 } ?? defaultParentOf(name)
+        if let parent, let raw = byName[parent.lowercased()]?.bucket, let b = CategoryBucket(rawValue: raw) {
+            return b
+        }
+        return defaultBucket(of: name)
+    }
+
+    /// Index `Category` rows by lower-cased name (first wins on a collision) — the `byName` map
+    /// `effectiveBucket(of:in:)` reads. Shared by the split derivation and the Manage-categories UI.
+    static func index(_ rows: [Category]) -> [String: Category] {
+        Dictionary(rows.map { ($0.name.lowercased(), $0) }, uniquingKeysWith: { first, _ in first })
+    }
+
     /// True if `name` is a built-in category (group, sub-category, or "Other"), case-insensitive.
     static func isPredefined(_ name: String) -> Bool {
         predefined.contains { $0.name.caseInsensitiveCompare(name) == .orderedSame }

@@ -1712,3 +1712,67 @@ amounts, so restored numbers rendered under the wrong symbol. Ported from the An
 `:app:testDebugUnitTest` + `:app:detekt` green. iOS `feat/backup-includes-preferences` `18a9ddd` —
 `xcodebuild build` + `test` succeeded (12 tests, 0 failures). Both branches pushed to origin
 2026-09-09, awaiting user-opened PR.
+
+---
+
+## Android → iOS — Insights Needs / Wants / Savings 50/30/20 split — 2026-09-10
+
+Ports the 50/30/20 rule split from Android `feat/needs-wants-split` (`327eed2` the split + trend +
+category bucket tagging, `d237fb9` the one-time "what counts as Savings?" ask). Logic ported from the
+Android **`InsightsViewModel` derivation + repos** (never from Compose); the visual language is matched
+to the Liquid Glass mockups `iOS NeedsWantsSplit.dc.html` / `iOS SavingsAllocationAsk.dc.html` via
+DesignSync. iOS branch `feat/needs-wants-split` off `main`.
+
+- **Bucket model** — `CategoryBucket { need, want, savings }` (`Budgetty/Category/CategoryBucket.swift`),
+  a plain enum whose `rawValue` (`NEED/WANT/SAVINGS`) matches Android's enum names so a cross-platform
+  backup round-trips the tag. Nullable `Category.bucket: String?` added (mirrors `parent`) — a
+  **lightweight SwiftData migration** (optional attribute, no schema-version bump, no `UserStore.models`
+  edit), existing rows stay `nil` and resolve from code. Android parity: Room v27 `categories.bucket`.
+- **Taxonomy** — `Categories.defaultBucket(of:)` + the `groupBucketDefault` / `categoryBucketDefault`
+  maps (ported 1:1), and the pure `Categories.effectiveBucket(of:in:)` (own tag → parent's tag → code
+  default; live, so re-tagging reclassifies past months). `CategoryOps.setBucket` mirrors `setParent`.
+- **Derivation** — `Budgetty/Support/NeedsWantsSplit.swift`: a pure, unit-tested `NeedsWantsSplitMath`
+  with the `NeedsWantsSplit` / `BucketShare` / `BucketMonth` / `SplitTone` / `BucketDeltaStatus` /
+  `SavingsAllocation` value types. Income basis; Needs/Wants from category tags; Savings = Savings-tagged
+  spend + net goal contributions in the window (or, under "count kept", income − Needs − Wants). Trailing
+  closed-month trend stops at the first income-less month. Exactly mirrors `computeSplit` /
+  `computeBucketTrend` — 14 new tests double as a cross-platform parity check.
+- **UI** — `Budgetty/Scenes/Insights/NeedsWantsSplitCard.swift`: the split card (fixed 50/80 target ticks,
+  bucket rows with delta pills, the setup state), the closed-month `BucketTrendCard` (Savings on top of
+  each column vs a dashed 20% line), the inline `SavingsAllocationAsk`, and the `SavingsAllocationSettingsSection`
+  grouped-list "change later" control. Wired into `InsightsView` (new derived state + a `needsWantsSavings`
+  section in all three layouts) and `InsightsCustomize` (new `InsightSection.needsWantsSavings` + the
+  settings group). Tagging: a `GlassSegmentedControl` [Need|Want|Savings] under every row in
+  `ManageCategoriesView` (built-in groups, subs, customs), preselected to the effective bucket.
+- **Localization** — 42 keys × 16 locales ported from Android `values-*/strings.xml` into
+  `Localizable.xcstrings`; positional specifiers preserved in translations (a language may reorder args),
+  literal percents doubled (`%%`) to match SwiftUI's key extraction.
+
+**Justified iOS deviations from Android:**
+- **No ViewModel** — the split/trend math lives in a pure `Support/` struct consumed by `InsightsView`
+  computed vars (the app's `SavingsMath`/`StreakEngine` pattern), not an `InsightsViewModel`.
+- **Setup CTA points to Budget (income), not "Tag categories".** The iOS mockup `1e` still shows the old
+  "Tag categories" flow, but the shipped Android build deliberately made income the precondition (built-ins
+  are pre-tagged) — parity follows the shipped Android behavior, not the stale mockup.
+- **Tri-state stored as an Int** (`0` unset / `1` count-kept / `2` set-aside) via `@AppStorage`
+  (`SettingsKey.nwsSavingsAllocation`), because `@AppStorage` can't observe a nullable `Bool`; the
+  `SavingsAllocation.countLeftoverAsSavings` bridge reproduces Android's nullable-Bool semantics. Per-user
+  (reset on sign-out, so the next account is re-asked).
+- **New section, not a replacement.** Android replaced its `FIXED_FLEXIBLE` card; iOS never had one, so
+  `needsWantsSavings` is a net-new Insights section added to the iPhone stack **and** both hardcoded iPad
+  masonry stacks (`regularStack` / `wideStack`).
+- **Bucket accents are Swift `Palette` tokens** byte-matched to Android's bucket hues; the "leftover" track
+  uses the iOS mockup's `--lft` neutral. The tagging control reuses the shared `GlassSegmentedControl`
+  (app-consistent; Android likewise reused its `SegmentedToggle`), so the selected segment isn't
+  bucket-tinted like mockup `1f`. The period pill is omitted from the card header (the period lives in the
+  Insights stepper; the iOS mockup put it at screen level).
+- **Trend subtitle** is a two-key `count == 1 ? … : …` ternary (`"%lld closed month"` / `"%lld closed
+  months"`) rather than a String Catalog plural; a couple of number-only labels and the "How Savings is
+  counted" settings header have no 1:1 Android key and fall back to English (everything else is localized
+  ×16).
+
+**Status:** iOS `feat/needs-wants-split` — `xcodebuild build` green and the **full suite (292 tests,
+34 suites, 0 failures)** passes; device-verified on iPhone 17 Pro (setup/UNSET ask → "count what I keep"
+→ populated count-kept with correct delta pills/summary/CTA; category tagging with live parent→sub
+inheritance and no disclosure-tap conflict; German localization). Android side built + device-verified on
+Pixel 6, both unmerged. Pushed to origin, awaiting user-opened PR.

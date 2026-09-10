@@ -68,6 +68,12 @@ enum SettingsKey {
     /// Whether the one-time "Insights and Home disagree — overlay planned bills?" discovery nudge has
     /// been dismissed. Per-user. Android parity: `SettingsStore` KEY_OVERLAY_NUDGE_DISMISSED.
     static let insightsOverlayNudgeDismissed = "insights.overlayNudgeDismissed"
+    /// How the Insights 50/30/20 split counts Savings. Tri-state (Android's nullable Bool, expressed
+    /// as an Int so `@AppStorage` can observe it): 0 = not asked yet (the split shows a one-time
+    /// inline ask), 1 = count everything kept (income − Needs − Wants), 2 = only deliberate savings
+    /// (goal transfers + Savings-tagged spend). Per-user (reset on sign-out). Android parity:
+    /// `SettingsStore` KEY_NWS_COUNT_LEFTOVER (see `SavingsAllocation`).
+    static let nwsSavingsAllocation = "insights.nwsSavingsAllocation"
 }
 
 /// Wipes every setting tied to the signed-in account — the app-lock PIN + biometric, the one-time
@@ -96,6 +102,9 @@ enum UserState {
             // next account on a shared device starts with the overlay off and the nudge fresh.
             SettingsKey.insightsIncludeRecurringBills,
             SettingsKey.insightsOverlayNudgeDismissed,
+            // The 50/30/20 split's Savings-allocation choice — reset so the next account on a shared
+            // device is asked fresh (the split shows its one-time inline ask again).
+            SettingsKey.nwsSavingsAllocation,
             HomeLayoutStore.orderKey,
             HomeLayoutStore.hiddenKey,
             InsightsLayoutStore.orderKey,

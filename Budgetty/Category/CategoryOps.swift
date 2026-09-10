@@ -90,6 +90,25 @@ enum CategoryOps {
         refreshTaxonomy(context)
     }
 
+    /// Tag `name` with a Needs/Wants/Savings `bucket` (nil clears the tag, reverting to the code
+    /// default) — drives the Insights 50/30/20 split. Built-ins are seeded as rows, so the tag stores
+    /// on the existing row; but if a predefined somehow has no row yet, insert one carrying its
+    /// predefined colour/emoji first (like Android's `setBucket`), so the tag sticks even for a
+    /// category that was code-only. A sub-category with no tag of its own follows its group.
+    @MainActor
+    static func setBucket(_ context: ModelContext, name: String, to bucket: CategoryBucket?) {
+        if let row = row(context, named: name) {
+            row.bucket = bucket?.rawValue
+        } else if Categories.isPredefined(name) {
+            context.insert(Category(name: name, colorArgb: Categories.color(for: name),
+                                    icon: Categories.emoji(for: name), bucket: bucket?.rawValue))
+        } else {
+            return
+        }
+        try? context.save()
+        refreshTaxonomy(context)
+    }
+
     // MARK: - Helpers
 
     /// A parent is only meaningful if it's non-empty and not the category itself.
