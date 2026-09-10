@@ -54,11 +54,20 @@ enum FirebaseBootstrap {
         if FirebaseApp.app() == nil { FirebaseApp.configure() }
 
         // Point Crashlytics at the user's stored choice immediately after configure(), so collection
-        // reflects an opt-out before any code that could crash runs. Default-on — see CrashReporting.
+        // reflects it before any code that could crash runs. Opt-in, default-off — see CrashReporting.
         CrashReporting.applyStoredPreference()
-        // Same for product analytics: apply the persisted opt-out (separate toggle, default-on) to the
-        // Analytics SDK at startup so collection follows the user's choice before any event fires (§0).
+        // Same for product analytics: apply the persisted choice (separate toggle, opt-in default-off)
+        // to the Analytics SDK at startup so collection follows the user's choice before any event
+        // fires (§0).
         Analytics.applyStoredPreference()
+        // Belt-and-suspenders for the opt-in consent gate: until the user has made the first-run choice
+        // (`AnalyticsConsentView`), force BOTH SDKs off — never collect before the choice. With the
+        // defaults flipped to false the applyStoredPreference calls above already yield off, but this
+        // makes "off until decided" explicit and independent of those defaults never regressing.
+        if UserDefaults.standard.object(forKey: SettingsKey.analyticsConsentDecided) as? Bool != true {
+            Analytics.setEnabled(false)
+            CrashReporting.setEnabled(false)
+        }
 
         // Migration: earlier builds used anonymous sessions, which are no longer supported. Sign out
         // any lingering anonymous user so they land on the login screen like Android.

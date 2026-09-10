@@ -1,6 +1,28 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "Help improve Budgetty" : {},
+    "Two things you can share, if you want to. Both are off until you turn them on." : {},
+    "Usage analytics" : {},
+    "Anonymous data about which features you use, so we can improve Budgetty. Never your receipts, amounts, or personal info." : {},
+    "Crash & diagnostics" : {},
+    "Automatic crash reports and performance data so we can fix problems faster." : {},
+    "What we collect, and never" : {},
+    "Collected" : {},
+    "Never" : {},
+    "Which screens you open" : {},
+    "Which features you use" : {},
+    "Crash reports" : {},
+    "App speed and errors" : {},
+    "Device model, OS version" : {},
+    "Your receipts" : {},
+    "Any amounts" : {},
+    "Your income" : {},
+    "Your identity" : {},
+    "Reports are tied to a random ID, not to you or your account, and you can turn either one off at any time in Settings." : {},
+    "No financial data ever leaves your device." : {},
+    "Not now" : {},
+    "Data & Privacy" : {},
     "Over by %lld" : {
       "localizations" : {
         "bg" : {

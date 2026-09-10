@@ -24,6 +24,9 @@ struct BudgettyApp: App {
     @AppStorage(SettingsKey.appearance) private var appearanceRaw = AppearancePref.system.rawValue
     @AppStorage(SettingsKey.onboarded) private var onboarded = false
     @AppStorage(SettingsKey.quizPending) private var quizPending = false
+    /// First-run telemetry consent gate: show `AnalyticsConsentView` until the user has decided. Set
+    /// by that screen and by enabling either telemetry toggle in Account. Device-global (opt-in).
+    @AppStorage(SettingsKey.analyticsConsentDecided) private var analyticsConsentDecided = false
 
     /// First-run gate: show Onboarding until completed. DEBUG env can force either way for previews.
     private var showOnboarding: Bool {
@@ -102,6 +105,8 @@ struct BudgettyApp: App {
                     LoginView()
                 } else if showQuiz {
                     InsightsQuizView(onComplete: { quizPending = false })
+                } else if !analyticsConsentDecided {
+                    AnalyticsConsentView()
                 } else {
                     AppLockGate { RootView() }
                 }
