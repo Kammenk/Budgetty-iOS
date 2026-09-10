@@ -46,6 +46,11 @@ enum FirebaseBootstrap {
             print("[Budgetty] Firebase not configured — GoogleService-Info.plist missing.")
             return false
         }
+        // App Check hardening (MONITOR mode): register the attestation provider factory BEFORE
+        // configure(), so App Check picks it up as it initializes. Release attests with App Attest
+        // (DeviceCheck fallback); DEBUG/simulator uses the debug provider. This only attaches tokens
+        // client-side — no console/server enforcement changes here — so it's fully non-breaking.
+        AppCheckConfig.installProviderFactory()
         if FirebaseApp.app() == nil { FirebaseApp.configure() }
 
         // Point Crashlytics at the user's stored choice immediately after configure(), so collection
