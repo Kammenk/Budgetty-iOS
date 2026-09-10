@@ -33,13 +33,24 @@ final class Category {
     /// resolving from code until a user nests something.
     var parent: String?
 
+    /// The Needs / Wants / Savings bucket this category's spend counts toward in the Insights
+    /// 50/30/20 split, stored as a `CategoryBucket.rawValue` ("NEED" / "WANT" / "SAVINGS"). `nil`
+    /// means "use the default": a built-in resolves to `Categories.defaultBucket(of:)` (its group's
+    /// bucket, with a handful of per-category exceptions) and a sub-category inherits its parent's;
+    /// a non-null value is the user's explicit choice in Manage categories. Like `parent` it is
+    /// user-editable and lightweight-migratable — existing rows stay `nil` and the bucket keeps
+    /// resolving from code until a user tags something. The effective bucket is derived live (see
+    /// `Categories.effectiveBucket(of:in:)`), so re-tagging a category reclassifies its past months.
+    var bucket: String?
+
     init(
         name: String,
         colorArgb: Int,
         icon: String = "",
         isCustom: Bool = false,
         createdAt: Date = .distantPast,
-        parent: String? = nil
+        parent: String? = nil,
+        bucket: String? = nil
     ) {
         self.name = name
         self.colorArgb = colorArgb
@@ -47,5 +58,6 @@ final class Category {
         self.isCustom = isCustom
         self.createdAt = createdAt
         self.parent = parent
+        self.bucket = bucket
     }
 }

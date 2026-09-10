@@ -38,6 +38,9 @@ struct InsightsView: View {
     @AppStorage(SettingsKey.insightsIncludeRecurringBills) private var includeRecurringBills = false
     /// One-time discovery nudge dismissal ("Insights and Home disagree?").
     @AppStorage(SettingsKey.insightsOverlayNudgeDismissed) private var overlayNudgeDismissed = false
+    /// The 50/30/20 split's Savings-allocation choice: 0 = not asked yet (the split shows its inline
+    /// ask), 1 = count everything kept, 2 = only deliberate savings. See `SavingsAllocation`.
+    @AppStorage(SettingsKey.nwsSavingsAllocation) private var nwsAllocRaw = 0
     /// The section explainer sheet the "Planned" badge opens (nil = none). No Summary case: the iOS
     /// stat grid ships with no header row to hang a badge on, and nothing in it changes with the layer.
     @State private var plannedDialog: PlannedDialog?
@@ -233,6 +236,7 @@ struct InsightsView: View {
         case .trend: trendCard
         case .breakdown: breakdownCard
         case .stats: statGrid
+        case .needsWantsSavings: needsWantsSplitSection
         case .highlights: highlightsSection
         case .comparison: comparisonSection
         case .topCategories: topCategoriesCard
@@ -285,6 +289,8 @@ struct InsightsView: View {
             } else {
                 RegularColumns {
                     trendCard
+                    nwsSplitCard
+                    nwsTrendCard
                     statGrid
                     highlightsSection
                     topCategoriesCard
@@ -312,6 +318,8 @@ struct InsightsView: View {
             } else {
                 ThreeColumns {
                     trendCard
+                    nwsSplitCard
+                    nwsTrendCard
                     statGrid
                     highlightsSection
                 } second: {
@@ -448,6 +456,85 @@ struct InsightsView: View {
     private var periodItems: [LineItem] { periodReceipts.flatMap(\.items) }
     private var totalSpent: Decimal { periodReceipts.reduce(.zero) { $0 + $1.paidTotal } }
     private var totalSaved: Decimal { periodReceipts.reduce(.zero) { $0 + $1.discount } }
+
+    // MARK: - Needs / Wants / Savings 50/30/20 split (Android parity)
+
+    /// The split card (+ its trend beneath it) as one reorderable Insights section on iPhone.
+    @ViewBuilder private var needsWantsSplitSection: some View {
+        VStack(spacing: 14) {
+            nwsSplitCard
+            nwsTrendCard
+        }
+    }
+
+    /// The split card itself — shared by the iPhone section and the iPad columns. Shows the setup
+    /// state when there's no income to measure against (`needsWantsSplit == nil`).
+    private var nwsSplitCard: some View {
+        NeedsWantsSplitCard(split: needsWantsSplit) { keep in nwsAllocRaw = keep ? 1 : 2 }
+    }
+
+    /// The closed-month trend, only beneath a populated split with enough months. iPad shows the
+    /// per-column savings %.
+    @ViewBuilder private var nwsTrendCard: some View {
+        if showsBucketTrend {
+            BucketTrendCard(months: bucketTrend, showMonthLabels: hSize == .regular)
+        }
+    }
+
+    private var nwsAllocation: SavingsAllocation { SavingsAllocation(rawValue: nwsAllocRaw) ?? .unset }
+
+    /// This period's planned income (income recurring scaled to the window via `windowAmount`) — the
+    /// 50/30/20 denominator, matching `IncomeInsightsCards.periodIncome`.
+    private var periodIncome: Decimal {
+        recurring.filter(\.isIncome).reduce(.zero) { $0 + $1.windowAmount(period.interval) }
+    }
+
+    /// Spend per raw category across `rs` (line totals, as the Breakdown attributes category spend).
+    private func spendByCategory(_ rs: [Receipt]) -> [String: Decimal] {
+        var sums: [String: Decimal] = [:]
+        for item in rs.flatMap(\.items) { sums[item.category, default: .zero] += item.lineTotal }
+        return sums
+    }
+
+    /// Net (signed) savings-goal contributions dated within `window` — deposits add, withdrawals net.
+    private func savingsContributed(in window: DateInterval) -> Decimal {
+        contributions.filter { window.contains($0.date) }.reduce(.zero) { $0 + $1.amount }
+    }
+
+    /// The split for the selected period; nil → the setup state (no income to measure against).
+    private var needsWantsSplit: NeedsWantsSplit? {
+        NeedsWantsSplitMath.split(
+            income: periodIncome,
+            spendByCategory: spendByCategory(periodReceipts),
+            categories: storedCategories,
+            savingsContributed: savingsContributed(in: period.interval),
+            countLeftoverAsSavings: nwsAllocation.countLeftoverAsSavings
+        )
+    }
+
+    /// The split across the last closed pay-cycle months (oldest first), independent of the selected
+    /// period. Walks back month by month; the run stops at the first month with no income plan.
+    private var bucketTrend: [BucketMonth] {
+        let f = DateFormatter(); f.dateFormat = "MMM"
+        let incomeRows = recurring.filter(\.isIncome)
+        let months: [NeedsWantsSplitMath.MonthInput] =
+            (1...NeedsWantsSplitMath.trendMonths).map { back in
+                let window = InsightsPeriod.stepped(unit: .month, offset: -back).interval
+                let rs = receipts.filter { window.contains($0.createdAt) }
+                return NeedsWantsSplitMath.MonthInput(
+                    axisLabel: f.string(from: window.start),
+                    income: incomeRows.reduce(.zero) { $0 + $1.windowAmount(window) },
+                    spendByCategory: spendByCategory(rs),
+                    savingsContributed: savingsContributed(in: window)
+                )
+            }
+        return NeedsWantsSplitMath.trend(recentFirst: months, categories: storedCategories)
+    }
+
+    /// The trend card renders only beneath a populated split and with enough closed months.
+    private var showsBucketTrend: Bool {
+        needsWantsSplit != nil && bucketTrend.count >= NeedsWantsSplitMath.minTrendMonths
+    }
 
     // MARK: - Planned recurring-bills overlay (Android parity)
 

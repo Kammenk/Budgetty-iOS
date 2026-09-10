@@ -10,7 +10,7 @@
 import SwiftUI
 
 enum InsightSection: String, CaseIterable, Identifiable {
-    case trend, breakdown, stats, highlights, comparison, topCategories, topStores,
+    case trend, breakdown, stats, needsWantsSavings, highlights, comparison, topCategories, topStores,
          biggestPurchases, income, subscriptions
     var id: String { rawValue }
 
@@ -19,6 +19,7 @@ enum InsightSection: String, CaseIterable, Identifiable {
         case .trend: "Trend"
         case .breakdown: "Breakdown"
         case .stats: "Stats"
+        case .needsWantsSavings: "Needs · Wants · Savings"
         case .highlights: "Highlights"
         case .comparison: "Period comparison"
         case .topCategories: "Top categories"
@@ -34,6 +35,7 @@ enum InsightSection: String, CaseIterable, Identifiable {
         case .trend: "chart.bar.fill"
         case .breakdown: "chart.pie.fill"
         case .stats: "square.grid.2x2.fill"
+        case .needsWantsSavings: "percent"
         case .highlights: "sparkles"
         case .comparison: "arrow.left.arrow.right"
         case .topCategories: "list.number"
@@ -76,6 +78,10 @@ struct InsightsCustomizeSheet: View {
     var body: some View {
         NavigationStack {
             List {
+                // How the 50/30/20 split counts Savings — the change-later counterpart to the split's
+                // one-time inline ask. Above Layers, matching Android's Customize header order.
+                SavingsAllocationSettingsSection()
+
                 Section {
                     Toggle(isOn: $includeRecurringBills) {
                         HStack(spacing: 12) {

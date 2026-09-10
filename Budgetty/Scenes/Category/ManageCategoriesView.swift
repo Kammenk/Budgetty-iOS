@@ -98,7 +98,10 @@ struct ManageCategoriesView: View {
                     .font(.subheadline).foregroundStyle(.secondary)
             } else {
                 ForEach(customs) { c in
-                    Button { editing = c } label: { customRow(c) }.buttonStyle(.plain)
+                    VStack(alignment: .leading, spacing: 10) {
+                        Button { editing = c } label: { customRow(c) }.buttonStyle(.plain)
+                        bucketControl(c.name)
+                    }
                 }
             }
             Button {
@@ -161,10 +164,16 @@ struct ManageCategoriesView: View {
                         Text("No sub-categories").font(.caption).foregroundStyle(.secondary)
                     }
                     ForEach(g.subs) { sub in
-                        subRow(sub, movable: g.name != Categories.other)
+                        VStack(alignment: .leading, spacing: 10) {
+                            subRow(sub, movable: g.name != Categories.other)
+                            bucketControl(sub.name)
+                        }
                     }
                 } label: {
-                    groupLabel(g)
+                    VStack(alignment: .leading, spacing: 10) {
+                        groupLabel(g)
+                        bucketControl(g.name)
+                    }
                 }
             }
         } header: {
@@ -214,6 +223,29 @@ struct ManageCategoriesView: View {
             .fill(Color(argb: Categories.color(for: name)))
             .frame(width: size, height: size)
             .overlay(Text(Categories.emoji(for: name)).font(.system(size: size * 0.5)))
+    }
+
+    /// The Needs / Wants / Savings tagging control beneath a category row — preselected to the
+    /// category's effective bucket; picking a segment stores an explicit override (a sub-category
+    /// with no tag of its own follows its group until one is set). Drives the Insights 50/30/20
+    /// split. Android parity: `CategoryBucketToggle`.
+    private func bucketControl(_ name: String) -> some View {
+        GlassSegmentedControl(
+            options: CategoryBucket.allCases,
+            selection: Binding(
+                get: { Categories.effectiveBucket(of: name, in: Categories.index(categories)) },
+                set: { CategoryOps.setBucket(context, name: name, to: $0) }
+            ),
+            title: bucketTitle
+        )
+    }
+
+    private func bucketTitle(_ bucket: CategoryBucket) -> LocalizedStringKey {
+        switch bucket {
+        case .need: "Need"
+        case .want: "Want"
+        case .savings: "Savings"
+        }
     }
 
     private func expandedBinding(_ name: String) -> Binding<Bool> {

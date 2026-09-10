@@ -78,6 +78,9 @@ enum A11y {
         static let customize = "insights_customize"
         static let periodPrev = "insights_period_prev"
         static let periodNext = "insights_period_next"
+        // Needs/Wants/Savings 50/30/20 split.
+        static let nwsSetupCTA = "insights_nws_setup_cta"
+        static let nwsAskKeep = "insights_nws_ask_keep"
     }
 
     enum Paywall {
