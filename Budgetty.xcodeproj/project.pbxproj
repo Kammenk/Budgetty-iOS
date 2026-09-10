@@ -12,6 +12,7 @@
 		FB1000000000000000000005 /* FirebaseAuth in Frameworks */ = {isa = PBXBuildFile; productRef = FB1000000000000000000003 /* FirebaseAuth */; };
 		FB1000000000000000000007 /* FirebaseCrashlytics in Frameworks */ = {isa = PBXBuildFile; productRef = FB1000000000000000000006 /* FirebaseCrashlytics */; };
 		FB100000000000000000000A /* FirebaseAnalytics in Frameworks */ = {isa = PBXBuildFile; productRef = FB1000000000000000000009 /* FirebaseAnalytics */; };
+		FB100000000000000000000B /* FirebaseAppCheck in Frameworks */ = {isa = PBXBuildFile; productRef = FB100000000000000000000C /* FirebaseAppCheck */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -91,6 +92,7 @@
 				FB1000000000000000000005 /* FirebaseAuth in Frameworks */,
 				FB1000000000000000000007 /* FirebaseCrashlytics in Frameworks */,
 				FB100000000000000000000A /* FirebaseAnalytics in Frameworks */,
+				FB100000000000000000000B /* FirebaseAppCheck in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -158,6 +160,7 @@
 				FB1000000000000000000003 /* FirebaseAuth */,
 				FB1000000000000000000006 /* FirebaseCrashlytics */,
 				FB1000000000000000000009 /* FirebaseAnalytics */,
+				FB100000000000000000000C /* FirebaseAppCheck */,
 			);
 			productName = Budgetty;
 			productReference = 69BE825E2FFB885100006F98 /* Budgetty.app */;
@@ -718,6 +721,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = FB1000000000000000000001 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
 			productName = FirebaseAnalytics;
+		};
+		FB100000000000000000000C /* FirebaseAppCheck */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = FB1000000000000000000001 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseAppCheck;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};
