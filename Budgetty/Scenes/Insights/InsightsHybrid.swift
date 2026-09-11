@@ -339,37 +339,6 @@ struct OverviewSetupChecklist: View {
     }
 }
 
-/// One compact pill toggle-chip (planned-layers / savings mode): a mini track+knob and a label, the whole
-/// chip toggling `checked`. Android parity: `OverviewToggleChip`.
-struct OverviewToggleChip: View {
-    let checked: Bool
-    let label: String
-    let onToggle: () -> Void
-
-    var body: some View {
-        Button(action: onToggle) {
-            HStack(spacing: 8) {
-                ZStack(alignment: checked ? .trailing : .leading) {
-                    Capsule().fill(checked ? Palette.tint : Palette.tertiaryLabel)
-                        .frame(width: 26, height: 15)
-                    Circle().fill(Color.white).frame(width: 11, height: 11).padding(.horizontal, 2)
-                }
-                Text(label)
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(checked ? Palette.label : Palette.secondaryLabel)
-                    .lineLimit(1)
-            }
-            .frame(maxWidth: .infinity)
-            .padding(.horizontal, 12).padding(.vertical, 9)
-            .background(Palette.tertiaryBackground, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .accessibilityAddTraits(checked ? [.isSelected, .isButton] : .isButton)
-        .accessibilityLabel(Text(label))
-    }
-}
-
 // MARK: - Per-tab invitations & empties (P8)
 
 /// A friendly per-tab invitation card: an icon, a title, one line, and a verb-first CTA — shown in place

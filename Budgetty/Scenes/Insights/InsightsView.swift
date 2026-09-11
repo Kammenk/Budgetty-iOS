@@ -148,9 +148,11 @@ struct InsightsView: View {
     /// button (once a recap is ready). Under accessibility Dynamic Type the recap button drops first (the
     /// one optional control) so the title and pip keep their room. D6: no Customize control.
     private var insightsToolbar: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: 12) {
             Text("Insights").font(.largeTitle).fontWeight(.bold)
             Spacer(minLength: 8)
+            // The two toolbar controls keep clear air between them (they read as separate affordances,
+            // not one cluster).
             if let score = wellbeingSummary.score.score {
                 NavigationLink { WellbeingView() } label: { WellbeingScorePip(score: score) }
                     .buttonStyle(.plain)
@@ -227,7 +229,7 @@ struct InsightsView: View {
             if !groupSlices.isEmpty { overviewTopSpending }
             if !overviewHighlights.isEmpty || projectedTotal != nil { overviewWorthKnowing }
             OverviewSetupChecklist(items: activeSetupItems, onAction: onSetupAction, onDismiss: onSetupDismiss)
-            overviewChips
+            overviewOptions
         }
     }
 
@@ -319,30 +321,48 @@ struct InsightsView: View {
         .contentCard(cornerRadius: 16)
     }
 
-    /// The two global quick-toggle chips: the planned-bills overlay (when there are bills) and the
-    /// Needs/Wants savings-allocation mode (once a split exists and the mode is set). Android parity:
-    /// `OverviewToggleChips`.
+    /// The two global Overview options, as full settings-style rows in one card (the mockup treatment):
+    /// the planned-bills overlay switch (when there are bills to overlay) and the Needs/Wants savings-
+    /// allocation mode (once a split exists and the mode is set — the first choice is made through the
+    /// checklist). Each row names what it does and gives a real, comfortably-sized control. Android
+    /// parity: `OverviewOptionsCard`.
     @ViewBuilder
-    private var overviewChips: some View {
+    private var overviewOptions: some View {
         let showPlanned = hasBills
         let showSavings = needsWantsSplit != nil && nwsAllocation != .unset
         if showPlanned || showSavings {
-            HStack(spacing: 8) {
+            VStack(spacing: 0) {
                 if showPlanned {
-                    OverviewToggleChip(checked: includeRecurringBills,
-                                       label: String(localized: "Planned layers")) {
-                        includeRecurringBills.toggle()
+                    Toggle(isOn: $includeRecurringBills) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Include recurring bills").font(.subheadline).foregroundStyle(Palette.label)
+                            Text("Overlay planned bills as a separate layer")
+                                .font(.caption).foregroundStyle(Palette.secondaryLabel)
+                        }
                     }
+                    .tint(Palette.tint)
+                    .padding(.vertical, 12)
+                    if showSavings { Divider() }
                 }
                 if showSavings {
                     let kept = nwsAllocation == .countKept
-                    OverviewToggleChip(checked: kept,
-                                       label: kept ? String(localized: "Savings: Kept")
-                                                   : String(localized: "Savings: Set aside")) {
-                        nwsAllocRaw = kept ? 2 : 1
+                    Button { nwsAllocRaw = kept ? 2 : 1 } label: {
+                        HStack(spacing: 12) {
+                            Text("Savings").font(.subheadline).foregroundStyle(Palette.label)
+                            Spacer(minLength: 8)
+                            Text(kept ? "Count what I keep" : "Only money I set aside")
+                                .font(.subheadline).foregroundStyle(Palette.secondaryLabel)
+                                .lineLimit(1).minimumScaleFactor(0.8)
+                            Image(systemName: "chevron.up.chevron.down")
+                                .font(.caption2.weight(.semibold)).foregroundStyle(Palette.tertiaryLabel)
+                        }
+                        .padding(.vertical, 12).contentShape(Rectangle())
                     }
+                    .buttonStyle(.plain)
                 }
             }
+            .padding(.horizontal, 16)
+            .contentCard(cornerRadius: 16)
         }
     }
 
