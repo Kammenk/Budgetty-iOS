@@ -185,13 +185,24 @@ struct InsightsTabBar: View {
         let selected = tab == selection
         return Text(tab.title)
             .font(.system(size: 14, weight: selected ? .semibold : .regular))
-            .foregroundStyle(selected ? Color.white : Palette.secondaryLabel)
+            .foregroundStyle(selected ? Palette.label : Palette.secondaryLabel)
             .lineLimit(1)
             .padding(.vertical, 8)
             .padding(.horizontal, 15)
+            // Match the History screen's segmented control (Receipts / Items / Budgets): the selected
+            // pill is a raised glass `matControl` capsule with a specular top edge and a soft shadow,
+            // the rest sit flat on a subtle fill — a tonal selection, not a bright tint (mirrors the
+            // muted `secondaryContainer` selection on Android).
             .background {
                 if selected {
-                    Capsule().fill(Palette.tint).shadow(color: Palette.tint.opacity(0.34), radius: 8, y: 2)
+                    Capsule().fill(Palette.matControl)
+                        .background(.ultraThinMaterial, in: Capsule())
+                        .overlay(Capsule().strokeBorder(
+                            LinearGradient(stops: [.init(color: Palette.glassSpecular, location: 0),
+                                                   .init(color: .clear, location: 0.5)],
+                                           startPoint: .top, endPoint: .bottom),
+                            lineWidth: 1))
+                        .shadow(color: .black.opacity(0.16), radius: 2.5, y: 1.5)
                 } else {
                     Capsule().fill(Palette.fill)
                 }
