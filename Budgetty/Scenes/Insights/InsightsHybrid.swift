@@ -414,10 +414,10 @@ struct PeriodEmptyState: View {
         VStack(spacing: 10) {
             Image(systemName: hasAnyData ? "calendar" : "chart.pie")
                 .font(.system(size: 32)).foregroundStyle(Palette.tertiaryLabel)
-            Text(hasAnyData ? "No spending in \(periodLabel)" : "Nothing to show yet")
+            Text(hasAnyData ? "No spending recorded for \(periodLabel)" : "No spending yet")
                 .font(.headline).foregroundStyle(Palette.label)
                 .multilineTextAlignment(.center)
-            Text(hasAnyData ? "Step to another period to see your spending." : "Scan a receipt to see your spending here.")
+            Text(hasAnyData ? "Try another period using the arrows above." : "Scan a receipt to start seeing your insights.")
                 .font(.subheadline).foregroundStyle(Palette.secondaryLabel)
                 .multilineTextAlignment(.center)
         }

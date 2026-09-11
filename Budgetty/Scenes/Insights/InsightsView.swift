@@ -81,17 +81,16 @@ struct InsightsView: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(spacing: 0) {
+                // The Hybrid five-tab model on both idioms: iPhone full-bleed, iPad the same column
+                // capped to a readable width and centred (the extra landscape room becomes side margin
+                // rather than a second pane — a platform-native simplification; see PARITY.md).
+                Group {
                     if hSize == .compact {
                         phoneHybrid
                     } else {
-                        insightsTitleRow.padding(.bottom, 2)
-                        if wide { wideStack } else { regularStack }
+                        phoneHybrid.adaptiveReadableWidth()
                     }
                 }
-                // Phone children manage their own horizontal insets (the tab bar bleeds to the edge);
-                // the iPad masonry keeps the shared 20pt gutter.
-                .padding(.horizontal, hSize == .compact ? 0 : 20)
                 .padding(.top, 6).padding(.bottom, 24)
             }
             .underFloatingDock()
@@ -159,15 +158,6 @@ struct InsightsView: View {
             if showRecapEntry && dynamicType < .accessibility1 {
                 RecapToolbarButton { showRecapReopen = true }
             }
-        }
-    }
-
-    /// The iPad title row (until the tablet Hybrid toolbar lands): the large title alone (D6 dropped the
-    /// Customize control).
-    private var insightsTitleRow: some View {
-        HStack {
-            Text("Insights").font(.largeTitle).fontWeight(.bold)
-            Spacer()
         }
     }
 
@@ -475,27 +465,11 @@ struct InsightsView: View {
     private var hasBills: Bool { recurring.contains { !$0.isIncome } }
     private var hasCustomBuckets: Bool { storedCategories.contains { $0.bucket != nil } }
 
-    /// The Wellbeing score's door — pinned directly under the stepper, above Breakdown, in every
-    /// layout. A fixed link, not a reorderable InsightSection (it costs the tab one row, not a block).
-    private var wellbeingEntry: some View {
-        NavigationLink { WellbeingView() } label: { WellbeingEntryRow(summary: wellbeingSummary) }
-            .buttonStyle(.plain)
-    }
-
+    /// The wellbeing summary behind the toolbar score pip (and its → Wellbeing link).
     private var wellbeingSummary: WellbeingSummary {
         WellbeingScan.run(receipts: receipts, budgets: budgets, recurring: recurring, goals: goals,
                           contributions: contributions, ignoredSubs: Set(ignoredRows.map(\.merchant)),
                           monthStartDay: monthStartDay)
-    }
-
-    /// The re-open-last-recap door — pinned just under the Wellbeing entry, shown only once a recap has
-    /// been generated for a closed period. Recomputes the story on demand as a full-screen cover.
-    @ViewBuilder
-    private var recapEntry: some View {
-        if !recapLastShownWeek.isEmpty || !recapLastShownMonth.isEmpty {
-            Button { showRecapReopen = true } label: { RecapReopenRow() }
-                .buttonStyle(.plain)
-        }
     }
 
     @ViewBuilder
@@ -544,65 +518,6 @@ struct InsightsView: View {
         if !purchases.isEmpty {
             BiggestPurchasesCard(purchases: purchases) { categoryColor($0) }
         }
-    }
-
-    /// iPad portrait: two masonry columns of the same cards, capped and centered.
-    private var regularStack: some View {
-        VStack(spacing: Dimens.regularColumnSpacing) {
-            stepper
-            wellbeingEntry
-            recapEntry
-            if periodReceipts.isEmpty {
-                emptyState
-            } else {
-                RegularColumns {
-                    trendCard
-                    nwsSplitCard
-                    nwsTrendCard
-                    statGrid
-                    highlightsSection
-                    topCategoriesCard
-                } right: {
-                    breakdownCard
-                    SubscriptionsCard()
-                    comparisonSection
-                    topStoresCard
-                    biggestSection
-                    incomeCards
-                }
-            }
-        }
-        .adaptiveReadableWidth(Dimens.wideContentMaxWidth)
-    }
-
-    /// iPad landscape: three masonry columns for the extra width.
-    private var wideStack: some View {
-        VStack(spacing: Dimens.regularColumnSpacing) {
-            stepper
-            wellbeingEntry
-            recapEntry
-            if periodReceipts.isEmpty {
-                emptyState
-            } else {
-                ThreeColumns {
-                    trendCard
-                    nwsSplitCard
-                    nwsTrendCard
-                    statGrid
-                    highlightsSection
-                } second: {
-                    breakdownCard
-                    comparisonSection
-                    topCategoriesCard
-                } third: {
-                    topStoresCard
-                    SubscriptionsCard()
-                    biggestSection
-                    incomeCards
-                }
-            }
-        }
-        .adaptiveReadableWidth(Dimens.landscapeContentMaxWidth)
     }
 
     // MARK: - Period
@@ -1253,13 +1168,4 @@ struct InsightsView: View {
         .contentCard(cornerRadius: 16)
     }
 
-    // MARK: - Empty
-
-    private var emptyState: some View {
-        VStack(spacing: 8) {
-            Image(systemName: "chart.pie").font(.system(size: 34)).foregroundStyle(Palette.tertiaryLabel)
-            Text("Nothing spent \(period.contextNoun)").font(.subheadline).foregroundStyle(Palette.secondaryLabel)
-        }
-        .frame(maxWidth: .infinity).padding(.top, 60)
-    }
 }
