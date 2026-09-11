@@ -1118,7 +1118,10 @@ struct InsightsView: View {
     private func statTile(_ title: LocalizedStringKey, _ value: String, color: Color) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(title).font(.caption).foregroundStyle(Palette.secondaryLabel)
+            // Keep the amount on one line in the narrow third-width tile — shrink to fit rather than
+            // wrap the currency symbol onto a second row (the iOS take on Android's marquee).
             Text(value).font(.title3).fontWeight(.bold).foregroundStyle(color)
+                .lineLimit(1).minimumScaleFactor(0.7)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(14)
