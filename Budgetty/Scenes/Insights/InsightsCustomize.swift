@@ -64,81 +64,8 @@ enum InsightsLayoutStore {
     static func csv(_ sections: Set<InsightSection>) -> String { sections.map(\.rawValue).joined(separator: ",") }
 }
 
-struct InsightsCustomizeSheet: View {
-    @Environment(\.dismiss) private var dismiss
-    @Binding var orderRaw: String
-    @Binding var hiddenRaw: String
-    /// The planned recurring-bills overlay opt-in. Off by default, remembered per user; flipping it
-    /// costs the Insights screen zero added height. Android parity: Customize → LAYERS.
-    @AppStorage(SettingsKey.insightsIncludeRecurringBills) private var includeRecurringBills = false
-
-    @State private var order: [InsightSection] = []
-    @State private var hidden: Set<InsightSection> = []
-
-    var body: some View {
-        NavigationStack {
-            List {
-                // How the 50/30/20 split counts Savings — the change-later counterpart to the split's
-                // one-time inline ask. Above Layers, matching Android's Customize header order.
-                SavingsAllocationSettingsSection()
-
-                Section {
-                    Toggle(isOn: $includeRecurringBills) {
-                        HStack(spacing: 12) {
-                            // The hatch swatch as the leading icon, so the sheet teaches the "planned"
-                            // texture before it appears on the charts.
-                            PlannedHatchSwatch(size: 20, corner: 5)
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text("Include recurring bills").foregroundStyle(Palette.label)
-                                Text("Overlay planned bills as a separate layer")
-                                    .font(.caption).foregroundStyle(Palette.secondaryLabel)
-                            }
-                        }
-                    }
-                    .tint(Palette.tint)
-                } header: {
-                    Text("Layers")
-                }
-
-                Section {
-                    ForEach(order) { section in
-                        HStack(spacing: 12) {
-                            Button {
-                                if hidden.contains(section) { hidden.remove(section) }
-                                else { hidden.insert(section) }
-                            } label: {
-                                Image(systemName: hidden.contains(section) ? "eye.slash.circle.fill" : "checkmark.circle.fill")
-                                    .font(.title3)
-                                    .foregroundStyle(hidden.contains(section) ? Palette.tertiaryLabel : Palette.good)
-                            }
-                            .buttonStyle(.borderless)
-                            Image(systemName: section.icon).foregroundStyle(Palette.tint).frame(width: 24)
-                            Text(section.title).foregroundStyle(Palette.label)
-                            Spacer()
-                        }
-                    }
-                    .onMove { order.move(fromOffsets: $0, toOffset: $1) }
-                } footer: {
-                    Text("Tap to show or hide a section. Use Edit to drag and reorder. Applies on iPhone.")
-                }
-            }
-            .navigationTitle("Customize Sections")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarLeading) { EditButton() }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Done") { save(); dismiss() }
-                }
-            }
-        }
-        .onAppear {
-            order = InsightsLayoutStore.order(orderRaw)
-            hidden = InsightsLayoutStore.hidden(hiddenRaw)
-        }
-    }
-
-    private func save() {
-        orderRaw = InsightsLayoutStore.csv(order)
-        hiddenRaw = InsightsLayoutStore.csv(hidden)
-    }
-}
+// The Hybrid redesign retired the whole-screen "Customize sections" sheet (D6): the fixed tabs are
+// fixed (D1), the Custom tab (`CustomSectionsSheet`) is the curation surface, and the overlay / savings
+// toggles are Overview quick-toggle chips. `InsightSection` + `InsightsLayoutStore` remain — the
+// onboarding quiz (`InsightsQuizView.applySetupQuiz`) and backup still read/write the order/hidden keys,
+// and the sign-out reset clears them.

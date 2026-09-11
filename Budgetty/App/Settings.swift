@@ -74,6 +74,16 @@ enum SettingsKey {
     /// (goal transfers + Savings-tagged spend). Per-user (reset on sign-out). Android parity:
     /// `SettingsStore` KEY_NWS_COUNT_LEFTOVER (see `SavingsAllocation`).
     static let nwsSavingsAllocation = "insights.nwsSavingsAllocation"
+    // ── Insights Hybrid tabs (Overview · Spending · Money · Trends · Custom) ──
+    /// The user-curated Custom tab's membership, as a CSV of `InsightSection` raw values in the user's
+    /// chosen order. Absent = the seed (`breakdown,topCategories`); a present-but-empty string = the
+    /// user cleared it. Per-user (reset on sign-out). Android parity: `SettingsStore` KEY_CUSTOM_INSIGHTS.
+    static let insightsCustomSections = "insights.customSections"
+    /// Which Overview "things to set up" checklist items the user has dismissed, as a CSV of
+    /// `InsightsSetupItem` keys. Transient/per-user (reset on sign-out; not in the backup DTO). The
+    /// OVERLAY item is *not* stored here — it reuses `insightsOverlayNudgeDismissed`. Android parity:
+    /// `SettingsStore` KEY_DISMISSED_INSIGHTS_SETUP.
+    static let insightsDismissedSetup = "insights.dismissedSetup"
 }
 
 /// Wipes every setting tied to the signed-in account — the app-lock PIN + biometric, the one-time
@@ -105,8 +115,14 @@ enum UserState {
             // The 50/30/20 split's Savings-allocation choice — reset so the next account on a shared
             // device is asked fresh (the split shows its one-time inline ask again).
             SettingsKey.nwsSavingsAllocation,
+            // The Hybrid Custom-tab membership + the Overview setup-checklist dismissals — per-user, so
+            // the next account starts on the seed Custom set with a fresh checklist.
+            SettingsKey.insightsCustomSections,
+            SettingsKey.insightsDismissedSetup,
             HomeLayoutStore.orderKey,
             HomeLayoutStore.hiddenKey,
+            // Old whole-screen order/hidden prefs — the Hybrid tabs are fixed (D1), so these are retired;
+            // reset them on sign-out (D2) so no stale layout leaks to the next account.
             InsightsLayoutStore.orderKey,
             InsightsLayoutStore.hiddenKey,
         ] {

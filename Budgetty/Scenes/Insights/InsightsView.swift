@@ -12,10 +12,20 @@ import SwiftData
 
 struct InsightsView: View {
     @Environment(\.horizontalSizeClass) private var hSize
+    @Environment(\.dynamicTypeSize) private var dynamicType
+    /// Switch the app's bottom tab — the "Add income or a budget" setup item jumps to Budget.
+    @Environment(\.selectTab) private var selectTab
     @State private var wide = false
-    @AppStorage(InsightsLayoutStore.orderKey) private var orderRaw = ""
-    @AppStorage(InsightsLayoutStore.hiddenKey) private var hiddenRaw = ""
-    @State private var showCustomize = false
+    /// The selected Hybrid tab (Overview · Spending · Money · Trends · Custom); Overview is the landing.
+    @State private var selectedTab: InsightsTab = .overview
+    /// The user-curated Custom tab's membership, as CSV of `InsightSection` raw values in order. Defaults
+    /// to the seed; a present-but-empty string means the user cleared it. See `InsightsCustomStore`.
+    @AppStorage(SettingsKey.insightsCustomSections) private var customSectionsRaw = InsightsCustomStore.seedCSV
+    /// Dismissed Overview setup-checklist items (CSV of `InsightsSetupItem` keys). OVERLAY is not here —
+    /// it reuses `overlayNudgeDismissed`.
+    @AppStorage(SettingsKey.insightsDismissedSetup) private var dismissedSetupRaw = ""
+    @State private var showCustomSections = false
+    @State private var showManageCategories = false
     @Query(sort: \Receipt.createdAt, order: .reverse) private var receipts: [Receipt]
     @Query(sort: \Recurring.createdAt) private var recurring: [Recurring]
     @Query private var storedCategories: [Category]
@@ -71,30 +81,33 @@ struct InsightsView: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(spacing: 0) {
-                    insightsHeader
-                        .padding(.bottom, 2)
-                    Group {
-                        if hSize == .regular {
-                            if wide { wideStack } else { regularStack }
-                        } else {
-                            compactStack
-                        }
+                // The Hybrid five-tab model on both idioms: iPhone full-bleed, iPad the same column
+                // capped to a readable width and centred (the extra landscape room becomes side margin
+                // rather than a second pane — a platform-native simplification; see PARITY.md).
+                Group {
+                    if hSize == .compact {
+                        phoneHybrid
+                    } else {
+                        phoneHybrid.adaptiveReadableWidth()
                     }
                 }
-                .padding(.horizontal, 20).padding(.top, 6).padding(.bottom, 24)
+                .padding(.top, 6).padding(.bottom, 24)
             }
             .underFloatingDock()
             .trackWideLandscape($wide)
             .screenCanvas()
-            // The mockup puts the title inside the scroll content with the customize control on the
+            // The mockup puts the title inside the scroll content with the toolbar controls on the
             // SAME row, which the system large-title nav bar can't do (toolbar items sit in the small
             // bar above the large title). So draw our own header and hide the bar — the Home pattern.
             .toolbar(.hidden, for: .navigationBar)
+            .navigationDestination(isPresented: $showManageCategories) { ManageCategoriesView() }
             .sheet(item: $categorySel) { CategoryTransactionsSheet(category: $0.name, items: periodItems) }
             .sheet(item: $storeSel) { StoreTransactionsSheet(store: $0.name, receipts: periodReceipts) }
-            .sheet(isPresented: $showCustomize) {
-                InsightsCustomizeSheet(orderRaw: $orderRaw, hiddenRaw: $hiddenRaw)
+            .sheet(isPresented: $showCustomSections) {
+                CustomSectionsSheet(
+                    selectedOrder: InsightsCustomStore.parse(customSectionsRaw),
+                    onSet: { customSectionsRaw = InsightsCustomStore.csv($0) }
+                )
             }
             .sheet(isPresented: $showCustomSheet) { DateRangeSheet(range: $customRange) }
             .fullScreenCover(isPresented: $showRecapReopen) { RecapReopenView() }
@@ -117,25 +130,42 @@ struct InsightsView: View {
 
     // MARK: - Layout
 
-    /// Custom header: the large "Insights" title with the customize control trailing on the same
-    /// baseline row. Customizing the section order/visibility applies to the iPhone layout only.
-    private var insightsHeader: some View {
-        HStack {
-            Text("Insights")
-                .font(.largeTitle).fontWeight(.bold)
-            Spacer()
-            if hSize == .compact {
-                Button { showCustomize = true } label: {
-                    Image(systemName: "slider.horizontal.3")
-                        .font(.system(size: 15, weight: .semibold))
-                        .foregroundStyle(Palette.label)
-                        .frame(width: 36, height: 36)
-                        .background(Palette.fill, in: Circle())
-                }
-                .accessibilityLabel("Customize sections")
-                .accessibilityIdentifier(A11y.Insights.customize)
+    // MARK: - Phone Hybrid (Overview · Spending · Money · Trends · Custom)
+
+    /// The iPhone Hybrid: a stacked toolbar (title + wellbeing pip + recap button), the full-width
+    /// period pill, the scrollable tab strip, then the selected tab's content.
+    private var phoneHybrid: some View {
+        VStack(spacing: 0) {
+            insightsToolbar.padding(.horizontal, 20)
+            stepper.padding(.horizontal, 20).padding(.top, 8)
+            InsightsTabBar(selection: $selectedTab).padding(.top, 12)
+            VStack(spacing: 14) { tabContent }
+                .padding(.horizontal, 20).padding(.top, 14)
+        }
+    }
+
+    /// The stacked toolbar's top row: title + the wellbeing score pip (once there's a score) + the recap
+    /// button (once a recap is ready). Under accessibility Dynamic Type the recap button drops first (the
+    /// one optional control) so the title and pip keep their room. D6: no Customize control.
+    private var insightsToolbar: some View {
+        HStack(spacing: 12) {
+            Text("Insights").font(.largeTitle).fontWeight(.bold)
+            Spacer(minLength: 8)
+            // The two toolbar controls keep clear air between them (they read as separate affordances,
+            // not one cluster).
+            if let score = wellbeingSummary.score.score {
+                NavigationLink { WellbeingView() } label: { WellbeingScorePip(score: score) }
+                    .buttonStyle(.plain)
+            }
+            if showRecapEntry && dynamicType < .accessibility1 {
+                RecapToolbarButton { showRecapReopen = true }
             }
         }
+    }
+
+    /// Whether the re-open-last-recap door is available (a recap has been generated for a closed period).
+    private var showRecapEntry: Bool {
+        !recapLastShownWeek.isEmpty || !recapLastShownMonth.isEmpty
     }
 
     private var incomeCards: some View {
@@ -149,85 +179,317 @@ struct InsightsView: View {
                             window: period.interval)
     }
 
-    /// iPhone: one column, in the user's chosen order with hidden sections removed.
-    private var compactStack: some View {
+    // MARK: - Tab content dispatch
+
+    @ViewBuilder
+    private var tabContent: some View {
+        switch selectedTab {
+        case .overview: overviewTab
+        case .custom: customTab
+        default: fixedTab(selectedTab)
+        }
+    }
+
+    /// A fixed group (Spending / Money / Trends): its sections in canonical order, each self-gating. A
+    /// tab with nothing to show gets a friendly stand-in — Money with no plan an invitation, Spending /
+    /// Trends with no spend a period-aware empty. Android parity: `BlankTabInvitation`.
+    @ViewBuilder
+    private func fixedTab(_ tab: InsightsTab) -> some View {
+        let hasData = !periodReceipts.isEmpty
+        if tab == .money && !hasIncome && !hasBills {
+            TabInvitationCard(
+                title: "Your money flow needs a plan",
+                body_: "Add your income or a budget to see your money flow.",
+                cta: "Add income or budget",
+                systemImage: "creditcard.fill",
+                onCta: { selectTab?(.budget) }
+            )
+        } else if (tab == .spending || tab == .trends) && !hasData {
+            PeriodEmptyState(periodLabel: period.friendlyLabel, hasAnyData: !receipts.isEmpty)
+        } else {
+            ForEach(sections(in: tab)) { sectionView($0) }
+        }
+    }
+
+    /// The sections a fixed tab renders, in display order. Android parity: `InsightsSection.tab()` order.
+    private func sections(in tab: InsightsTab) -> [InsightSection] {
+        switch tab {
+        case .spending: [.breakdown, .topCategories, .topStores, .biggestPurchases, .subscriptions]
+        case .money: [.income, .needsWantsSavings]
+        case .trends: [.trend, .comparison, .highlights]
+        case .overview, .custom: []
+        }
+    }
+
+    // MARK: - Overview tab (bespoke composite)
+
+    private var overviewTab: some View {
         VStack(spacing: 14) {
-            stepper
-            wellbeingEntry
-            recapEntry
-            if periodReceipts.isEmpty {
-                emptyState
-            } else {
-                if showOverlayNudge { overlayNudge }
-                ForEach(visibleSections) { sectionView($0) }
+            overviewHero
+            if !groupSlices.isEmpty { overviewTopSpending }
+            if !overviewHighlights.isEmpty || projectedTotal != nil { overviewWorthKnowing }
+            OverviewSetupChecklist(items: activeSetupItems, onAction: onSetupAction, onDismiss: onSetupDismiss)
+            overviewOptions
+        }
+    }
+
+    /// Hero: total spent + period-over-period delta + the 50/30/20 mini split + headline stats.
+    private var overviewHero: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text("Total spent").font(.caption).foregroundStyle(Palette.secondaryLabel)
+            HStack(alignment: .bottom, spacing: 8) {
+                Text(totalSpent.formatMoney())
+                    .font(.system(size: 36, weight: .bold)).foregroundStyle(Palette.label)
+                overviewDelta
+            }
+            if let split = needsWantsSplit {
+                MiniSplitBar(split: split).padding(.top, 16)
+            }
+            HStack(spacing: 10) {
+                statTile("Avg / day", avgPerDay.formatMoney(), color: Palette.label)
+                statTile("Receipts", "\(periodReceipts.count)", color: Palette.label)
+                statTile("Saved", totalSaved.formatMoney(), color: Palette.good)
+            }
+            .padding(.top, 18)
+        }
+        .padding(18)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .contentCard(cornerRadius: 16)
+    }
+
+    @ViewBuilder
+    private var overviewDelta: some View {
+        if previousTotal > 0 {
+            let pct = Int(((dbl(totalSpent) - dbl(previousTotal)) / dbl(previousTotal) * 100).rounded())
+            if pct != 0 {
+                let down = pct < 0
+                Text("\(down ? "↓" : "↑") \(abs(pct))%")
+                    .font(.subheadline).fontWeight(.bold)
+                    .foregroundStyle(down ? Palette.good : Palette.secondaryLabel)
+                    .padding(.bottom, 6)
             }
         }
     }
 
-    /// The one-time discovery nudge above the analysis sections: names, in the user's own terms, the
-    /// disagreement a tester reported ("Home also counts €X of recurring bills") and offers to switch
-    /// the overlay on — the only surface that reveals an otherwise-invisible, off-by-default preference.
-    /// Android parity: `OverlayDiscoveryNudge`.
-    private var overlayNudge: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(alignment: .top) {
-                Text("Insights and Home disagree?")
-                    .font(.subheadline).fontWeight(.semibold).foregroundStyle(Palette.label)
-                Spacer(minLength: 8)
-                Button {
-                    withAnimation { overlayNudgeDismissed = true }
-                } label: {
-                    Image(systemName: "xmark").font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(Palette.secondaryLabel).frame(width: 28, height: 28)
+    /// Top spending: the top-four category groups as a compact list, linking into the Spending tab.
+    /// (A plain list, not the donut — the donut drags its own legend + "See all"; Android does the same.)
+    private var overviewTopSpending: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            OverviewLinkHeader(title: "Top spending", linkTab: .spending) { selectedTab = $0 }
+            ForEach(Array(groupSlices.prefix(4)), id: \.name) { slice in
+                Button { categorySel = Sel(name: slice.name) } label: {
+                    HStack(spacing: 10) {
+                        Circle().fill(categoryColor(slice.name)).frame(width: 9, height: 9)
+                        Text(Categories.displayName(slice.name))
+                            .font(.subheadline).foregroundStyle(Palette.label).lineLimit(1)
+                        Spacer(minLength: 8)
+                        Text(slice.value.formatMoney())
+                            .font(.subheadline).fontWeight(.semibold).foregroundStyle(Palette.label)
+                    }
+                    .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel("Dismiss")
             }
-            Text("Home also counts \(periodBills.formatMoney()) of recurring bills this period. Overlay them here as a planned layer.")
-                .font(.caption).foregroundStyle(Palette.secondaryLabel)
-            Button {
-                withAnimation { includeRecurringBills = true; overlayNudgeDismissed = true }
-            } label: {
-                HStack(spacing: 7) {
-                    PlannedHatchSwatch(size: 12, corner: 3)
-                    Text("Overlay bills").font(.subheadline).fontWeight(.semibold)
-                }
-                .foregroundStyle(Palette.tint)
-            }
-            .buttonStyle(.plain)
-            .padding(.top, 2)
         }
-        .padding(.horizontal, 16).padding(.vertical, 14)
+        .padding(18)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Palette.tintSoft, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .contentCard(cornerRadius: 16)
     }
 
-    /// The Wellbeing score's door — pinned directly under the stepper, above Breakdown, in every
-    /// layout. A fixed link, not a reorderable InsightSection (it costs the tab one row, not a block).
-    private var wellbeingEntry: some View {
-        NavigationLink { WellbeingView() } label: { WellbeingEntryRow(summary: wellbeingSummary) }
+    private var overviewHighlights: [InsightHighlight] {
+        InsightHighlight.compute(current: periodItems, previous: previousItems)
+    }
+
+    /// Worth knowing: the top highlights + the on-pace projection, linking into the Trends tab.
+    private var overviewWorthKnowing: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            OverviewLinkHeader(title: "Worth knowing", linkTab: .trends) { selectedTab = $0 }
+            ForEach(Array(overviewHighlights.prefix(2))) { h in
+                HStack(alignment: .top, spacing: 10) {
+                    Text(h.emoji).font(.system(size: 16))
+                    Text(h.text(compareNoun: period.compareNoun))
+                        .font(.system(size: 14)).foregroundStyle(Palette.label)
+                }
+            }
+            if let projected = projectedTotal {
+                Text("On pace for \(projected.formatMoney())")
+                    .font(.subheadline).foregroundStyle(Palette.secondaryLabel)
+            }
+        }
+        .padding(18)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .contentCard(cornerRadius: 16)
+    }
+
+    /// The two global Overview options, as full settings-style rows in one card (the mockup treatment):
+    /// the planned-bills overlay switch (when there are bills to overlay) and the Needs/Wants savings-
+    /// allocation mode (once a split exists and the mode is set — the first choice is made through the
+    /// checklist). Each row names what it does and gives a real, comfortably-sized control. Android
+    /// parity: `OverviewOptionsCard`.
+    @ViewBuilder
+    private var overviewOptions: some View {
+        let showPlanned = hasBills
+        let showSavings = needsWantsSplit != nil && nwsAllocation != .unset
+        if showPlanned || showSavings {
+            VStack(spacing: 0) {
+                if showPlanned {
+                    Toggle(isOn: $includeRecurringBills) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Include recurring bills").font(.subheadline).foregroundStyle(Palette.label)
+                            Text("Overlay planned bills as a separate layer")
+                                .font(.caption).foregroundStyle(Palette.secondaryLabel)
+                        }
+                    }
+                    .tint(Palette.tint)
+                    .padding(.vertical, 12)
+                    if showSavings { Divider() }
+                }
+                if showSavings {
+                    let kept = nwsAllocation == .countKept
+                    Button { nwsAllocRaw = kept ? 2 : 1 } label: {
+                        HStack(spacing: 12) {
+                            Text("Savings").font(.subheadline).foregroundStyle(Palette.label)
+                            Spacer(minLength: 8)
+                            Text(kept ? "Count what I keep" : "Only money I set aside")
+                                .font(.subheadline).foregroundStyle(Palette.secondaryLabel)
+                                .lineLimit(1).minimumScaleFactor(0.8)
+                            Image(systemName: "chevron.up.chevron.down")
+                                .font(.caption2.weight(.semibold)).foregroundStyle(Palette.tertiaryLabel)
+                        }
+                        .padding(.vertical, 12).contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(.horizontal, 16)
+            .contentCard(cornerRadius: 16)
+        }
+    }
+
+    // MARK: - Overview setup checklist (P3)
+
+    /// Which setup-checklist items are live right now — each fires only while its setup is genuinely
+    /// incomplete and it hasn't been dismissed. The overlay item reuses the older discovery-nudge gate
+    /// (and its own dismissed flag). Android parity: `activeSetupItems`.
+    private var activeSetupItems: [InsightsSetupItem] {
+        let dismissed = Set(dismissedSetupRaw.split(separator: ",").map(String.init))
+        var out: [InsightsSetupItem] = []
+        if needsWantsSplit != nil && nwsAllocation == .unset && !dismissed.contains(InsightsSetupItem.savings.rawValue) {
+            out.append(.savings)
+        }
+        if !hasIncome && !hasBills && !dismissed.contains(InsightsSetupItem.income.rawValue) {
+            out.append(.income)
+        }
+        if !includeRecurringBills && !overlayNudgeDismissed && !overlayBills.isEmpty && periodBills > 0 {
+            out.append(.overlay)
+        }
+        if needsWantsSplit != nil && !hasCustomBuckets && !dismissed.contains(InsightsSetupItem.buckets.rawValue) {
+            out.append(.buckets)
+        }
+        return out
+    }
+
+    private func onSetupAction(_ item: InsightsSetupItem) {
+        switch item {
+        case .savings: withAnimation { selectedTab = .money }   // the "what counts as savings?" ask is there
+        case .income: selectTab?(.budget)
+        case .overlay: withAnimation { includeRecurringBills = true }
+        case .buckets: showManageCategories = true
+        }
+    }
+
+    private func onSetupDismiss(_ item: InsightsSetupItem) {
+        if item == .overlay {
+            overlayNudgeDismissed = true
+        } else {
+            var keys = dismissedSetupRaw.split(separator: ",").map(String.init)
+            if !keys.contains(item.rawValue) { keys.append(item.rawValue) }
+            dismissedSetupRaw = keys.joined(separator: ",")
+        }
+    }
+
+    // MARK: - Custom tab (P4)
+
+    private var customTab: some View {
+        let chosen = InsightsCustomStore.parse(customSectionsRaw)
+        return VStack(spacing: 14) {
+            HStack(spacing: 10) {
+                customCountLabel(chosen)
+                Spacer(minLength: 8)
+                Button { showCustomSections = true } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "plus").font(.system(size: 13, weight: .bold))
+                        Text("Choose sections").font(.subheadline).fontWeight(.semibold)
+                    }
+                    .foregroundStyle(Palette.tint)
+                    .padding(.horizontal, 12).padding(.vertical, 7)
+                    .background(Palette.tintSoft, in: Capsule())
+                }
+                .buttonStyle(.plain)
+            }
+            if chosen.isEmpty {
+                customEmptyInvite
+            } else {
+                ForEach(chosen) { sectionView($0) }
+                addSectionRow
+            }
+        }
+    }
+
+    private func customCountLabel(_ chosen: [InsightSection]) -> some View {
+        // Uppercase the assembled string (the localized plural count + the period) so the plural resolves
+        // via the "%lld sections" catalog entry without a deprecated Text(_:) + Text concatenation.
+        let text = chosen.isEmpty
+            ? String(localized: "No sections yet")
+            : String(localized: "\(chosen.count) sections") + " · " + period.friendlyLabel
+        return Text(text.uppercased())
+            .font(.caption).fontWeight(.bold).foregroundStyle(Palette.secondaryLabel)
+    }
+
+    private var customEmptyInvite: some View {
+        VStack(spacing: 14) {
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .strokeBorder(Palette.tertiaryLabel, style: StrokeStyle(lineWidth: 2, dash: [5, 4]))
+                .frame(width: 56, height: 56)
+                .overlay(Image(systemName: "plus").font(.title3).foregroundStyle(Palette.secondaryLabel))
+            Text("Your own view").font(.title3).fontWeight(.semibold).foregroundStyle(Palette.label)
+            Text("Pick only the sections you care about — they stay in this tab, in the order you choose, and follow the same period as everything else.")
+                .font(.subheadline).foregroundStyle(Palette.secondaryLabel).multilineTextAlignment(.center)
+            Button { showCustomSections = true } label: {
+                Text("Add sections").font(.body).fontWeight(.semibold).ctaPill(height: 48)
+            }
             .buttonStyle(.plain)
+        }
+        .frame(maxWidth: .infinity).padding(.vertical, 22).padding(.horizontal, 18)
+        .contentCard(cornerRadius: 16)
     }
 
+    private var addSectionRow: some View {
+        Button { showCustomSections = true } label: {
+            HStack(spacing: 8) {
+                Image(systemName: "plus").font(.system(size: 13, weight: .bold))
+                Text("Add another section").font(.subheadline).fontWeight(.semibold)
+            }
+            .foregroundStyle(Palette.secondaryLabel)
+            .frame(maxWidth: .infinity).padding(.vertical, 14)
+            .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .strokeBorder(Palette.tertiaryLabel, lineWidth: 1))
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+
+    // MARK: - Hybrid data helpers
+
+    private var hasIncome: Bool { recurring.contains(where: \.isIncome) }
+    private var hasBills: Bool { recurring.contains { !$0.isIncome } }
+    private var hasCustomBuckets: Bool { storedCategories.contains { $0.bucket != nil } }
+
+    /// The wellbeing summary behind the toolbar score pip (and its → Wellbeing link).
     private var wellbeingSummary: WellbeingSummary {
         WellbeingScan.run(receipts: receipts, budgets: budgets, recurring: recurring, goals: goals,
                           contributions: contributions, ignoredSubs: Set(ignoredRows.map(\.merchant)),
                           monthStartDay: monthStartDay)
-    }
-
-    /// The re-open-last-recap door — pinned just under the Wellbeing entry, shown only once a recap has
-    /// been generated for a closed period. Recomputes the story on demand as a full-screen cover.
-    @ViewBuilder
-    private var recapEntry: some View {
-        if !recapLastShownWeek.isEmpty || !recapLastShownMonth.isEmpty {
-            Button { showRecapReopen = true } label: { RecapReopenRow() }
-                .buttonStyle(.plain)
-        }
-    }
-
-    private var visibleSections: [InsightSection] {
-        let hidden = InsightsLayoutStore.hidden(hiddenRaw)
-        return InsightsLayoutStore.order(orderRaw).filter { !hidden.contains($0) }
     }
 
     @ViewBuilder
@@ -278,84 +540,27 @@ struct InsightsView: View {
         }
     }
 
-    /// iPad portrait: two masonry columns of the same cards, capped and centered.
-    private var regularStack: some View {
-        VStack(spacing: Dimens.regularColumnSpacing) {
-            stepper
-            wellbeingEntry
-            recapEntry
-            if periodReceipts.isEmpty {
-                emptyState
-            } else {
-                RegularColumns {
-                    trendCard
-                    nwsSplitCard
-                    nwsTrendCard
-                    statGrid
-                    highlightsSection
-                    topCategoriesCard
-                } right: {
-                    breakdownCard
-                    SubscriptionsCard()
-                    comparisonSection
-                    topStoresCard
-                    biggestSection
-                    incomeCards
-                }
-            }
-        }
-        .adaptiveReadableWidth(Dimens.wideContentMaxWidth)
-    }
-
-    /// iPad landscape: three masonry columns for the extra width.
-    private var wideStack: some View {
-        VStack(spacing: Dimens.regularColumnSpacing) {
-            stepper
-            wellbeingEntry
-            recapEntry
-            if periodReceipts.isEmpty {
-                emptyState
-            } else {
-                ThreeColumns {
-                    trendCard
-                    nwsSplitCard
-                    nwsTrendCard
-                    statGrid
-                    highlightsSection
-                } second: {
-                    breakdownCard
-                    comparisonSection
-                    topCategoriesCard
-                } third: {
-                    topStoresCard
-                    SubscriptionsCard()
-                    biggestSection
-                    incomeCards
-                }
-            }
-        }
-        .adaptiveReadableWidth(Dimens.landscapeContentMaxWidth)
-    }
-
     // MARK: - Period
 
-    /// `‹ [pill] ›` — the Android period stepper: arrows walk a calendar-aligned block one unit at
-    /// a time; the centre pill shows the active unit as an eyebrow over the period value and opens
-    /// a menu to switch the unit or pick a custom range (arrows disable while a custom range is
-    /// active).
+    /// The period control: ONE full-width fully-rounded pill with the step arrows *inside* it and the
+    /// active window centred (tap the centre to switch unit or pick a range). The locked cross-platform
+    /// tweak — no eyebrow, no separate arrow buttons. Arrows disable while a custom range is active.
     private var stepper: some View {
         let steppable = !period.isCustom
-        return HStack(spacing: 12) {
-            stepButton("chevron.left", disabled: !steppable || !canStepBackward) { step(-1) }
+        return HStack(spacing: 4) {
+            arrowButton("chevron.left", disabled: !steppable || !canStepBackward) { step(-1) }
                 .accessibilityLabel("Previous period")
                 .accessibilityIdentifier(A11y.Insights.periodPrev)
             periodMenu
-            stepButton("chevron.right", disabled: !steppable || !canStepForward) { step(1) }
+            arrowButton("chevron.right", disabled: !steppable || !canStepForward) { step(1) }
                 .accessibilityLabel("Next period")
                 .accessibilityIdentifier(A11y.Insights.periodNext)
         }
+        .padding(.horizontal, 6).padding(.vertical, 5)
         .frame(maxWidth: .infinity)
-        .padding(.top, 8).padding(.bottom, 6)
+        .background(Palette.matControl, in: Capsule())
+        .background(.ultraThinMaterial, in: Capsule())
+        .overlay(Capsule().strokeBorder(Palette.matControlBorder, lineWidth: 0.5))
     }
 
     private var periodMenu: some View {
@@ -395,28 +600,15 @@ struct InsightsView: View {
                 }
             }
         } label: {
-            HStack(spacing: 10) {
-                VStack(alignment: .leading, spacing: 0) {
-                    HStack(spacing: 4) {
-                        if period.isCustom {
-                            Image(systemName: "calendar").font(.system(size: 9, weight: .semibold))
-                        }
-                        Text(period.isCustom ? "CUSTOM" : (period.steppedUnit?.eyebrow ?? ""))
-                            .font(.system(size: 10, weight: .medium)).kerning(0.8)
-                    }
-                    .foregroundStyle(Palette.secondaryLabel)
-                    Text(period.friendlyLabel)
-                        .font(.headline).foregroundStyle(Palette.label).lineLimit(1)
-                }
+            HStack(spacing: 6) {
+                Text(period.friendlyLabel)
+                    .font(.headline).foregroundStyle(Palette.label).lineLimit(1)
                 Image(systemName: "chevron.down")
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(Palette.secondaryLabel)
+                    .font(.system(size: 10, weight: .semibold)).foregroundStyle(Palette.secondaryLabel)
             }
-            .padding(.horizontal, 16).padding(.vertical, 7)
-            .frame(minWidth: 150)
-            .background(Palette.matControl, in: Capsule())
-            .background(.ultraThinMaterial, in: Capsule())
-            .overlay(Capsule().strokeBorder(Palette.matControlBorder, lineWidth: 0.5))
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 5)
+            .contentShape(Rectangle())
         }
         .accessibilityLabel("Period: \(period.friendlyLabel)")
     }
@@ -437,13 +629,15 @@ struct InsightsView: View {
         return period.interval.start > oldest
     }
 
-    private func stepButton(_ symbol: String, disabled: Bool = false, action: @escaping () -> Void) -> some View {
+    /// A plain glyph step arrow that lives *inside* the period pill (no separate circular background).
+    private func arrowButton(_ symbol: String, disabled: Bool, action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            Image(systemName: symbol).font(.system(size: 14, weight: .semibold))
+            Image(systemName: symbol).font(.system(size: 15, weight: .semibold))
                 .foregroundStyle(disabled ? Palette.tertiaryLabel : Palette.label)
-                .frame(width: 36, height: 36)
-                .background(Palette.fill, in: Circle())
+                .frame(width: 40, height: 34)
+                .contentShape(Rectangle())
         }
+        .buttonStyle(.plain)
         .disabled(disabled)
     }
 
@@ -561,13 +755,6 @@ struct InsightsView: View {
     /// percentages are taken against. The Breakdown sheet's "Spent" and % denominator use this (not the
     /// paid total, which nets off discounts) so "44% of €X" reconciles with the legend.
     private var breakdownSpent: Decimal { periodItems.reduce(.zero) { $0 + $1.lineTotal } }
-
-    /// The one-time discovery nudge shows when: overlay off, not dismissed, and there are recurring
-    /// bills projecting a positive amount this period (the figure Home already counts). iPhone only.
-    private var showOverlayNudge: Bool {
-        hSize == .compact && !includeRecurringBills && !overlayNudgeDismissed
-            && !overlayBills.isEmpty && periodBills > 0
-    }
 
     /// "Dec 2025 – Jun 2026" — the span the 7 trend bars cover, for the Trend sheet subtitle.
     private var trendRangeLabel: String {
@@ -931,7 +1118,10 @@ struct InsightsView: View {
     private func statTile(_ title: LocalizedStringKey, _ value: String, color: Color) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(title).font(.caption).foregroundStyle(Palette.secondaryLabel)
+            // Keep the amount on one line in the narrow third-width tile — shrink to fit rather than
+            // wrap the currency symbol onto a second row (the iOS take on Android's marquee).
             Text(value).font(.title3).fontWeight(.bold).foregroundStyle(color)
+                .lineLimit(1).minimumScaleFactor(0.7)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(14)
@@ -1001,13 +1191,4 @@ struct InsightsView: View {
         .contentCard(cornerRadius: 16)
     }
 
-    // MARK: - Empty
-
-    private var emptyState: some View {
-        VStack(spacing: 8) {
-            Image(systemName: "chart.pie").font(.system(size: 34)).foregroundStyle(Palette.tertiaryLabel)
-            Text("Nothing spent \(period.contextNoun)").font(.subheadline).foregroundStyle(Palette.secondaryLabel)
-        }
-        .frame(maxWidth: .infinity).padding(.top, 60)
-    }
 }

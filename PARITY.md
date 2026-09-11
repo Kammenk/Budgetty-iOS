@@ -1776,3 +1776,73 @@ DesignSync. iOS branch `feat/needs-wants-split` off `main`.
 → populated count-kept with correct delta pills/summary/CTA; category tagging with live parent→sub
 inheritance and no disclosure-tap conflict; German localization). Android side built + device-verified on
 Pixel 6, both unmerged. Pushed to origin, awaiting user-opened PR.
+
+## Android → iOS — Insights "Hybrid" redesign (5 tabs + Overview + Custom) — 2026-09-11
+
+Ports the Android Insights Hybrid redesign (Android branch `feat/insights-tab-grouping`, P1–P8 + D1–D10)
+to SwiftUI. The screen was one long scroll of ~11 look-alike cards behind a "Customize sections" sheet;
+it is now five focused tabs — **Overview · Spending · Money · Trends · Custom** — with Wellbeing + recap
+promoted to the toolbar and a user-curated Custom tab. Matched to the mockups `iOS InsightsHybrid.dc.html`
+/ `iOS InsightsHybridStates.dc.html` (Liquid Glass) via DesignSync; logic ported from the Android
+`InsightsScreen` / `InsightsTab` + the shipped build's behaviour (never from Compose pixels). iOS branch
+`feat/insights-hybrid` off `main`.
+
+- **Tab model** — `InsightsTab { overview, spending, money, trends, custom }` + `InsightSection.tab`
+  mapping (`Budgetty/Scenes/Insights/InsightsHybrid.swift`), mirroring Android's `InsightsSection.tab()`.
+  Spending = Breakdown + Top categories + Top stores + Biggest + Subscriptions; Money = Income & bills
+  (the whole `IncomeInsightsCards` bundle: income-vs-spending + savings-rate + fixed-vs-flexible +
+  income-by-source) + Needs/Wants/Savings; Trends = Trend + Period comparison + Highlights; Overview is a
+  bespoke composite (Summary/stats folded into its hero); Custom is user-composed.
+- **Toolbar (D10 stacked)** — title + `WellbeingScorePip` (a band-coloured ring reusing `SavingsRing`;
+  green ≥70 / amber 40–69 / red below; → Wellbeing; shown only once there's a score) + `RecapToolbarButton`
+  (circular tonal + play + amber unread dot; only when a recap is ready; **drops first under accessibility
+  Dynamic Type**). D6: no Customize control.
+- **Period control** — one full-width pill with the step arrows *inside* and the window centred (the two
+  locked cross-platform tweaks applied to iOS too: full-width inner-arrow pill, circular recap button).
+- **Scrollable pill tab bar (D9)** — `InsightsTabBar`: all five groups reachable at every size, active pill
+  tinted with a soft shadow, trailing fade, scroll-selected-into-view. (Android uses a fixed `SegmentedToggle`;
+  iOS pills scroll — the platform-native answer to five 390pt labels + Dynamic Type, per the states mockup.)
+- **Overview** — hero (total + period-over-period Δ% + 50/30/20 `MiniSplitBar` + Avg/day·Receipts·Saved
+  tiles); Top-spending (top-4 groups → Spending); Worth-knowing (highlights + on-pace → Trends); the
+  consolidated setup checklist (`activeSetupItems`: SAVINGS→Money tab, INCOME→`selectTab(.budget)`,
+  OVERLAY→turn on overlay, BUCKETS→ManageCategories; collapse/expand, per-row + header dismiss); the two
+  quick-toggle chips (planned-bills overlay, savings Kept/Set-aside) — the chips replace the old Customize
+  sheet's Layers toggle + savings-allocation control (D6).
+- **Custom (P4)** — the curated tab + `CustomSectionsSheet` picker (members-first, up/down reorder,
+  home-group labels, switches; SwiftUI renders it as a centred form on iPad). Membership persists in
+  `SettingsKey.insightsCustomSections` (CSV, seed `breakdown,topCategories`; absent = seed, empty = cleared
+  via defaulting `@AppStorage` to the seed CSV) and resets on sign-out.
+- **Per-tab empties (P8)** — Money with no plan → a verb-first `TabInvitationCard` (→ Budget); Spending /
+  Trends with no spend → `PeriodEmptyState` (reuses Android's `insights_empty_period[_sub]` /
+  `insights_empty_no_data[_sub]`).
+- **Localization** — 39 new keys (37 strings + 2 plurals) × 16 locales transcoded from Android
+  `values-*/strings.xml` into `Localizable.xcstrings` (en implicit for simple keys; `variations.plural`
+  with each language's CLDR forms — ru/pl/cs one·few·many·other, ro one·few·other — for `%lld things to set
+  up` and `%lld sections`; `%1$s`→`%@`, `%1$d`→`%lld`). 0 missing translations.
+- **Persistence/reset** — retired the whole-screen "Customize sections" sheet (D6) but kept `InsightSection`
+  + `InsightsLayoutStore` (the onboarding quiz `applySetupQuiz` and the backup DTO still read/write the
+  order/hidden keys). New `SettingsKey.insightsCustomSections` + `insightsDismissedSetup` added to
+  `UserState.clear()`.
+
+**Justified iOS deviations from Android:**
+- **No ViewModel** — all derived state lives in `InsightsView` computed vars (the app's pattern; there is no
+  `InsightsViewModel` on iOS).
+- **iPad = the same five-tab column, centred + width-capped** — not Android P6's landscape two-pane
+  (permanent Overview column + group pane). iOS never shared Android's tablet layout (it had a hardcoded
+  masonry), so this is a layout choice, not a feature gap; the five-tab Hybrid is feature-identical. The
+  landscape two-pane is **deferred** because it needs a scroll-container rework that can't be live-verified
+  this session (the iPad simulator is signed out), and shipping it unverified is riskier than a clean,
+  consistent column. Revisit when iPad live-visual is possible.
+- **No "By-category change" card** — iOS has no `categoryDeltas` derivation (Android's Trends 4th card); the
+  Trends tab ships Trend + Period comparison + Highlights. A small follow-up if wanted.
+- **Coarser Money sections** — iOS bundles income-vs-spending / savings-rate / fixed-vs-flexible /
+  income-by-source into one `IncomeInsightsCards` block, where Android has them as four separate sections;
+  the Money tab shows the same content, just not individually add-to-Custom-able.
+
+**Status:** iOS `feat/insights-hybrid` — `xcodebuild build` green and the **full suite (292 tests,
+34 suites, 0 failures)** passes; **device-verified on iPhone 17 Pro** (all five tabs, the scrollable tab
+bar's scroll-into-view + fade, Overview hero + Δ% + mini-split + stat tiles, the setup checklist
+collapse/expand with the fixed "1 thing to set up" plural, the quick-toggle chips, the Money money-flow
+cards, and the Custom seed + section picker with members-first/reorder/home labels). Android side is
+merged-to-`main`-pending (`feat/insights-tab-grouping`, HEAD `f0a9395`). **Not pushed or merged — awaiting
+the user's device-verification gate (incl. iPad live-visual, which needs sign-in).**
