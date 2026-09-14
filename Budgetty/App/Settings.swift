@@ -23,14 +23,20 @@ enum SettingsKey {
     static let appLockEnabled = "pref.appLockEnabled"
     /// Auto-lock delay in minutes: 0 = immediately, 1, or 5.
     static let autoLockMinutes = "pref.autoLockMinutes"
-    /// Crashlytics collection — default-ON with an opt-out toggle (see `CrashReporting`).
+    /// Crashlytics collection — opt-in, default OFF (see `CrashReporting`). Nothing is collected until
+    /// the first-run consent gate (`AnalyticsConsentView`) or the Account toggle turns it on.
     /// Unlike the `notifications` key deleted alongside the trim, this one is read.
     static let crashReporting = "pref.crashReporting"
-    /// Product analytics collection (Firebase Analytics, §0) — default-ON with an opt-out toggle,
-    /// SEPARATE from crash reporting (see `Analytics`). Device-global like `crashReporting` — NOT reset
-    /// on sign-out. Android parity: `SettingsStore` KEY_ANALYTICS. A fresh key string (the pre-trim
-    /// `analytics` key was removed) so no stale value is resurrected.
+    /// Product analytics collection (Firebase Analytics, §0) — opt-in, default OFF, SEPARATE from crash
+    /// reporting (see `Analytics`). Device-global like `crashReporting` — NOT reset on sign-out.
+    /// Android parity: `SettingsStore` KEY_ANALYTICS. A fresh key string (the pre-trim `analytics` key
+    /// was removed) so no stale value is resurrected.
     static let analytics = "pref.analyticsEnabled"
+    /// Whether the user has made the one-time first-run telemetry choice (`AnalyticsConsentView`). Gates
+    /// that screen: shown until true. Device-global like the two telemetry keys above — NOT reset on
+    /// sign-out (see `UserState.clear`), so a signed-out user isn't re-asked. Enabling either telemetry
+    /// toggle from Account also sets it. Android parity: `SettingsStore` KEY_ANALYTICS_CONSENT_DECIDED.
+    static let analyticsConsentDecided = "pref.analyticsConsentDecided"
     static let premium = "pref.premium"           // effective Premium flag (subscription OR comped account)
     /// Account-comp entitlement cache: the server-granted `premium` auth claim (see `CompEntitlement`,
     /// set by functions/tools/comp.js). Cached so a comped account shows Premium instantly on launch.

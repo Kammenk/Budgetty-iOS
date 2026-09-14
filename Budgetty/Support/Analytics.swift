@@ -7,12 +7,13 @@
 //  of `CrashReporting`. Every event is its own method with fixed params, so a call site cannot
 //  fat-finger an event name or a param key; the names/params live only in the `Event`/`Param` enums.
 //
-//  Collection is default-on with an opt-out: `SettingsKey.analytics` defaults to true and the Account
-//  screen exposes a toggle, SEPARATE from crash reporting. The stored preference is the source of truth —
-//  `setEnabled` is applied at startup (`FirebaseBootstrap.configure`) and again on every toggle change,
-//  so the SDK state always follows the user's choice. `setAnalyticsCollectionEnabled` persists inside the
-//  SDK and survives process death, so a user who opts out stays opted out even before startup re-applies
-//  the preference (same as `CrashReporting`).
+//  Collection is opt-in: `SettingsKey.analytics` defaults to FALSE, and nothing is collected until the
+//  user turns it on — either at the first-run consent gate (`AnalyticsConsentView`) or via the Account
+//  toggle, SEPARATE from crash reporting. The stored preference is the source of truth — `setEnabled`
+//  is applied at startup (`FirebaseBootstrap.configure`, which also forces collection off until the
+//  consent choice is made) and again on every toggle change, so the SDK state always follows the user's
+//  choice. `setAnalyticsCollectionEnabled` persists inside the SDK and survives process death, so an
+//  opted-out user stays opted out even before startup re-applies the preference (same as `CrashReporting`).
 //
 //  Privacy: params carry ONLY enums and ints (kind, type, source, length, gain, cards viewed). No
 //  category name, item name, amount, email, store name, or any other free text is ever logged here, and
@@ -37,11 +38,12 @@ enum LimitSource: String {
 
 enum Analytics {
 
-    // ── Collection toggle (opt-out, default-on) ───────────────────────────────────
+    // ── Collection toggle (opt-in, default-off) ───────────────────────────────────
 
-    /// The user's persisted choice; default-on when never set. Device-global, NOT reset on sign-out.
+    /// The user's persisted choice; default-OFF when never set (opt-in). Device-global, NOT reset on
+    /// sign-out.
     static var isEnabled: Bool {
-        UserDefaults.standard.object(forKey: SettingsKey.analytics) as? Bool ?? true
+        UserDefaults.standard.object(forKey: SettingsKey.analytics) as? Bool ?? false
     }
 
     /// Point the SDK at `enabled`. Called at startup and on every toggle change. Firebase's own

@@ -24,8 +24,12 @@ struct AccountView: View {
     @AppStorage(SettingsKey.autoLockMinutes) private var autoLockMinutes = 0
     @AppStorage(SettingsKey.recapEnabled) private var recapEnabled = true
     @AppStorage(SettingsKey.recapFrequency) private var recapFrequencyRaw = RecapFrequency.both.rawValue
-    @AppStorage(SettingsKey.crashReporting) private var crashReporting = true
-    @AppStorage(SettingsKey.analytics) private var analyticsEnabled = true
+    // Telemetry is opt-in (default OFF); the first-run consent gate or these toggles turn it on.
+    @AppStorage(SettingsKey.crashReporting) private var crashReporting = false
+    @AppStorage(SettingsKey.analytics) private var analyticsEnabled = false
+    /// Flipping either telemetry toggle here counts as making the first-run choice (see the gate in
+    /// `BudgettyApp`), so a user who enables from Settings is never re-asked.
+    @AppStorage(SettingsKey.analyticsConsentDecided) private var analyticsConsentDecided = false
     @AppStorage(SettingsKey.premium) private var premium = false
     private let theme = AppTheme.shared
 
@@ -70,6 +74,11 @@ struct AccountView: View {
 
                 sectionHeader("Privacy & Security")
                 privacyCard
+                    .padding(.bottom, 24)
+
+                sectionHeader("Data & Privacy")
+                dataPrivacyCard
+                dataPrivacyFootnote
                     .padding(.bottom, 24)
 
                 NavigationLink { SupportAboutView() } label: {
@@ -352,10 +361,11 @@ struct AccountView: View {
         }
     }
 
-    /// Security group: the app-lock PIN gate (with biometrics as an optional shortcut and the
-    /// auto-lock delay), then the crash-reporting opt-out. Turning App lock on sets a PIN first; the
-    /// PIN hash lives in the Keychain (see `PinLock`), while the on/off + delay + biometric flags are
-    /// AppStorage. This absorbs the old Face-ID-only lock — biometrics reuse the same `faceID` flag.
+    /// Security group: the app-lock PIN gate, with biometrics as an optional shortcut and the auto-lock
+    /// delay. (Telemetry moved to its own "Data & Privacy" section — see `dataPrivacyCard`.) Turning
+    /// App lock on sets a PIN first; the PIN hash lives in the Keychain (see `PinLock`), while the
+    /// on/off + delay + biometric flags are AppStorage. This absorbs the old Face-ID-only lock —
+    /// biometrics reuse the same `faceID` flag.
     private var privacyCard: some View {
         VStack(spacing: 0) {
             Toggle(isOn: $appLockEnabled) { label("App lock", "lock.fill", Color(argb: 0xFF30B0C7)) }
@@ -394,27 +404,56 @@ struct AccountView: View {
                     }
                 }
             }
+        }
+        .contentCard(cornerRadius: 14)
+    }
+
+    /// The "Data & Privacy" group (mockup 1d): the two telemetry opt-in toggles — Usage analytics and
+    /// Crash reporting — plus a Privacy Policy row, over a reassurance footnote. Opt-in, default off:
+    /// the stored preference is the source of truth, so every change is pushed straight to the SDK and
+    /// also records the first-run consent choice (`analyticsConsentDecided`) — enabling from Settings
+    /// counts as deciding, so the gate never re-asks. Android parity: the Account "Data & privacy" rows.
+    private var dataPrivacyCard: some View {
+        VStack(spacing: 0) {
+            Toggle(isOn: $analyticsEnabled) {
+                label("account_analytics", "chart.bar.xaxis", Color(argb: 0xFF5856D6),
+                      subtitle: "account_analytics_sub")
+            }
+            .tint(Palette.good)
+            .padding(.vertical, 8).padding(.horizontal, 16)
+            .onChange(of: analyticsEnabled) { _, enabled in
+                Analytics.setEnabled(enabled)
+                analyticsConsentDecided = true
+            }
             divider
-            // Default-on with a real opt-out (Android parity). The stored preference is the source of
-            // truth — push every change straight to the SDK so it can't drift from the toggle.
             Toggle(isOn: $crashReporting) {
                 label("Crash reporting", "exclamationmark.triangle.fill", Color(argb: 0xFFFF9500))
             }
             .tint(Palette.good)
             .padding(.vertical, 8).padding(.horizontal, 16)
-            .onChange(of: crashReporting) { _, enabled in CrashReporting.setEnabled(enabled) }
-            divider
-            // Product analytics — a SEPARATE opt-out beside crash reporting (§0, Android parity). The
-            // stored preference is the source of truth — push every change straight to the SDK.
-            Toggle(isOn: $analyticsEnabled) {
-                label("account_analytics", "chart.bar.xaxis", Color(argb: 0xFFFF9500),
-                      subtitle: "account_analytics_sub")
+            .onChange(of: crashReporting) { _, enabled in
+                CrashReporting.setEnabled(enabled)
+                analyticsConsentDecided = true
             }
-            .tint(Palette.good)
-            .padding(.vertical, 8).padding(.horizontal, 16)
-            .onChange(of: analyticsEnabled) { _, enabled in Analytics.setEnabled(enabled) }
+            divider
+            Link(destination: Legal.privacyPolicy) {
+                row("Privacy Policy", "hand.raised.fill", Color(argb: 0xFF34C759)) {
+                    Image(systemName: "arrow.up.right")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(Palette.label.opacity(0.3))
+                }
+            }
+            .buttonStyle(.plain)
         }
         .contentCard(cornerRadius: 14)
+    }
+
+    /// Reassurance footnote under the Data & Privacy card — the same line the consent gate shows.
+    private var dataPrivacyFootnote: some View {
+        Text("No financial data ever leaves your device.")
+            .font(.caption).foregroundStyle(Palette.secondaryLabel)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 16).padding(.top, 8)
     }
 
     private var autoLockLabel: String {
