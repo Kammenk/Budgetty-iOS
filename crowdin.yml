@@ -24,8 +24,12 @@ files:
   # Localizable.xcstrings is a MULTILINGUAL String Catalog: a single file holds
   # every language. Crowdin reads `en` as the source and writes every target
   # language back into the SAME file — so source and translation are one path.
+  # `multilingual: true` is REQUIRED — without it the CLI rejects the same-path
+  # translation ("should contain at least one language placeholder"). Do NOT add
+  # a `dest:` (known bug with multilingual formats + dest breaks download).
   - source: /Budgetty/Localizable.xcstrings
     translation: /Budgetty/Localizable.xcstrings
+    multilingual: true
 
 # ⚠️ After the first round-trip, verify the catalog with a SEMANTIC key-diff
 #    (not git's line-diff) — the String Catalog parser can reorder or re-key.
