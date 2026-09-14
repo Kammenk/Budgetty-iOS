@@ -217,6 +217,7 @@ enum LanguageOption {
         ("es", "Español"),
         ("fi", "Suomi"),
         ("fr", "Français"),
+        ("hu", "Magyar"),
         ("it", "Italiano"),
         ("nb", "Norsk"),
         ("nl", "Nederlands"),

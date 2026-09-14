@@ -246,6 +246,7 @@
 				es,
 				fi,
 				fr,
+				hu,
 				it,
 				nb,
 				nl,
