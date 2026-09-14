@@ -67,7 +67,7 @@ struct WellbeingBanner: View {
         if firstRun { return Text("Set a budget to unlock it") }
         guard let tip else { return Text("See how you're doing") }
         let amt = (tip.amount ?? .zero).formatMoney()
-        let label = tip.label ?? ""
+        let label = Categories.displayName(tip.label ?? "")
         switch tip.type {
         case .categorySpike: return Text("\(label) is up \(tip.percent ?? 0)%")
         case .negativeCashflow: return Text("\(amt) more out than in")

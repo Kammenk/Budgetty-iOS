@@ -661,7 +661,7 @@ struct WellbeingView: View {
     private func tipTitle(_ tip: WellbeingTip) -> Text {
         let amt = (tip.amount ?? .zero).formatMoney()
         let amt2 = (tip.amount2 ?? .zero).formatMoney()
-        let label = tip.label ?? ""
+        let label = Categories.displayName(tip.label ?? "")
         switch tip.type {
         case .negativeCashflow: return Text("You spent \(amt) more than you earned this month")
         case .overBudget: return Text("Over budget in \(tip.count ?? 0) categories — \(amt) above plan")
