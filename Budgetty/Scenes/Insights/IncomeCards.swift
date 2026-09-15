@@ -8,6 +8,7 @@
 //  Net = income − bills − spend. (Upcoming bills moved to the Home screen.)
 //
 
+import SwiftData
 import SwiftUI
 
 struct IncomeInsightsCards: View {

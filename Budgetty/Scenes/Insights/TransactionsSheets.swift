@@ -6,6 +6,7 @@
 //  Presented from the Insights "Top categories" / "Top stores" rows.
 //
 
+import SwiftData
 import SwiftUI
 
 /// Line items belonging to `category` (rolled up to its group) for the given items.
