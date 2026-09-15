@@ -1884,4 +1884,4 @@ home there.
 
 **Status:** Android **merged to `main` + pushed** (`751729e`); build + detekt + lint green, device-verified
 on Pixel 6 (overlay toggle reshapes the Breakdown donut live; savings switcher recomputes the whole split).
-iOS: **PENDING port.**
+iOS: **PORTED** — `feat/insights-inline-controls` merged to `main` (`d245c2d`) 2026-09-15. `xcodebuild build` + the full unit suite (**292 tests / 34 suites, 0 failures**) green on the iPhone 17 Pro sim; live-run not visually verified (Firebase login wall, no guest path). Needed 3 `import SwiftData` fixes for Xcode 26's `#MemberImportVisibility` (`IncomeCards`/`InsightsExtraCards`/`TransactionsSheets`), also cherry-picked to `main` as `43c72f6`.
