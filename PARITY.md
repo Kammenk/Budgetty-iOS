@@ -1885,3 +1885,25 @@ home there.
 **Status:** Android **merged to `main` + pushed** (`751729e`); build + detekt + lint green, device-verified
 on Pixel 6 (overlay toggle reshapes the Breakdown donut live; savings switcher recomputes the whole split).
 iOS: **PORTED** — `feat/insights-inline-controls` merged to `main` (`d245c2d`) 2026-09-15. `xcodebuild build` + the full unit suite (**292 tests / 34 suites, 0 failures**) green on the iPhone 17 Pro sim; live-run not visually verified (Firebase login wall, no guest path). Needed 3 `import SwiftData` fixes for Xcode 26's `#MemberImportVisibility` (`IncomeCards`/`InsightsExtraCards`/`TransactionsSheets`), also cherry-picked to `main` as `43c72f6`.
+
+## Android → iOS — Analytics consent screen wording — 2026-09-15
+
+Copy-only correction to the first-run telemetry consent screen (`AnalyticsConsentView` /
+Android `AnalyticsConsentScreen`), across all 17 locales — no behaviour or logic change:
+
+- Disclosure toggle "What we collect, and never" → **"What we collect — and what we don't"**
+  (the clipped phrasing now pairs with the two disclosure columns).
+- Disclosure column header "Never" → **"Not collected"**, so the column reads naturally
+  top-to-bottom above its list of items.
+- Usage-analytics card lead adjective "Anonymous" → **"Anonymized"** — reports are tied to a
+  random ID (pseudonymous), so this avoids overclaiming true anonymity. Adjective only; the
+  rest of the sentence is unchanged in every locale.
+
+es/fi/ro/ru already rendered the toggle idiomatically as "…and what we don't", so only the
+header + adjective changed for those four.
+
+**Status:** Android **merged to `main` + pushed** (`aefa60e`); `:app:lintDebug` green.
+iOS: **PORTED** — `fix/analytics-consent-wording` (`49e7d74`). Strings converted mechanically
+from Android (xcstrings keys renamed to the new English source; the 16 localizations are
+byte-identical to Android's). `xcodebuild build` (Debug, iOS Simulator) green. Pure copy —
+no device run needed.

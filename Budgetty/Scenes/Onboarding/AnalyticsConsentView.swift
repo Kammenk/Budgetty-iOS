@@ -85,7 +85,7 @@ struct AnalyticsConsentView: View {
                 icon: "chart.bar.fill",
                 tile: analyticsTile,
                 title: "Usage analytics",
-                subtitle: "Anonymous data about which features you use, so we can improve Budgetty. Never your receipts, amounts, or personal info."
+                subtitle: "Anonymized data about which features you use, so we can improve Budgetty. Never your receipts, amounts, or personal info."
             )
             Rectangle().fill(Palette.separator).frame(height: 0.5)
                 .padding(.leading, 66)
@@ -127,7 +127,7 @@ struct AnalyticsConsentView: View {
         .padding(16)
     }
 
-    // MARK: - "What we collect, and never"
+    // MARK: - "What we collect — and what we don't"
 
     private var collectAndNeverCard: some View {
         VStack(spacing: 0) {
@@ -135,7 +135,7 @@ struct AnalyticsConsentView: View {
                 withAnimation(.easeInOut(duration: 0.22)) { detailExpanded.toggle() }
             } label: {
                 HStack {
-                    Text("What we collect, and never")
+                    Text("What we collect — and what we don't")
                         .font(.subheadline).fontWeight(.semibold)
                         .foregroundStyle(Palette.label)
                     Spacer()
@@ -156,7 +156,7 @@ struct AnalyticsConsentView: View {
                                      items: ["Which screens you open", "Which features you use",
                                              "Crash reports", "App speed and errors",
                                              "Device model, OS version"])
-                        detailColumn(header: "Never", tint: Palette.bad, glyph: "xmark",
+                        detailColumn(header: "Not collected", tint: Palette.bad, glyph: "xmark",
                                      items: ["Your receipts", "Any amounts", "Your income",
                                              "Your categories", "Your identity"])
                     }
