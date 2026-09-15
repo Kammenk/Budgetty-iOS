@@ -301,102 +301,102 @@
         }
       }
     },
-    "Anonymous data about which features you use, so we can improve Budgetty. Never your receipts, amounts, or personal info." : {
+    "Anonymized data about which features you use, so we can improve Budgetty. Never your receipts, amounts, or personal info." : {
       "localizations" : {
         "bg" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Анонимни данни за това кои функции използваш, за да можем да подобряваме Budgetty. Никога твоите бележки, суми или лични данни."
+            "value" : "Анонимизирани данни за това кои функции използваш, за да можем да подобряваме Budgetty. Никога твоите бележки, суми или лични данни."
           }
         },
         "cs" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Anonymní údaje o tom, které funkce používáte, abychom mohli Budgetty vylepšovat. Nikdy vaše účtenky, částky ani osobní údaje."
+            "value" : "Anonymizované údaje o tom, které funkce používáte, abychom mohli Budgetty vylepšovat. Nikdy vaše účtenky, částky ani osobní údaje."
           }
         },
         "da" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Anonyme data om, hvilke funktioner du bruger, så vi kan forbedre Budgetty. Aldrig dine kvitteringer, beløb eller personlige oplysninger."
+            "value" : "Anonymiserede data om, hvilke funktioner du bruger, så vi kan forbedre Budgetty. Aldrig dine kvitteringer, beløb eller personlige oplysninger."
           }
         },
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Anonyme Daten darüber, welche Funktionen du nutzt, damit wir Budgetty verbessern können. Niemals deine Belege, Beträge oder persönlichen Daten."
+            "value" : "Anonymisierte Daten darüber, welche Funktionen du nutzt, damit wir Budgetty verbessern können. Niemals deine Belege, Beträge oder persönlichen Daten."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Datos anónimos sobre qué funciones usas, para que podamos mejorar Budgetty. Nunca tus recibos, importes ni datos personales."
+            "value" : "Datos anonimizados sobre qué funciones usas, para que podamos mejorar Budgetty. Nunca tus recibos, importes ni datos personales."
           }
         },
         "fi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Anonyymejä tietoja siitä, mitä ominaisuuksia käytät, jotta voimme parantaa Budgettya. Ei koskaan kuittejasi, summiasi tai henkilötietojasi."
+            "value" : "Anonymisoituja tietoja siitä, mitä ominaisuuksia käytät, jotta voimme parantaa Budgettya. Ei koskaan kuittejasi, summiasi tai henkilötietojasi."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Des données anonymes sur les fonctionnalités que vous utilisez, afin d'améliorer Budgetty. Jamais vos reçus, vos montants ni vos informations personnelles."
+            "value" : "Des données anonymisées sur les fonctionnalités que vous utilisez, afin d'améliorer Budgetty. Jamais vos reçus, vos montants ni vos informations personnelles."
           }
         },
         "hu" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Névtelen adatok arról, mely funkciókat használod, hogy jobbá tehessük a Budgettyt. Soha nem a nyugtáid, összegeid vagy személyes adataid."
+            "value" : "Anonimizált adatok arról, mely funkciókat használod, hogy jobbá tehessük a Budgettyt. Soha nem a nyugtáid, összegeid vagy személyes adataid."
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Dati anonimi sulle funzioni che usi, così possiamo migliorare Budgetty. Mai i tuoi scontrini, importi o dati personali."
+            "value" : "Dati anonimizzati sulle funzioni che usi, così possiamo migliorare Budgetty. Mai i tuoi scontrini, importi o dati personali."
           }
         },
         "nb" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Anonyme data om hvilke funksjoner du bruker, så vi kan forbedre Budgetty. Aldri kvitteringene, beløpene eller de personlige opplysningene dine."
+            "value" : "Anonymiserte data om hvilke funksjoner du bruker, så vi kan forbedre Budgetty. Aldri kvitteringene, beløpene eller de personlige opplysningene dine."
           }
         },
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Anonieme gegevens over welke functies je gebruikt, zodat we Budgetty kunnen verbeteren. Nooit je bonnen, bedragen of persoonlijke gegevens."
+            "value" : "Geanonimiseerde gegevens over welke functies je gebruikt, zodat we Budgetty kunnen verbeteren. Nooit je bonnen, bedragen of persoonlijke gegevens."
           }
         },
         "pl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Anonimowe dane o tym, których funkcji używasz, abyśmy mogli ulepszać Budgetty. Nigdy Twoich paragonów, kwot ani danych osobowych."
+            "value" : "Zanonimizowane dane o tym, których funkcji używasz, abyśmy mogli ulepszać Budgetty. Nigdy Twoich paragonów, kwot ani danych osobowych."
           }
         },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Dados anónimos sobre as funcionalidades que usa, para podermos melhorar o Budgetty. Nunca os seus recibos, valores ou dados pessoais."
+            "value" : "Dados anonimizados sobre as funcionalidades que usa, para podermos melhorar o Budgetty. Nunca os seus recibos, valores ou dados pessoais."
           }
         },
         "ro" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Date anonime despre funcțiile pe care le folosești, ca să putem îmbunătăți Budgetty. Niciodată bonurile, sumele sau datele tale personale."
+            "value" : "Date anonimizate despre funcțiile pe care le folosești, ca să putem îmbunătăți Budgetty. Niciodată bonurile, sumele sau datele tale personale."
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Анонимные данные о том, какими функциями вы пользуетесь, чтобы мы могли улучшать Budgetty. Никогда ваши чеки, суммы или личные данные."
+            "value" : "Анонимизированные данные о том, какими функциями вы пользуетесь, чтобы мы могли улучшать Budgetty. Никогда ваши чеки, суммы или личные данные."
           }
         },
         "sv" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Anonym data om vilka funktioner du använder, så att vi kan förbättra Budgetty. Aldrig dina kvitton, belopp eller personuppgifter."
+            "value" : "Anonymiserad data om vilka funktioner du använder, så att vi kan förbättra Budgetty. Aldrig dina kvitton, belopp eller personuppgifter."
           }
         }
       }
@@ -601,30 +601,30 @@
         }
       }
     },
-    "What we collect, and never" : {
+    "What we collect — and what we don't" : {
       "localizations" : {
         "bg" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Какво събираме и какво никога"
+            "value" : "Какво събираме — и какво не"
           }
         },
         "cs" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Co shromažďujeme a co nikdy"
+            "value" : "Co shromažďujeme — a co ne"
           }
         },
         "da" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Hvad vi indsamler, og aldrig"
+            "value" : "Hvad vi indsamler — og hvad ikke"
           }
         },
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Was wir erfassen und was nie"
+            "value" : "Was wir erfassen — und was nicht"
           }
         },
         "es" : {
@@ -642,43 +642,43 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ce que nous collectons, et jamais"
+            "value" : "Ce que nous collectons — et ce que nous ne collectons pas"
           }
         },
         "hu" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Mit gyűjtünk, és mit soha"
+            "value" : "Mit gyűjtünk — és mit nem"
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Cosa raccogliamo e cosa mai"
+            "value" : "Cosa raccogliamo — e cosa no"
           }
         },
         "nb" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Hva vi samler inn, og aldri"
+            "value" : "Hva vi samler inn — og hva ikke"
           }
         },
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Wat we verzamelen, en nooit"
+            "value" : "Wat we verzamelen — en wat niet"
           }
         },
         "pl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Co zbieramy, a czego nigdy"
+            "value" : "Co zbieramy — a czego nie"
           }
         },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "O que recolhemos e o que nunca"
+            "value" : "O que recolhemos — e o que não"
           }
         },
         "ro" : {
@@ -696,7 +696,7 @@
         "sv" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Vad vi samlar in, och aldrig"
+            "value" : "Vad vi samlar in — och vad inte"
           }
         }
       }
@@ -801,102 +801,102 @@
         }
       }
     },
-    "Never" : {
+    "Not collected" : {
       "localizations" : {
         "bg" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Никога"
+            "value" : "Не се събира"
           }
         },
         "cs" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Nikdy"
+            "value" : "Neshromažďuje se"
           }
         },
         "da" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Aldrig"
+            "value" : "Indsamles ikke"
           }
         },
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Nie"
+            "value" : "Nicht erfasst"
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Nunca"
+            "value" : "No se recopila"
           }
         },
         "fi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ei koskaan"
+            "value" : "Ei kerätä"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Jamais"
+            "value" : "Non collecté"
           }
         },
         "hu" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Soha"
+            "value" : "Nem gyűjtött adatok"
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Mai"
+            "value" : "Non raccolto"
           }
         },
         "nb" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Aldri"
+            "value" : "Samles ikke inn"
           }
         },
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Nooit"
+            "value" : "Niet verzameld"
           }
         },
         "pl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Nigdy"
+            "value" : "Niezbierane"
           }
         },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Nunca"
+            "value" : "Não recolhido"
           }
         },
         "ro" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Niciodată"
+            "value" : "Nu se colectează"
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Никогда"
+            "value" : "Не собираем"
           }
         },
         "sv" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Aldrig"
+            "value" : "Samlas inte in"
           }
         }
       }
