@@ -95180,214 +95180,214 @@
         }
       }
     },
-    "Counting everything you keep. Change in Customize sections." : {
+    "Counting everything you keep." : {
       "localizations" : {
         "bg" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Броим всичко, което задържаш. Промени в Персонализирай секциите."
+            "value" : "Броим всичко, което задържаш."
           }
         },
         "cs" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Počítáme vše, co si necháte. Změňte v Přizpůsobit sekce."
+            "value" : "Počítáme vše, co si necháte."
           }
         },
         "da" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Tæller alt, du beholder. Ændr under Tilpas sektioner."
+            "value" : "Tæller alt, du beholder."
           }
         },
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Zählt alles, was du behältst. Änderbar unter Bereiche anpassen."
+            "value" : "Zählt alles, was du behältst."
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Counting everything you keep. Change in Customize sections."
+            "value" : "Counting everything you keep."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Cuenta todo lo que guardas. Cámbialo en Personalizar secciones."
+            "value" : "Cuenta todo lo que guardas."
           }
         },
         "fi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Lasketaan kaikki, minkä pidät. Muuta kohdassa Mukauta osioita."
+            "value" : "Lasketaan kaikki, minkä pidät."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Compte tout ce que vous gardez. Modifiable dans Personnaliser les sections."
+            "value" : "Compte tout ce que vous gardez."
           }
         },
         "hu" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Minden megtartott pénzt számít. Módosítsd a Szakaszok testreszabása alatt."
+            "value" : "Minden megtartott pénzt számít."
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Conta tutto ciò che tieni. Modifica in Personalizza sezioni."
+            "value" : "Conta tutto ciò che tieni."
           }
         },
         "nb" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Teller alt du beholder. Endre i Tilpass seksjoner."
+            "value" : "Teller alt du beholder."
           }
         },
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Telt alles wat je overhoudt. Wijzig bij Secties aanpassen."
+            "value" : "Telt alles wat je overhoudt."
           }
         },
         "pl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Liczymy wszystko, co zatrzymujesz. Zmień w Dostosuj sekcje."
+            "value" : "Liczymy wszystko, co zatrzymujesz."
           }
         },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Conta tudo o que você guarda. Altere em Personalizar seções."
+            "value" : "Conta tudo o que você guarda."
           }
         },
         "ro" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Numărăm tot ce păstrezi. Schimbă în Personalizează secțiunile."
+            "value" : "Numărăm tot ce păstrezi."
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Считаем всё, что остаётся. Измените в Настроить разделы."
+            "value" : "Считаем всё, что остаётся."
           }
         },
         "sv" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Räknar allt du behåller. Ändra i Anpassa sektioner."
+            "value" : "Räknar allt du behåller."
           }
         }
       }
     },
-    "Counting money you set aside. Change in Customize sections." : {
+    "Counting money you set aside." : {
       "localizations" : {
         "bg" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Броим парите, които заделяш. Промени в Персонализирай секциите."
+            "value" : "Броим парите, които заделяш."
           }
         },
         "cs" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Počítáme peníze, které dáte stranou. Změňte v Přizpůsobit sekce."
+            "value" : "Počítáme peníze, které dáte stranou."
           }
         },
         "da" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Tæller penge, du lægger til side. Ændr under Tilpas sektioner."
+            "value" : "Tæller penge, du lægger til side."
           }
         },
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Zählt Geld, das du zurücklegst. Änderbar unter Bereiche anpassen."
+            "value" : "Zählt Geld, das du zurücklegst."
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Counting money you set aside. Change in Customize sections."
+            "value" : "Counting money you set aside."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Cuenta el dinero que apartas. Cámbialo en Personalizar secciones."
+            "value" : "Cuenta el dinero que apartas."
           }
         },
         "fi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Lasketaan sivuun laittamasi raha. Muuta kohdassa Mukauta osioita."
+            "value" : "Lasketaan sivuun laittamasi raha."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Compte l'argent que vous mettez de côté. Modifiable dans Personnaliser les sections."
+            "value" : "Compte l'argent que vous mettez de côté."
           }
         },
         "hu" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "A félretett pénzt számít. Módosítsd a Szakaszok testreszabása alatt."
+            "value" : "A félretett pénzt számít."
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Conta il denaro che metti da parte. Modifica in Personalizza sezioni."
+            "value" : "Conta il denaro che metti da parte."
           }
         },
         "nb" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Teller penger du setter av. Endre i Tilpass seksjoner."
+            "value" : "Teller penger du setter av."
           }
         },
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Telt geld dat je apart zet. Wijzig bij Secties aanpassen."
+            "value" : "Telt geld dat je apart zet."
           }
         },
         "pl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Liczymy pieniądze, które odkładasz. Zmień w Dostosuj sekcje."
+            "value" : "Liczymy pieniądze, które odkładasz."
           }
         },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Conta o dinheiro que você separa. Altere em Personalizar seções."
+            "value" : "Conta o dinheiro que você separa."
           }
         },
         "ro" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Numărăm banii pe care îi pui deoparte. Schimbă în Personalizează secțiunile."
+            "value" : "Numărăm banii pe care îi pui deoparte."
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Считаем деньги, которые вы откладываете. Измените в Настроить разделы."
+            "value" : "Считаем деньги, которые вы откладываете."
           }
         },
         "sv" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Räknar pengar du lägger undan. Ändra i Anpassa sektioner."
+            "value" : "Räknar pengar du lägger undan."
           }
         }
       }

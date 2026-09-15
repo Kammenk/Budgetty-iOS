@@ -196,6 +196,11 @@ struct InsightsView: View {
     @ViewBuilder
     private func fixedTab(_ tab: InsightsTab) -> some View {
         let hasData = !periodReceipts.isEmpty
+        // The planned-bills overlay switch leads the Spending tab — next to the charts its layer reshapes.
+        // Android parity: SpendingOverlayToggleCard (Spending-only; Trends honours the same global toggle).
+        if tab == .spending && hasBills {
+            overlayToggleCard
+        }
         if tab == .money && !hasIncome && !hasBills {
             TabInvitationCard(
                 title: "Your money flow needs a plan",
@@ -229,7 +234,6 @@ struct InsightsView: View {
             if !groupSlices.isEmpty { overviewTopSpending }
             if !overviewHighlights.isEmpty || projectedTotal != nil { overviewWorthKnowing }
             OverviewSetupChecklist(items: activeSetupItems, onAction: onSetupAction, onDismiss: onSetupDismiss)
-            overviewOptions
         }
     }
 
@@ -321,49 +325,22 @@ struct InsightsView: View {
         .contentCard(cornerRadius: 16)
     }
 
-    /// The two global Overview options, as full settings-style rows in one card (the mockup treatment):
-    /// the planned-bills overlay switch (when there are bills to overlay) and the Needs/Wants savings-
-    /// allocation mode (once a split exists and the mode is set — the first choice is made through the
-    /// checklist). Each row names what it does and gives a real, comfortably-sized control. Android
-    /// parity: `OverviewOptionsCard`.
-    @ViewBuilder
-    private var overviewOptions: some View {
-        let showPlanned = hasBills
-        let showSavings = needsWantsSplit != nil && nwsAllocation != .unset
-        if showPlanned || showSavings {
-            VStack(spacing: 0) {
-                if showPlanned {
-                    Toggle(isOn: $includeRecurringBills) {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("Include recurring bills").font(.subheadline).foregroundStyle(Palette.label)
-                            Text("Overlay planned bills as a separate layer")
-                                .font(.caption).foregroundStyle(Palette.secondaryLabel)
-                        }
-                    }
-                    .tint(Palette.tint)
-                    .padding(.vertical, 12)
-                    if showSavings { Divider() }
-                }
-                if showSavings {
-                    let kept = nwsAllocation == .countKept
-                    Button { nwsAllocRaw = kept ? 2 : 1 } label: {
-                        HStack(spacing: 12) {
-                            Text("Savings").font(.subheadline).foregroundStyle(Palette.label)
-                            Spacer(minLength: 8)
-                            Text(kept ? "Count what I keep" : "Only money I set aside")
-                                .font(.subheadline).foregroundStyle(Palette.secondaryLabel)
-                                .lineLimit(1).minimumScaleFactor(0.8)
-                            Image(systemName: "chevron.up.chevron.down")
-                                .font(.caption2.weight(.semibold)).foregroundStyle(Palette.tertiaryLabel)
-                        }
-                        .padding(.vertical, 12).contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-                }
+    /// The planned-bills overlay switch, leading the Spending tab — next to the charts its "planned"
+    /// layer reshapes (the Breakdown donut; the Trends bars). A visible switch so its on/off state stays
+    /// glanceable; the caller shows it only when there are bills to overlay. Android parity:
+    /// `SpendingOverlayToggleCard` (moved here from the retired Overview options card).
+    private var overlayToggleCard: some View {
+        Toggle(isOn: $includeRecurringBills) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Include recurring bills").font(.subheadline).foregroundStyle(Palette.label)
+                Text("Overlay planned bills as a separate layer")
+                    .font(.caption).foregroundStyle(Palette.secondaryLabel)
             }
-            .padding(.horizontal, 16)
-            .contentCard(cornerRadius: 16)
         }
+        .tint(Palette.tint)
+        .padding(.vertical, 12)
+        .padding(.horizontal, 16)
+        .contentCard(cornerRadius: 16)
     }
 
     // MARK: - Overview setup checklist (P3)
