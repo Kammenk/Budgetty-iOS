@@ -60,14 +60,38 @@ struct NeedsWantsSplitCard: View {
                 }
             }
 
-            // Summary + goal nudge + footer note only once the definition is chosen.
+            // Summary, the persistent change-savings-counting control, goal nudge + footer note — only
+            // once the definition is chosen. The switcher is the home of that choice now (Overview's
+            // options card is retired). Android parity: `SavingsAllocationSwitchRow`.
             if !unset {
                 Divider().padding(.top, 16)
                 Text(summary(split)).font(.subheadline).foregroundStyle(Palette.secondaryLabel).padding(.top, 12)
+                savingsAllocationSwitchRow(split).padding(.top, 12)
                 SavingsGoalCta(allocation: split.allocation) { selectTab?(.budget) }.padding(.top, 12)
                 Text(footer(split)).font(.caption).foregroundStyle(Palette.secondaryLabel).padding(.top, 12)
             }
         }
+    }
+
+    /// The persistent "how Savings is counted" control, shown once the mode is chosen (the first pick is
+    /// `SavingsAllocationAsk`). Tapping flips countKept ↔ setAside — the home of that choice now that the
+    /// Overview options card is gone. Android parity: `SavingsAllocationSwitchRow`.
+    @ViewBuilder
+    private func savingsAllocationSwitchRow(_ split: NeedsWantsSplit) -> some View {
+        let kept = split.allocation == .countKept
+        Button { onChoose(!kept) } label: {
+            HStack(spacing: 12) {
+                Text("Savings").font(.subheadline).foregroundStyle(Palette.label)
+                Spacer(minLength: 8)
+                Text(kept ? "Count what I keep" : "Only money I set aside")
+                    .font(.subheadline).foregroundStyle(Palette.secondaryLabel)
+                    .lineLimit(1).minimumScaleFactor(0.8)
+                Image(systemName: "chevron.up.chevron.down")
+                    .font(.caption2.weight(.semibold)).foregroundStyle(Palette.tertiaryLabel)
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
     }
 
     private func header(_ income: Decimal) -> some View {
@@ -107,8 +131,8 @@ struct NeedsWantsSplitCard: View {
 
     private func footer(_ split: NeedsWantsSplit) -> LocalizedStringKey {
         split.allocation == .countKept
-            ? "Counting everything you keep. Change in Customize sections."
-            : "Counting money you set aside. Change in Customize sections."
+            ? "Counting everything you keep."
+            : "Counting money you set aside."
     }
 
     // MARK: Setup (no income yet)
