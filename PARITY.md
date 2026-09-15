@@ -1846,3 +1846,42 @@ collapse/expand with the fixed "1 thing to set up" plural, the quick-toggle chip
 cards, and the Custom seed + section picker with members-first/reorder/home labels). Android side is
 merged-to-`main`-pending (`feat/insights-tab-grouping`, HEAD `f0a9395`). **Not pushed or merged — awaiting
 the user's device-verification gate (incl. iPad live-visual, which needs sign-in).**
+
+## Android → iOS — Insights: overlay & savings controls moved to their owning tabs — 2026-09-15
+
+Follows the Insights Hybrid redesign (above). On Android the planned-bills **overlay switch** and the
+Needs/Wants **savings-counting** choice were the two quick-toggle chips at the bottom of the **Overview**
+tab (the D6 replacement for the old Customize→Layers sheet). They sat a tab away from the charts they
+change, so they moved next to what they control, and Overview is now summary-only. Android branch
+`feat/insights-inline-overlay-toggle`, merged to `main` (merge `751729e`, refactor `2c3a08d`). Port the
+behaviour from `InsightsScreen.kt` (no ViewModel is involved).
+
+- **Overlay switch → top of the Spending tab.** New `SpendingOverlayToggleCard` (title
+  `insights_overlay_toggle_title` / subtitle `insights_overlay_toggle_subtitle`, a plain `Switch`) is the
+  first item of the Spending tab, gated `state.isLoaded && state.hasBills`. Same `includeRecurringBills`
+  state as before — it still drives the Breakdown donut's planned layer and the Trends bars' hatched caps;
+  only the control moved. **Spending-only** is deliberate (Trends honours the same global toggle but carries
+  no control of its own); revisit only if wanted.
+- **Savings-counting → persistent switcher on the Money split card.** New `SavingsAllocationSwitchRow`
+  inside `NeedsWantsSplitCard`'s chosen (`!unset`) branch, between the allocation summary and the
+  "give it a goal" CTA: a tappable row (header `insights_nws_alloc_header`, value
+  `insights_nws_ask_keep`/`insights_nws_ask_aside`, an UnfoldMore glyph) that flips COUNT_KEPT ↔ SET_ASIDE.
+  This is the load-bearing half — the Money card previously showed the allocation chooser **only while
+  UNSET** (the first-time ask), so without this the setting is unchangeable after the first pick.
+- **Overview loses the options card.** `OverviewOptionsCard` (both chips) is deleted, and
+  `OverviewControls.onChooseSavingsAllocation` with it. Discovery is unchanged — the "things to set up"
+  checklist still surfaces SAVINGS (→ Money tab) and OVERLAY (turns the overlay on).
+- **String trim (mirror mechanically, don't re-translate).** `insights_nws_footer_keep` /
+  `insights_nws_footer_aside` dropped their stale second sentence ("Change in Customize sections." — that
+  menu has been gone since D6, and the switcher now sits on the card) across all 17 Android locales. Mirror
+  by removing the same trailing sentence from both keys in `Localizable.xcstrings`.
+
+iOS mapping: this relocates controls iOS already has (the two Overview chips from the Hybrid port above), so
+reuse the existing switch + allocation-chooser components — no new mockup is needed, though a short design
+pass on the Spending-tab toggle placement is optional. Note the iOS Money bundling: iOS packs the money-flow
+cards into `IncomeInsightsCards`, but the Needs/Wants/Savings card is separate, so the switcher has a clear
+home there.
+
+**Status:** Android **merged to `main` + pushed** (`751729e`); build + detekt + lint green, device-verified
+on Pixel 6 (overlay toggle reshapes the Breakdown donut live; savings switcher recomputes the whole split).
+iOS: **PENDING port.**
