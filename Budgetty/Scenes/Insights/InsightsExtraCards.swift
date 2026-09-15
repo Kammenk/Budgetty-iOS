@@ -8,6 +8,7 @@
 //  All period-relative; the hosting InsightsView feeds them pre-windowed data.
 //
 
+import SwiftData
 import SwiftUI
 
 // MARK: - Highlights
