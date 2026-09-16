@@ -61,7 +61,7 @@ struct SupportAboutView: View {
                     .shadow(color: Palette.tint.opacity(0.35), radius: 12, y: 6)
                     .padding(.bottom, 12)
                 Text("Budgetty").font(.headline).foregroundStyle(Palette.label)
-                Text("Budgetty 1.0 · Made with 💜")
+                Text("Budgetty \(Self.appVersion) · Made with 💜")
                     .font(.caption).foregroundStyle(Palette.secondaryLabel)
                     .padding(.top, 4)
             }
@@ -71,6 +71,10 @@ struct SupportAboutView: View {
         .underFloatingDock(reportingScroll: false)
         .screenCanvas()
         .navigationTitle("Support & About")
+    }
+
+    private static var appVersion: String {
+        Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1.1"
     }
 
     private func sectionHeader(_ title: LocalizedStringKey) -> some View {
