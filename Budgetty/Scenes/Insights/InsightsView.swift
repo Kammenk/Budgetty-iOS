@@ -246,6 +246,7 @@ struct InsightsView: View {
                     .font(.system(size: 36, weight: .bold)).foregroundStyle(Palette.label)
                 overviewDelta
             }
+            overviewWithBills
             if let split = needsWantsSplit {
                 MiniSplitBar(split: split).padding(.top, 16)
             }
@@ -272,6 +273,24 @@ struct InsightsView: View {
                     .foregroundStyle(down ? Palette.good : Palette.secondaryLabel)
                     .padding(.bottom, 6)
             }
+        }
+    }
+
+    /// The Overview hero's "With bills" line: actual spend + the period's planned recurring bills, shown
+    /// only when the user has bills. Additive and clearly labelled — the hero total, its delta and the
+    /// 50/30/20 bar all stay transactions-only, so this never redefines "Total spent". Mirrors the Money
+    /// tab's "spending + planned bills"; the hatch matches the Spending/Trends overlay key. Android
+    /// parity: `OverviewWithBillsLine`.
+    @ViewBuilder
+    private var overviewWithBills: some View {
+        if hasBills {
+            HStack(spacing: 6) {
+                PlannedHatchSwatch(size: 9, corner: 2.5)
+                Text("With bills").font(.footnote).foregroundStyle(Palette.secondaryLabel)
+                Text((totalSpent + periodBills).formatMoney())
+                    .font(.footnote).fontWeight(.semibold).foregroundStyle(Palette.label)
+            }
+            .padding(.top, 9)
         }
     }
 

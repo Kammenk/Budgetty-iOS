@@ -1907,3 +1907,38 @@ iOS: **PORTED** — `fix/analytics-consent-wording` (`49e7d74`). Strings convert
 from Android (xcstrings keys renamed to the new English source; the 16 localizations are
 byte-identical to Android's). `xcodebuild build` (Debug, iOS Simulator) green. Pure copy —
 no device run needed.
+
+## Android → iOS — Insights Overview "With bills" total on the Total spent hero — 2026-09-29
+
+The Insights → Overview tab's **"Total spent"** hero was transactions-only, with no bills
+reflected anywhere on the tab (bills appear only on the Money tab and the opt-in Spending /
+Trends overlay). Add a quiet secondary **"With bills"** line under the hero figure (above the
+50/30/20 bar): a planned-hatch swatch + "With bills" + the emphasised amount.
+
+**Behavior rules:**
+- **With bills = Total spent + the period's planned recurring bills** (`total + periodBills`) —
+  the same all-planned-bills notion the Money tab already uses (`out = periodBills + total`),
+  **not** Home's paid-only figure. Shown **only when `hasBills`**; hidden entirely otherwise
+  (the hero is then exactly as it shipped).
+- The hero total, its ↑/↓ delta and the 50/30/20 split all stay **transactions-only** — this is
+  an additive, clearly-labelled roll-up, never a redefinition of "Total spent".
+- Even at €0 spent it reads "With bills <planned>" (all planned bills), so the card carries a
+  figure before the first receipt of the period.
+- Reuses the shared planned **hatch swatch** (Android `PlannedSwatch` / iOS `PlannedHatchSwatch`
+  on `Palette.plan`), matching the Spending/Trends recurring-bills overlay key, and the existing
+  **"With bills"** string (Android `home_with_bills`; iOS xcstrings key already shipped by Home)
+  — no new strings, no schema change.
+- Phone and tablet share one view (`OverviewTabContent` / `overviewHero`), so the line is
+  identical on both surfaces by design (the tablet mockup's "beside the figure" flourish was
+  intentionally not taken, to avoid width-branching a shared view).
+
+**Android refs:** `ui/insights/InsightsScreen.kt` (`OverviewWithBillsLine`, called from
+`OverviewTabContent`); `InsightsViewModel` `total` + `periodBills` + `hasBills`.
+**iOS refs:** `Budgetty/Scenes/Insights/InsightsView.swift` (`overviewWithBills`, in
+`overviewHero`); `Support/PlannedHatch.swift` `PlannedHatchSwatch`.
+**Design:** `InsightsOverviewWithBills.dc.html` / `iOS Insights Overview With Bills.dc.html` /
+`TabletInsightsOverviewWithBills.dc.html` — Direction A (compact line), all three surfaces.
+
+**Status:** Android **merged to `main` + pushed** (`742f6c5`); compile + detekt + lint green.
+iOS: **PORTED** — `feat/insights-overview-with-bills`; `xcodebuild build` (Debug, iOS
+Simulator) green. Pure presentation; no device run needed (matches the approved mockup).
