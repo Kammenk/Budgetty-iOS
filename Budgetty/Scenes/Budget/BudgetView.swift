@@ -161,7 +161,28 @@ struct BudgetView: View {
             savingsSection
             activeSubBudgetsSection
             categorySection(catStreaks)
+            envelopesEntry
         }
+    }
+
+    /// Entry to the Multiple-budgets ("envelopes") screen — named budgets beyond the main one, each
+    /// with its own window, scope and pace. Android parity: the Budget-screen envelopes card.
+    private var envelopesEntry: some View {
+        NavigationLink { BudgetEnvelopesView() } label: {
+            HStack(spacing: 12) {
+                Text("🧾").font(.title3)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Multiple budgets").font(.body).fontWeight(.semibold).foregroundStyle(Palette.label)
+                    Text("Trips, groceries, envelopes — each with its own pace")
+                        .font(.caption).foregroundStyle(Palette.secondaryLabel)
+                }
+                Spacer()
+                Image(systemName: "chevron.right").font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(Palette.tertiaryLabel)
+            }
+            .padding(16).contentCard(cornerRadius: 18)
+        }
+        .buttonStyle(.plain)
     }
 
     // MARK: - Derived data
