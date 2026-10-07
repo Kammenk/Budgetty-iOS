@@ -111,8 +111,9 @@ struct TripsView: View {
         }
     }
 
-    /// "€54 under" / "€20 over" for a past trip with a budget, else nil.
-    private func budgetResult(_ trip: Trip, spent: Decimal) -> (text: String, color: Color)? {
+    /// "€54 under" / "€20 over" for a past trip with a budget, else nil. LocalizedStringKey so the
+    /// "under"/"over" word localizes (the money is interpolated as %@).
+    private func budgetResult(_ trip: Trip, spent: Decimal) -> (text: LocalizedStringKey, color: Color)? {
         guard let budget = trip.budgetAmount, budget > 0 else { return nil }
         let diff = budget - spent
         if diff >= 0 { return ("\(diff.formatMoney()) under", Palette.good) }

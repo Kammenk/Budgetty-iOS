@@ -181,7 +181,7 @@ struct DebtPayoffView: View {
     @ViewBuilder private func payoffOrderSection(_ plan: DebtPlan) -> some View {
         if !plan.order.isEmpty {
             VStack(alignment: .leading, spacing: 8) {
-                Text("Payoff order · \(strategy == .snowball ? "Snowball" : "Avalanche")")
+                Text("Payoff order · \(String(localized: strategy == .snowball ? "Snowball" : "Avalanche"))")
                     .font(.headline).foregroundStyle(Palette.label)
                 VStack(spacing: 8) {
                     ForEach(Array(plan.order.enumerated()), id: \.offset) { index, row in
