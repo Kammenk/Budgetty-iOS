@@ -161,24 +161,28 @@ struct HomeView: View {
     /// Custom header: the large "Budgetty" brand title with the account avatar trailing on the same
     /// baseline row, exactly as in the mockup.
     private var homeHeader: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: 8) {
             Text("Budgetty")
                 .font(.largeTitle).fontWeight(.bold)
-            Spacer()
-            // Mockup: quiet pill next to the avatar opens the section customize sheet.
+                .lineLimit(1).minimumScaleFactor(0.85)
+            Spacer(minLength: 6)
+            // A compact glass circle (matching the eye) — makes room for the Hide-amounts eye + avatar
+            // in the trailing cluster; opens the section-customize sheet.
             Button { showCustomize = true } label: {
-                HStack(spacing: 4) {
-                    Image(systemName: "star")
-                        .font(.system(size: 12, weight: .semibold))
-                    Text("Customize").font(.system(size: 13, weight: .semibold))
-                }
-                .foregroundStyle(Palette.tint)
-                .padding(.horizontal, 12).padding(.vertical, 6)
-                .background(Palette.fill, in: Capsule())
+                Image(systemName: "slider.horizontal.3")
+                    .font(.system(size: 15, weight: .medium))
+                    .foregroundStyle(Palette.tint)
+                    .frame(width: 36, height: 36)
+                    .background {
+                        Circle().fill(Palette.glassFill)
+                            .background(.ultraThinMaterial, in: Circle())
+                            .overlay(Circle().strokeBorder(Palette.glassBorder, lineWidth: 0.5))
+                    }
             }
             .buttonStyle(.plain)
             .accessibilityLabel("Customize sections")
             .accessibilityIdentifier(A11y.Home.customize)
+            HideAmountsEye()
             NavigationLink { AccountView() } label: {
                 AvatarView(initials: auth.initials, size: 36, fontSize: 14)
             }
@@ -276,9 +280,7 @@ struct HomeView: View {
 
             // Mockup: the big figure never truncates — very large amounts scroll horizontally.
             ScrollView(.horizontal, showsIndicators: false) {
-                Text(periodSpent.formatMoney())
-                    .font(.system(size: 46, weight: .bold))
-                    .foregroundStyle(.white)
+                MoneyText(amount: periodSpent, size: 46, weight: .bold, color: .white, hero: true)
             }
             .padding(.vertical, 4)
 
@@ -398,9 +400,7 @@ struct HomeView: View {
             // Spent-first hero: the money already out this cycle, in neutral label colour — never
             // truncates, and it's a real figure even before income is set (no placeholder needed).
             ScrollView(.horizontal, showsIndicators: false) {
-                Text(totalSpentThisCycle.formatMoney())
-                    .font(.system(size: 46, weight: .bold))
-                    .foregroundStyle(Palette.label)
+                MoneyText(amount: totalSpentThisCycle, size: 46, weight: .bold)
             }
             .padding(.vertical, 2)
 
@@ -1106,8 +1106,7 @@ struct ReceiptRowView: View {
             }
             Spacer(minLength: 8)
             VStack(alignment: .trailing, spacing: 2) {
-                Text((amountOverride ?? receipt.paidTotal).formatMoney()).font(.body).fontWeight(.semibold)
-                    .foregroundStyle(Palette.label)
+                MoneyText(amount: amountOverride ?? receipt.paidTotal, size: 17, weight: .semibold)
                 if amountOverride == nil, receipt.discount > 0 {
                     Text("−\(receipt.discount.formatMoney())")
                         .font(.caption).foregroundStyle(Palette.good)

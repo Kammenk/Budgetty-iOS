@@ -23,6 +23,11 @@ enum SettingsKey {
     static let appLockEnabled = "pref.appLockEnabled"
     /// Auto-lock delay in minutes: 0 = immediately, 1, or 5.
     static let autoLockMinutes = "pref.autoLockMinutes"
+    /// "Hide amounts" privacy mode — every money value renders as a frosted pill instead of the figure.
+    /// Device-global display pref (like `appearance`); toggled from the nav-bar eye and Account → Privacy.
+    static let hideAmounts = "pref.hideAmounts"
+    /// Re-hide amounts every time the app returns from the background (optional sub-option, default off).
+    static let hideAmountsOnBackground = "pref.hideAmountsOnBackground"
     /// Crashlytics collection — opt-in, default OFF (see `CrashReporting`). Nothing is collected until
     /// the first-run consent gate (`AnalyticsConsentView`) or the Account toggle turns it on.
     /// Unlike the `notifications` key deleted alongside the trim, this one is read.

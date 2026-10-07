@@ -22,6 +22,7 @@ struct AccountView: View {
     @AppStorage(SettingsKey.faceID) private var faceID = false
     @AppStorage(SettingsKey.appLockEnabled) private var appLockEnabled = false
     @AppStorage(SettingsKey.autoLockMinutes) private var autoLockMinutes = 0
+    @AppStorage(SettingsKey.hideAmountsOnBackground) private var hideAmountsOnBackground = false
     @AppStorage(SettingsKey.recapEnabled) private var recapEnabled = true
     @AppStorage(SettingsKey.recapFrequency) private var recapFrequencyRaw = RecapFrequency.both.rawValue
     // Telemetry is opt-in (default OFF); the first-run consent gate or these toggles turn it on.
@@ -74,6 +75,7 @@ struct AccountView: View {
 
                 sectionHeader("Privacy & Security")
                 privacyCard
+                hideAmountsFootnote
                     .padding(.bottom, 24)
 
                 sectionHeader("Data & Privacy")
@@ -414,8 +416,31 @@ struct AccountView: View {
                     }
                 }
             }
+            divider
+            Toggle(isOn: Binding(get: { MoneyVisibility.shared.hidden },
+                                 set: { MoneyVisibility.shared.hidden = $0 })) {
+                label("Hide amounts", "eye.slash.fill", Palette.tint)
+            }
+            .tint(Palette.good)
+            .padding(.vertical, 8).padding(.horizontal, 16)
+            if MoneyVisibility.shared.hidden || hideAmountsOnBackground {
+                divider
+                Toggle(isOn: $hideAmountsOnBackground) {
+                    label("Hide when I leave the app", "rectangle.portrait.and.arrow.right", Color(argb: 0xFF8E8E93))
+                }
+                .tint(Palette.good)
+                .padding(.vertical, 8).padding(.horizontal, 16)
+            }
         }
         .contentCard(cornerRadius: 14)
+    }
+
+    /// Footnote under the Privacy & Security card explaining the Hide-amounts scope (mockup 1c).
+    private var hideAmountsFootnote: some View {
+        Text("Blurs every money value across Budgetty. Labels, categories and charts stay readable. You can also use the eye on Home. \u{201C}Hide when I leave the app\u{201D} hides them again each time you come back.")
+            .font(.caption).foregroundStyle(Palette.secondaryLabel)
+            .padding(.horizontal, 16).padding(.top, 6)
+            .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     /// The "Data & Privacy" group (mockup 1d): the two telemetry opt-in toggles — Usage analytics and

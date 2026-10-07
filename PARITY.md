@@ -1984,3 +1984,22 @@ Simulator) green. Pure presentation; no device run needed (matches the approved 
 **UX improvements made in passing:** the Start sheet got a keyboard "Done" toolbar + `.scrollDismissesKeyboard(.interactively)`; `BackupService.export/restore` are now `@MainActor` (they read `@Model` objects), clearing a batch of actor-isolation warnings.
 
 **iOS files:** `Model/Trip.swift` (new), `Data/UserStore.swift` (register), `Data/Backup.swift` (TripDTO), `Scenes/Trips/{TripStats,TripOps,TripsView,StartTripSheet}.swift` (new), `Scenes/Scan/{ScanFlowView,ReviewView}.swift` (auto-tag + banner + trip chip), `Scenes/Tags/TagComponents.swift` (filled ✈️ chip), `Scenes/Home/HomeView.swift` (active-trip capsule), `Scenes/Account/AccountView.swift` (Trips row).
+
+## Android → iOS — Hide amounts (privacy mask) — 2026-10-07
+**Status:** PORTED (2026-10-07, sim-verified iPhone 17 Pro) — nav-bar eye, app-wide mask, frosted-pill on prominent amounts, Account → Privacy switch + auto-hide, backup round-trip.
+
+**Android:** `feat/hide-amounts`. FREE. A display preference (device-global, like theme): every money value renders as a privacy pill/mask instead of the figure, so the app can be opened in public. Labels, categories, bars and chart shapes stay readable — only the figures are masked.
+
+**Reactivity (the key port decision):** iOS `formatMoney()` is a `Decimal` extension read from dozens of view bodies, so — exactly like `AppTheme`/`Palette.tint` — the hide flag lives in an `@Observable` singleton `MoneyVisibility.shared`. `formatMoney()` reads `MoneyVisibility.shared.hidden`; SwiftUI's observation tracks that read *during* each view's body evaluation (even inside a called function), so flipping the eye re-masks every on-screen amount in one pass with **no per-call-site wiring** — the direct analog of Android's Compose snapshot-state `AppFormats.hideAmounts`. Sim-verified: one tap re-masks Home + History + the trip capsule at once.
+
+**Behaviour rules (ported):**
+- `formatMoney()` returns "•••• €" (mask + currency symbol, no sign/magnitude) while hidden; `formatMoneyRaw()` is the always-real figure, used for amounts the user is actively setting (the price-range filter labels). Android: `formatMoney` / `formatMoneyRaw`.
+- `MoneyText` renders the approved **frosted pill** (fixed-width gradient-blur capsule, hides sign + magnitude) for prominent amounts, with a white-alpha variant over the gradient hero (`hero: true`). Applied to both Home heroes, the Insights hero, and the shared `ReceiptRowView` (so Home recent + History rows get pills). The long tail of string-interpolated amounts uses the `formatMoney` text mask ("•••• €").
+- **Eye toggle** (`HideAmountsEye`) in the Home / History / Insights headers: a glass circle (eye) that fills with the tint and shows eye.slash while hidden. Self-contained — reads/flips `MoneyVisibility.shared`.
+- **Account → Privacy & Security**: a "Hide amounts" switch (bound to the same flag) + "Hide when I leave the app" sub-option + footnote (mockup 1c).
+- **Auto-hide on background**: `BudgettyApp` re-hides amounts on `scenePhase == .background` when the sub-option is on (Android's onStop), so they're masked again on return.
+- Backup round-trips `hideAmounts` + `hideAmountsOnBackground` in `SettingsDTO` (applied on `.replace`; the live flag is nudged via `MoneyVisibility.refreshFromDefaults()`). Display-only — data export is unaffected.
+
+**Header layout:** adding the eye to Home crowded the title, so the "Customize" pill became a compact glass-circle icon button (consistent trailing cluster: customize · eye · avatar), and the title is pinned to one line.
+
+**iOS files:** `Theme/MoneyVisibility.swift` (new), `Model/Money.swift` (`formatMoney` mask + `formatMoneyRaw`), `Scenes/Components/HideAmounts.swift` (new — `MoneyText` + `HideAmountsEye`), `App/Settings.swift` (keys), `Scenes/Home/HomeView.swift` (eye + header + hero pills + ReceiptRowView pill), `Scenes/History/HistoryView.swift` (eye), `Scenes/Insights/InsightsView.swift` (eye + hero pill), `Scenes/Account/AccountView.swift` (Privacy toggle + auto-hide + footnote), `Scenes/History/HistoryFilters.swift` (raw price labels), `BudgettyApp.swift` (auto-hide), `Data/Backup.swift` (SettingsDTO).

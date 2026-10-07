@@ -132,6 +132,12 @@ struct BudgettyApp: App {
                     // Foreground: pick up a comp grant/revoke made since the app was last active.
                     Task { await refreshComp() }
                 }
+                // "Hide when I leave the app": re-hide amounts on backgrounding, so they're masked
+                // again on return (Android's onStop behaviour). Independent of the app-lock gate.
+                if phase == .background,
+                   UserDefaults.standard.bool(forKey: SettingsKey.hideAmountsOnBackground) {
+                    MoneyVisibility.shared.hidden = true
+                }
             }
         }
         .modelContainer(container)
