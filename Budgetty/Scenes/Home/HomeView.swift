@@ -1038,6 +1038,12 @@ struct ReceiptRowView: View {
     /// instead of the default navigate-forward chevron used on Home.
     var expandable = false
     var expanded = false
+    /// When set (History's tag filter), the row shows this amount — the sum of the receipt's matching
+    /// items — instead of the whole paid total, and drops the order-level discount line that can't be
+    /// apportioned to a subset. Android parity: the narrowed-receipt amount from `buildReceipts`.
+    var amountOverride: Decimal? = nil
+    /// Tag capsules shown under the row (History's tag view); empty elsewhere.
+    var tags: [String] = []
     @AppStorage(SettingsKey.dateFormat) private var dateFormatRaw = DateFormatOption.system.rawValue
 
     var body: some View {
@@ -1047,12 +1053,13 @@ struct ReceiptRowView: View {
                 Text(receipt.store).font(.body).foregroundStyle(Palette.label)
                 Text("\(dateLabel(receipt.date)) · \(itemCountLabel(receipt.items.count))")
                     .font(.caption).foregroundStyle(Palette.secondaryLabel)
+                TagRowStrip(tags: tags).padding(.top, 3)
             }
             Spacer(minLength: 8)
             VStack(alignment: .trailing, spacing: 2) {
-                Text(receipt.paidTotal.formatMoney()).font(.body).fontWeight(.semibold)
+                Text((amountOverride ?? receipt.paidTotal).formatMoney()).font(.body).fontWeight(.semibold)
                     .foregroundStyle(Palette.label)
-                if receipt.discount > 0 {
+                if amountOverride == nil, receipt.discount > 0 {
                     Text("−\(receipt.discount.formatMoney())")
                         .font(.caption).foregroundStyle(Palette.good)
                 }

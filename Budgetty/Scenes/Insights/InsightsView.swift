@@ -74,6 +74,7 @@ struct InsightsView: View {
     private struct Sel: Identifiable { let id = UUID(); let name: String }
     @State private var categorySel: Sel?
     @State private var storeSel: Sel?
+    @State private var tagSel: Sel?
     /// The breakdown slice/row the user tapped — puts that category's emoji in the donut centre and
     /// dims the rest. Cleared when the Groups/All toggle flips.
     @State private var pickedCategory: String?
@@ -103,6 +104,7 @@ struct InsightsView: View {
             .navigationDestination(isPresented: $showManageCategories) { ManageCategoriesView() }
             .sheet(item: $categorySel) { CategoryTransactionsSheet(category: $0.name, items: periodItems) }
             .sheet(item: $storeSel) { StoreTransactionsSheet(store: $0.name, receipts: periodReceipts) }
+            .sheet(item: $tagSel) { TagTransactionsSheet(tag: $0.name, items: periodItems) }
             .sheet(isPresented: $showCustomSections) {
                 CustomSectionsSheet(
                     selectedOrder: InsightsCustomStore.parse(customSectionsRaw),
@@ -219,7 +221,7 @@ struct InsightsView: View {
     /// The sections a fixed tab renders, in display order. Android parity: `InsightsSection.tab()` order.
     private func sections(in tab: InsightsTab) -> [InsightSection] {
         switch tab {
-        case .spending: [.breakdown, .topCategories, .topStores, .biggestPurchases, .subscriptions]
+        case .spending: [.breakdown, .topCategories, .topStores, .biggestPurchases, .byTag, .subscriptions]
         case .money: [.income, .needsWantsSavings]
         case .trends: [.trend, .comparison, .highlights]
         case .overview, .custom: []
@@ -499,6 +501,7 @@ struct InsightsView: View {
         case .comparison: comparisonSection
         case .topCategories: topCategoriesCard
         case .topStores: topStoresCard
+        case .byTag: byTagCard
         case .biggestPurchases: biggestSection
         case .income: incomeCards
         case .subscriptions: SubscriptionsCard()
@@ -1185,6 +1188,77 @@ struct InsightsView: View {
         .padding(18)
         .frame(maxWidth: .infinity, alignment: .leading)
         .contentCard(cornerRadius: 16)
+    }
+
+    // MARK: - By tag
+
+    /// The period's top-5 tags by spend. A line item's spend counts toward every tag it carries, so
+    /// totals overlap and needn't sum to the period total (the card's footnote says as much). Ties
+    /// break by tag name so the order is stable. Android parity: `InsightsViewModel.topTagsOf`.
+    private var topTags: [(tag: String, value: Decimal)] {
+        var sums: [String: Decimal] = [:]
+        for item in periodItems {
+            let line = item.lineTotal
+            for t in item.tags { sums[t.name, default: .zero] += line }
+        }
+        return sums
+            .map { (tag: $0.key, value: $0.value) }
+            .sorted { $0.value != $1.value ? $0.value > $1.value : $0.tag < $1.tag }
+            .prefix(5).map { $0 }
+    }
+
+    /// A glass card under By category with the period's top tags, counts and bars, plus the footnote on
+    /// why tags don't sum to the total. Tapping a tag opens its transactions sheet (the iOS idiom for an
+    /// Insights drill-down — Android deep-links to a History tag filter instead). Absent when nothing is
+    /// tagged this period. Android parity: `ByTagContent`.
+    @ViewBuilder
+    private var byTagCard: some View {
+        let tags = topTags
+        if !tags.isEmpty {
+            let maxValue = tags.first?.value ?? .zero
+            VStack(alignment: .leading, spacing: 4) {
+                Text("By tag").font(.headline)
+                Text("Top tags by spend · \(period.friendlyLabel)")
+                    .font(.caption).foregroundStyle(Palette.secondaryLabel)
+                VStack(spacing: 12) {
+                    ForEach(tags, id: \.tag) { t in
+                        Button { tagSel = Sel(name: t.tag) } label: { tagStatRow(t.tag, t.value, maxValue) }
+                            .buttonStyle(.plain)
+                    }
+                }
+                .padding(.top, 10)
+                Text("A transaction can carry several tags, so these don't add up to your total spend.")
+                    .font(.caption).foregroundStyle(Palette.secondaryLabel)
+                    .padding(.top, 12)
+            }
+            .padding(18)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .contentCard(cornerRadius: 16)
+        }
+    }
+
+    /// An outlined #pill, the period spend, and an accent bar (tags have no colour of their own).
+    private func tagStatRow(_ tag: String, _ amount: Decimal, _ maxValue: Decimal) -> some View {
+        let frac: Double = maxValue > 0
+            ? min(1, max(0.04, NSDecimalNumber(decimal: amount).doubleValue
+                               / NSDecimalNumber(decimal: maxValue).doubleValue))
+            : 0
+        return VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                TagPill(tag: tag, size: 15, prominent: true)
+                Spacer()
+                Text(amount.formatMoney()).font(.subheadline).fontWeight(.medium)
+                    .foregroundStyle(Palette.label)
+            }
+            GeometryReader { geo in
+                ZStack(alignment: .leading) {
+                    Capsule().fill(Palette.fill)
+                    Capsule().fill(Palette.tint).frame(width: max(0, geo.size.width * frac))
+                }
+            }
+            .frame(height: 6)
+        }
+        .contentShape(Rectangle())
     }
 
 }

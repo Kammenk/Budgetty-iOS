@@ -92,6 +92,57 @@ struct StoreTransactionsSheet: View {
     }
 }
 
+/// Line items carrying `tag` for the given period items — the Insights "By tag" drill-down. iOS uses a
+/// sheet here (its idiom for Insights slices), where Android deep-links to a History tag filter.
+struct TagTransactionsSheet: View {
+    let tag: String
+    let items: [LineItem]
+    @Environment(\.dismiss) private var dismiss
+
+    private var matching: [LineItem] {
+        items.filter { item in item.tags.contains { $0.name == tag } }
+            .sorted { $0.lineTotal > $1.lineTotal }
+    }
+    private var total: Decimal { matching.reduce(.zero) { $0 + $1.lineTotal } }
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(spacing: 16) {
+                    header(tile: tagTile, title: "#\(tag)",
+                           subtitle: "\(matching.count) item\(matching.count == 1 ? "" : "s")", total: total)
+                    card {
+                        ForEach(Array(matching.enumerated()), id: \.element.persistentModelID) { idx, item in
+                            HStack(spacing: 12) {
+                                CategoryTile(category: item.category)
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(item.name).font(.subheadline).foregroundStyle(Palette.label)
+                                    Text(item.receipt?.store ?? "").font(.caption).foregroundStyle(Palette.secondaryLabel)
+                                }
+                                Spacer(minLength: 8)
+                                Text(item.lineTotal.formatMoney()).font(.subheadline).fontWeight(.semibold)
+                            }
+                            .padding(.horizontal, 16).padding(.vertical, 11)
+                            if idx < matching.count - 1 { Divider().padding(.leading, 58) }
+                        }
+                    }
+                }
+                .padding(.horizontal, 20).padding(.vertical, 16)
+            }
+            .background(Palette.groupedBackground)
+            .navigationTitle("#\(tag)").navigationBarTitleDisplayMode(.inline)
+            .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
+        }
+        .coversFloatingDock()
+    }
+
+    private var tagTile: some View {
+        Image(systemName: "tag.fill").font(.system(size: 22)).foregroundStyle(Palette.tint)
+            .frame(width: 52, height: 52)
+            .background(Palette.tintSoft, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+    }
+}
+
 // MARK: - Shared bits
 
 private func header<Tile: View>(tile: Tile, title: String, subtitle: String, total: Decimal) -> some View {

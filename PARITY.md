@@ -1942,3 +1942,22 @@ Trends overlay). Add a quiet secondary **"With bills"** line under the hero figu
 **Status:** Android **merged to `main` + pushed** (`742f6c5`); compile + detekt + lint green.
 iOS: **PORTED** — `feat/insights-overview-with-bills`; `xcodebuild build` (Debug, iOS
 Simulator) green. Pure presentation; no device run needed (matches the approved mockup).
+
+## Android → iOS — Free-form tags (#tags) — 2026-10-07
+**Status:** PORTED (2026-10-07, sim-verified iPhone 17 Pro) — review tags, History filter + row capsules, Insights By-tag + drill-down, Account → Manage tags, backup round-trip.
+
+**Android:** `feat/tags` (3 commits: free-form tags core; dashed ＋tag chip + Roborazzi goldens; Insights "By tag" + History tag filter). DB v28 adds a `tags` catalog + `transaction_tags` join. FREE; the **substrate for Travel mode**.
+
+**Model (the one structural difference):** Android keeps a catalog table + a many-to-many join with cascade FKs. iOS models it as a SwiftData many-to-many between `LineItem` and a new `Tag` @Model (`@Relationship(deleteRule: .nullify, inverse: \LineItem.tags)`). A `Tag` can exist with no items (a Travel trip tag before its first expense); deleting a line item nullifies its links (catalog row stays); deleting a tag nullifies links the other way (line items kept). Additive → SwiftData lightweight migration, no plan.
+
+**Behaviour rules (ported):**
+- **Normalization** (`Tag.normalize`): trim, lowercase, drop leading '#', whitespace runs → single hyphen, strip anything but Unicode letters/numbers/hyphen. Unicode-aware ("#Дача" → "дача", "Client Trip" → "client-trip"), matching `TagEntity.normalize` and the mockup JS.
+- **Review:** each item card carries its OWN tags (per-line, like Android's per-row `TagField`) — outlined #capsules + a tinted "＋ Tag" that opens the tag sheet (autocomplete: existing substring matches, else a looser "SIMILAR" prefix fallback; create-on-type; Recent). Editing a receipt re-seeds each row's tags; save re-links them (the delete+reinsert cascade drops old links, re-created from the rows).
+- **History:** a Tags filter chip + sheet (multi-select + Any/All match + a live result count), tag capsules on item and receipt rows, and a "Tag A–Z" sort. Under a tag filter a receipt narrows to its matching items and the shown amount + month totals sum only those (dropping the order-level discount/charges that can't be apportioned), so the total matches Insights — Android's `buildReceipts` narrowing.
+- **Insights:** a "By tag" card on the Spending tab — top-5 tags by period spend (overlapping, with the "don't add up to your total" footnote), accent bars (tags have no colour of their own). Tapping a tag opens a `TagTransactionsSheet` — the iOS idiom for an Insights drill-down (store/category slices already open sheets), where Android deep-links to a History tag filter. Hybrid five-tab model drives iPhone + iPad alike, so the card appears on both.
+- **Account → Tags:** a Manage screen with per-row Rename / Merge / Delete (rename-into-an-existing-name merges; delete keeps transactions), matching `TagsViewModel`. Merge picks the target from a sheet.
+- **Backup:** round-trips each line item's tags (`LineItemDTO.tags`, optional so old files still decode; `.replace` clears the catalog first, fetch-or-create by normalized name on restore) — Android's BackupData/BackupManager change.
+
+**Strings:** English-first (SwiftUI `LocalizedStringKey` literals auto-extract into the String Catalog); Crowdin translation is a later sync, exactly as Android ships these English-first with `tools:ignore="MissingTranslation"`.
+
+**iOS files:** `Model/Tag.swift` (new), `Model/LineItem.swift` (+`tags`), `Data/UserStore.swift` (register `Tag.self`), `Data/TagOps.swift` (new), `Data/Backup.swift`, `Scenes/Tags/{TagComponents,TagInputSheet,TagsView}.swift` (new), `Scenes/Scan/{ReceiptDraft,ReviewView}.swift`, `Scenes/History/{HistoryView,HistoryFilters}.swift`, `Scenes/Insights/{InsightsCustomize,InsightsView,TransactionsSheets}.swift`, `Scenes/Home/HomeView.swift` (`ReceiptRowView` + tags/amount override), `Scenes/Account/AccountView.swift` (Tags row).
