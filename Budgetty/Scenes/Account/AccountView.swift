@@ -41,6 +41,7 @@ struct AccountView: View {
     @State private var showExporter = false
     @State private var exportDoc = BackupDocument(data: Data())
     @State private var showImporter = false
+    @State private var showImportCsv = false
     @State private var pendingImport: BackupFile?
     @State private var importChoice = false
     @State private var backupError: String?
@@ -134,6 +135,7 @@ struct AccountView: View {
         .fileImporter(isPresented: $showImporter, allowedContentTypes: [.json]) { result in
             handleImport(result)
         }
+        .fullScreenCover(isPresented: $showImportCsv) { ImportCsvView() }
         .confirmationDialog(importDialogTitle, isPresented: $importChoice, titleVisibility: .visible) {
             Button("Merge with current data") { applyImport(.merge) }
             Button("Replace all data", role: .destructive) { applyImport(.replace) }
@@ -210,6 +212,22 @@ struct AccountView: View {
             divider
             Button { showImporter = true } label: {
                 row("Import data", "square.and.arrow.down", Color(argb: 0xFF30B0C7)) { chevron }
+            }
+            .buttonStyle(.plain)
+            divider
+            Button { showImportCsv = true } label: {
+                HStack(spacing: 12) {
+                    SettingsIcon(symbol: "tablecells", background: Color(argb: 0xFF34C759))
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Import from CSV").foregroundStyle(Palette.label)
+                        Text("From a bank or another app").font(.caption).foregroundStyle(Palette.secondaryLabel)
+                    }
+                    Spacer()
+                    Text("New").font(.caption2).fontWeight(.bold).foregroundStyle(Palette.tint)
+                        .padding(.horizontal, 8).padding(.vertical, 3).background(Palette.tintSoft, in: Capsule())
+                    chevron
+                }
+                .padding(.vertical, 13).padding(.horizontal, 16).contentShape(Rectangle())
             }
             .buttonStyle(.plain)
             divider
