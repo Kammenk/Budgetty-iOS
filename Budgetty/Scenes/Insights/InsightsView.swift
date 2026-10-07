@@ -26,6 +26,7 @@ struct InsightsView: View {
     @AppStorage(SettingsKey.insightsDismissedSetup) private var dismissedSetupRaw = ""
     @State private var showCustomSections = false
     @State private var showManageCategories = false
+    @State private var showForecast = false
     @Query(sort: \Receipt.createdAt, order: .reverse) private var receipts: [Receipt]
     @Query(sort: \Recurring.createdAt) private var recurring: [Recurring]
     @Query private var storedCategories: [Category]
@@ -102,6 +103,7 @@ struct InsightsView: View {
             // bar above the large title). So draw our own header and hide the bar — the Home pattern.
             .toolbar(.hidden, for: .navigationBar)
             .navigationDestination(isPresented: $showManageCategories) { ManageCategoriesView() }
+            .navigationDestination(isPresented: $showForecast) { ForecastView() }
             .sheet(item: $categorySel) { CategoryTransactionsSheet(category: $0.name, items: periodItems) }
             .sheet(item: $storeSel) { StoreTransactionsSheet(store: $0.name, receipts: periodReceipts) }
             .sheet(item: $tagSel) { TagTransactionsSheet(tag: $0.name, items: periodItems) }
@@ -216,6 +218,10 @@ struct InsightsView: View {
             PeriodEmptyState(periodLabel: period.friendlyLabel, hasAnyData: !receipts.isEmpty)
         } else {
             ForEach(sections(in: tab)) { sectionView($0) }
+        }
+        // Entry to the premium cash-flow forecast (its own screen gates the content). Android parity.
+        if tab == .trends {
+            ForecastEntryCard { showForecast = true }
         }
     }
 
@@ -1261,4 +1267,24 @@ struct InsightsView: View {
         .contentShape(Rectangle())
     }
 
+}
+
+/// Trends entry to the premium cash-flow forecast; the forecast screen gates the content itself.
+private struct ForecastEntryCard: View {
+    let onTap: () -> Void
+    var body: some View {
+        Button(action: onTap) {
+            HStack(spacing: 12) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Cash-flow forecast").font(.headline).foregroundStyle(Palette.label)
+                    Text("See where your balance is heading").font(.caption).foregroundStyle(Palette.secondaryLabel)
+                }
+                Spacer()
+                Image(systemName: "chevron.right").font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(Palette.tertiaryLabel)
+            }
+            .padding(16).contentCard(cornerRadius: 18)
+        }
+        .buttonStyle(.plain)
+    }
 }

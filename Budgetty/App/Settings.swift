@@ -22,6 +22,16 @@ enum SettingsKey {
     static let budgetCadence = "pref.budgetCadence"
     /// Pinned fortnight anchor as an epoch day (0 = none yet). See `PayCycle.fortnight`.
     static let fortnightAnchor = "pref.fortnightAnchor"
+    // ── Cash-flow forecast (per-user financial data; cleared on sign-out via UserState.clear, kept out
+    // of backup — a stored balance goes stale). Budgetty never connects to a bank; balance is entered. ──
+    /// The current balance the projection starts from (decimal string; blank = not set → setup prompt).
+    static let forecastStartBalance = "pref.forecastStartBalance"
+    /// The "warn me below" comfort line (decimal string; blank = 0).
+    static let forecastComfortThreshold = "pref.forecastComfortThreshold"
+    /// Optional override for average monthly discretionary spend (decimal string; blank = last-3-mo avg).
+    static let forecastDiscretionary = "pref.forecastDiscretionary"
+    /// Remembered forecast horizon in months (3 / 6 / 12).
+    static let forecastHorizonMonths = "pref.forecastHorizonMonths"
     static let accent = "pref.accent"             // Premium accent theme (see AccentOption/AppTheme)
     static let faceID = "pref.faceID"
     /// App lock (PIN gate) on/off; the PIN hash itself lives in the Keychain (see `PinLock`).
@@ -141,6 +151,12 @@ enum UserState {
             // reset them on sign-out (D2) so no stale layout leaks to the next account.
             InsightsLayoutStore.orderKey,
             InsightsLayoutStore.hiddenKey,
+            // Cash-flow forecast — per-user financial data (an entered balance + its assumptions): never
+            // leak one account's figures to the next on a shared device. Android parity.
+            SettingsKey.forecastStartBalance,
+            SettingsKey.forecastComfortThreshold,
+            SettingsKey.forecastDiscretionary,
+            SettingsKey.forecastHorizonMonths,
         ] {
             defaults.removeObject(forKey: key)
         }
