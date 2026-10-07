@@ -2116,3 +2116,24 @@ Simulator) green. Pure presentation; no device run needed (matches the approved 
 **Structural notes:** relationship-based spend (each matched `LineItem.receipt` deduped by `persistentModelID`). Free cap = 1 (`envelopeFreeLimit`); the test account is Premium so the cap path was reasoned, not tapped. Pushed via `NavigationLink` from the Budget screen (`.underFloatingDock()`); amount uses `.number` formatting like the main budget sheets.
 
 **iOS files:** `Scenes/Budgets/BudgetPace.swift` (new — pure pace math), `Model/BudgetEnvelope.swift` (new), `Scenes/Budgets/BudgetEnvelopesView.swift` (new — list + pace bar + edit sheet), `Scenes/Budget/BudgetView.swift` (Multiple-budgets entry card), `Data/UserStore.swift` (register), `Data/Backup.swift` (BudgetEnvelopeDTO).
+
+## Android → iOS — Planners (Loan calculator + Debt payoff) — 2026-10-07
+**Status:** PORTED (2026-10-07, sim-verified iPhone 17 Pro) — Account → Planners: two free what-if tools, a Loan calculator and a Debt payoff planner. Nothing is linked to an account.
+
+**Android:** `feat/planners` (Room v28 `debts`). FREE. A Planners hub opens either tool. The loan calc is scratch-only (nothing persisted); the debt planner persists the user's debts and simulates the payoff live.
+
+**Behaviour rules (ported):**
+- `LoanCalculator.compute` is a 1:1 port: closed-form level payment `P·r ÷ (1 − (1+r)^−n)` (degrading to `P ÷ n` at 0%), with a re-run month-by-month schedule for the per-year principal/interest/balance. Sim-verified: €15 000 @ 6.9% / 5 yr → **€296,31/mo**, €2 778,65 interest, €17 778,65 paid, 84% principal; the split bar, by-year stacked bars and amortisation table all reconcile.
+- `DebtPayoffSimulator.simulate` is a 1:1 port: each month every debt accrues interest then pays its minimum; the leftover budget (all minimums + extra, so a cleared debt's minimum cascades) attacks debts in strategy order — **snowball** (smallest balance) or **avalanche** (highest APR); capped at 600 months. `DebtInput.id` is the debt's index (the map key for the clear-month), so no SwiftData identity is needed in the pure layer.
+- `Debt` @Model (emoji, name, balance, aprPercent, minPayment, createdAt). The screen computes the plan + the minimums-only baseline + both strategies live off the `@Query`. Sim-verified: a €2 400 @ 19.9% / €60-min card with €150 extra → **"Debt-free by Nov 2027 · 13 months · 54 months sooner", "Saves 1 288,23 € interest vs minimums"** (67 − 13 = 54; 1 571,52 − 283,29 = 1 288,23); the add sheet's live solo-cost line reads "67 months … 1 571,52 € in interest".
+- Debt screen: strategy toggle + hint, result card (or a "not clearing" state), snowball/avalanche compare cards (CHEAPEST/QUICK WINS), a SwiftUI `Canvas` balance-to-zero chart (plan area+line, dashed minimums baseline, a ring where each debt clears), an extra-per-month stepper+`Slider` (0–500 by 25), the debt list, the numbered payoff order, and the estimate note. Add/edit sheet: emoji grid, name, balance, APR + min, live solo-cost, delete.
+- Backup round-trips debts (`DebtDTO`, additive). The loan calculator persists nothing.
+
+**Structural notes:** hub + both tools are pushed via `NavigationLink` from Account (`.underFloatingDock()`). Planner figures use `formatMoneyRaw` (scratch what-if values stay readable even in Hide-amounts mode). The free "1 extra budget" cap belongs to envelopes, not planners — planners are entirely free (no gate), matching Android.
+
+**iOS files:** `Scenes/Planners/LoanCalculator.swift` + `DebtPayoffSimulator.swift` (new — pure math), `Scenes/Planners/PlannersView.swift` + `LoanCalculatorView.swift` + `DebtPayoffView.swift` + `PlannerComponents.swift` (new — hub, two screens, shared field), `Model/Debt.swift` (new), `Data/UserStore.swift` (register), `Scenes/Account/AccountView.swift` (Planners row), `Data/Backup.swift` (DebtDTO).
+
+---
+
+## iOS parity campaign — COMPLETE (2026-10-07)
+All 11 Oct-2026 competitor features ported to iOS main and sim-verified on iPhone 17 Pro: Tags, Travel Mode, Hide Amounts, Habit category suggestions, Fortnightly cadence, Templates, Warranties, CSV import, Cash-flow forecast, Multiple budgets (Envelopes), Planners (Loan + Debt payoff).
