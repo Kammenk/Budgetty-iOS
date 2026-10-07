@@ -38,6 +38,9 @@ struct BackupFile: Codable {
     var trips: [TripDTO]? = []
     /// Saved transaction templates. Optional for forward-compat; additive on restore.
     var templates: [TemplateDTO]? = []
+    /// Tracked product warranties. Optional for forward-compat; additive on restore. Expiry is derived
+    /// from purchaseDate + durationMonths, so nothing date-stale carries over.
+    var warranties: [WarrantyDTO]? = []
     /// The user's DISPLAY / DATA-INTERPRETATION preferences (currency, month-start day, theme, …), so a
     /// full `.replace` restore reproduces the account faithfully on a new device — most importantly the
     /// currency (the app appends a symbol and never converts amounts, so the same numbers under the wrong
@@ -167,6 +170,23 @@ struct TemplateDTO: Codable {
     init(_ t: Template) {
         emoji = t.emoji; name = t.name; amount = t.amount; category = t.category
         store = t.store; askAmount = t.askAmount; createdAt = t.createdAt
+    }
+}
+
+struct WarrantyDTO: Codable {
+    var name: String
+    var emoji: String
+    var store: String
+    var category: String
+    var purchaseDate: Date
+    var durationMonths: Int
+    var coverageNote: String
+    var receiptId: Double
+    var createdAt: Date
+    init(_ w: Warranty) {
+        name = w.name; emoji = w.emoji; store = w.store; category = w.category
+        purchaseDate = w.purchaseDate; durationMonths = w.durationMonths
+        coverageNote = w.coverageNote; receiptId = w.receiptId; createdAt = w.createdAt
     }
 }
 
@@ -346,6 +366,7 @@ enum BackupService {
             wellbeingScores: try context.fetch(FetchDescriptor<WellbeingScoreEntity>()).map(WellbeingScoreDTO.init),
             trips: try context.fetch(FetchDescriptor<Trip>()).map(TripDTO.init),
             templates: try context.fetch(FetchDescriptor<Template>()).map(TemplateDTO.init),
+            warranties: try context.fetch(FetchDescriptor<Warranty>()).map(WarrantyDTO.init),
             settings: SettingsDTO.current()
         )
         return try encoder().encode(file)
@@ -379,6 +400,7 @@ enum BackupService {
             for t in try context.fetch(FetchDescriptor<Tag>()) { context.delete(t) }
             for t in try context.fetch(FetchDescriptor<Trip>()) { context.delete(t) }
             for t in try context.fetch(FetchDescriptor<Template>()) { context.delete(t) }
+            for w in try context.fetch(FetchDescriptor<Warranty>()) { context.delete(w) }
             try context.save() // flush deletes before re-inserting unique-keyed rows
         }
 
@@ -488,6 +510,14 @@ enum BackupService {
             context.insert(Template(emoji: dto.emoji, name: dto.name, amount: dto.amount,
                                     category: dto.category, store: dto.store, askAmount: dto.askAmount,
                                     createdAt: dto.createdAt))
+        }
+
+        // Warranties — additive with fresh rows.
+        for dto in file.warranties ?? [] {
+            context.insert(Warranty(name: dto.name, emoji: dto.emoji, store: dto.store,
+                                    category: dto.category, purchaseDate: dto.purchaseDate,
+                                    durationMonths: dto.durationMonths, coverageNote: dto.coverageNote,
+                                    receiptId: dto.receiptId, createdAt: dto.createdAt))
         }
 
         try context.save()

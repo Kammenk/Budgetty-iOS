@@ -242,6 +242,11 @@ struct AccountView: View {
                 row("Templates", "bolt.fill", Color(argb: 0xFFFF9500)) { chevron }
             }
             .buttonStyle(.plain)
+            divider
+            NavigationLink { WarrantiesView() } label: {
+                row("Warranties", "checkmark.shield.fill", Color(argb: 0xFF34C759)) { chevron }
+            }
+            .buttonStyle(.plain)
         }
         .contentCard(cornerRadius: 14)
     }
