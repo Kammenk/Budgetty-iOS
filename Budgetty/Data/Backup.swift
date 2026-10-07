@@ -36,6 +36,8 @@ struct BackupFile: Codable {
     /// Travel-mode trips (metadata over a tag). Optional for forward-compat; the tag links ride on the
     /// line items, so a restored trip reconnects to its expenses through the tag.
     var trips: [TripDTO]? = []
+    /// Saved transaction templates. Optional for forward-compat; additive on restore.
+    var templates: [TemplateDTO]? = []
     /// The user's DISPLAY / DATA-INTERPRETATION preferences (currency, month-start day, theme, …), so a
     /// full `.replace` restore reproduces the account faithfully on a new device — most importantly the
     /// currency (the app appends a symbol and never converts amounts, so the same numbers under the wrong
@@ -151,6 +153,20 @@ struct BuyingLimitDTO: Codable {
     init(_ l: BuyingLimit) {
         emoji = l.emoji; label = l.label; keywords = l.keywords
         timeframeRaw = l.timeframeRaw; count = l.count; createdAt = l.createdAt
+    }
+}
+
+struct TemplateDTO: Codable {
+    var emoji: String
+    var name: String
+    var amount: Decimal
+    var category: String
+    var store: String
+    var askAmount: Bool
+    var createdAt: Date
+    init(_ t: Template) {
+        emoji = t.emoji; name = t.name; amount = t.amount; category = t.category
+        store = t.store; askAmount = t.askAmount; createdAt = t.createdAt
     }
 }
 
@@ -329,6 +345,7 @@ enum BackupService {
             buyingLimits: try context.fetch(FetchDescriptor<BuyingLimit>()).map(BuyingLimitDTO.init),
             wellbeingScores: try context.fetch(FetchDescriptor<WellbeingScoreEntity>()).map(WellbeingScoreDTO.init),
             trips: try context.fetch(FetchDescriptor<Trip>()).map(TripDTO.init),
+            templates: try context.fetch(FetchDescriptor<Template>()).map(TemplateDTO.init),
             settings: SettingsDTO.current()
         )
         return try encoder().encode(file)
@@ -361,6 +378,7 @@ enum BackupService {
             for s in try context.fetch(FetchDescriptor<WellbeingScoreEntity>()) { context.delete(s) }
             for t in try context.fetch(FetchDescriptor<Tag>()) { context.delete(t) }
             for t in try context.fetch(FetchDescriptor<Trip>()) { context.delete(t) }
+            for t in try context.fetch(FetchDescriptor<Template>()) { context.delete(t) }
             try context.save() // flush deletes before re-inserting unique-keyed rows
         }
 
@@ -463,6 +481,13 @@ enum BackupService {
             context.insert(Trip(name: dto.name, tag: normalized, startDate: dto.startDate,
                                 endDate: dto.endDate, budgetAmount: dto.budgetAmount, active: dto.active,
                                 createdAt: dto.createdAt, endedAt: dto.endedAt))
+        }
+
+        // Templates — additive with fresh rows.
+        for dto in file.templates ?? [] {
+            context.insert(Template(emoji: dto.emoji, name: dto.name, amount: dto.amount,
+                                    category: dto.category, store: dto.store, askAmount: dto.askAmount,
+                                    createdAt: dto.createdAt))
         }
 
         try context.save()

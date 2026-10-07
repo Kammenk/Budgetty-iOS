@@ -56,7 +56,14 @@ struct RootView: View {
         #endif
         return .home
     }()
-    @State private var showScan = false
+    /// The presented scan flow, carrying its entry mode so the value can't go stale across the
+    /// sheet→cover handoff (the Add sheet must fully dismiss before the cover can present).
+    private struct ScanItem: Identifiable { let id = UUID(); let mode: ScanEntry }
+    @State private var scanItem: ScanItem?
+    /// The Add Expense sheet (templates + capture/upload/manual), the Scan button's entry point.
+    @State private var showAddSheet = false
+    /// The scan mode chosen in the Add sheet, promoted to `scanItem` once the sheet dismisses.
+    @State private var pendingMode: ScanEntry?
     @State private var dockHidden = false
     @State private var lastScrollY: CGFloat?
     /// Measured height of `bottomChrome`, handed to the tab roots so their scroll content clears it.
@@ -93,7 +100,21 @@ struct RootView: View {
             mainTabs
             #endif
         }
-        .fullScreenCover(isPresented: $showScan) { ScanFlowView().coversFloatingDock() }
+        .fullScreenCover(item: $scanItem) { item in
+            ScanFlowView(mode: item.mode).coversFloatingDock()
+        }
+        // The Scan button opens the Add Expense sheet; picking an option stashes the mode and dismisses,
+        // then the scan flow presents in that mode (a sheet and a cover can't be shown at once).
+        .sheet(isPresented: $showAddSheet, onDismiss: {
+            if let mode = pendingMode { pendingMode = nil; scanItem = ScanItem(mode: mode) }
+        }) {
+            AddExpenseSheet(
+                onCapture: { pendingMode = .capture },
+                onLibrary: { pendingMode = .library },
+                onManual: { pendingMode = .manual },
+                onTemplate: { pendingMode = .template($0.persistentModelID) }
+            )
+        }
         .fullScreenCover(isPresented: $showRecap) {
             if let story = recapStory {
                 RecapStoryView(story: story, onClose: closeRecap, onSeeDetails: openRecapDetails,
@@ -114,7 +135,7 @@ struct RootView: View {
         .sheet(isPresented: $showBuyingLimits) { NavigationStack { BuyingLimitsView().coversFloatingDock() } }
         .onAppear {
             #if DEBUG
-            if ProcessInfo.processInfo.environment["SHOW_SCAN"] == "1" { showScan = true }
+            if ProcessInfo.processInfo.environment["SHOW_SCAN"] == "1" { scanItem = ScanItem(mode: .capture) }
             if ProcessInfo.processInfo.environment["BL_NUDGE"] == "1", buyingLimitNudge.pending == nil {
                 buyingLimitNudge.post(BuyingLimitNudge(title: "Fizzy drinks", emoji: "🥤",
                     countAfter: 4, limitCount: 3, timeframe: .monthly))
@@ -309,7 +330,7 @@ struct RootView: View {
     /// `offset` doesn't reflow layout, so the safe-area inset — and the content under it — hold still.
     private var bottomChrome: some View {
         VStack(spacing: 10) {
-            Button { showScan = true } label: { scanPill }
+            Button { showAddSheet = true } label: { scanPill }
                 .buttonStyle(.plain)
                 .accessibilityIdentifier(A11y.Tab.scan)
                 .offset(y: dockHidden ? 66 : 0) // down by dock height + the 10pt gap
@@ -376,7 +397,7 @@ struct RootView: View {
 
     /// iPad accessory variant — same pill, no floating offset (the accessory positions it).
     private var scanAccessory: some View {
-        Button { showScan = true } label: { scanPill }
+        Button { showAddSheet = true } label: { scanPill }
             .buttonStyle(.plain)
             .accessibilityIdentifier(A11y.Tab.scan)
     }

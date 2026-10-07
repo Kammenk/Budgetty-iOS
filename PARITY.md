@@ -2034,3 +2034,21 @@ Simulator) green. Pure presentation; no device run needed (matches the approved 
 **Scope notes (minor):** the Fortnightly segment's "New" badge and the Android window-date header weren't ported (the iOS `GlassSegmentedControl` is generic and the iOS Budget card has no window label); the Home Safe-to-Spend hero stays monthly (the cadence surfaces on the Budget screen, its primary surface). Behaviour is otherwise faithful.
 
 **iOS files:** `Support/PayCycle.swift` (fortnight), `Model/Budget.swift` (`fortnightlyKey` + conversions), `App/Settings.swift` (keys), `Scenes/Budget/BudgetView.swift` (3-up toggle + period resolution/persistence + switch dialog + fortnight window), `Data/Backup.swift` (SettingsDTO).
+
+## Android → iOS — Transaction templates — 2026-10-07
+**Status:** PORTED (2026-10-07, sim-verified iPhone 17 Pro) — Add Expense sheet with a template strip, prefilled manual entry, create/edit + Manage screen, backup.
+
+**Android:** `feat/templates`. FREE, no cap. A template is a saved "regular" logged in one tap — it never posts by itself (that's a recurring bill); tapping it pre-fills the manual review, which the user confirms. `askAmount` templates leave the price blank for variable regulars.
+
+**The one structural change:** the iOS Scan button went straight to the capture screen; the mockup (5a) makes it open an **"Add Expense" sheet** — a template-chip strip above Take Photo / Upload File / Add Manually. Implemented as `AddExpenseSheet`, which stashes the chosen `ScanEntry` mode and, once it dismisses, the scan flow presents in that mode (`ScanFlowView(mode:)` — capture / library / manual / template). A sheet and a full-screen cover can't coexist, so the mode rides an Identifiable `ScanItem` through the handoff to stay correct.
+
+**Behaviour rules (ported):**
+- `Template` @Model (emoji, name, amount, category, store, askAmount, createdAt); additive migration. The Add-sheet strip + Manage list order by createdAt.
+- Tapping a chip → `ScanFlowView(mode: .template(id))` → `startFromTemplate` pre-fills one review row (name, category, `prefillAmount` — blank for ask-amount) + the store (Android's `startManual(id)`). Sim-verified: "Coffee" chip → review pre-filled Coffee / Groceries / €3, composing with the active trip's auto-tag.
+- Create/edit form (`TemplateEditSheet`, mockup 5d): emoji (defaults to the category's), name, amount, category (the picker), optional store, an "Ask for the amount each time" switch, and Delete when editing.
+- Manage screen (Account → Templates, mockup 5e): list with swipe-to-delete + tap-to-edit + a New button; empty-state invite. FREE, no cap.
+- Backup round-trips templates (`TemplateDTO`, additive).
+
+**Scope notes (minor):** drag-to-reorder in Manage and the "Save as Template" entry from a receipt's ··· menu weren't ported (createdAt ordering + the New-template form cover the create path); the emoji is entered as text (no dedicated emoji picker). Behaviour is otherwise faithful.
+
+**iOS files:** `Model/Template.swift` (new), `Data/UserStore.swift` (register), `Scenes/Scan/AddExpenseSheet.swift` (new), `Scenes/Templates/TemplatesView.swift` (new — manage + edit), `Scenes/Scan/ScanFlowView.swift` (`ScanEntry` mode + `startFromTemplate`), `Scenes/RootView.swift` (Scan→Add sheet→cover handoff), `Scenes/Account/AccountView.swift` (Templates row), `Data/Backup.swift` (TemplateDTO).
