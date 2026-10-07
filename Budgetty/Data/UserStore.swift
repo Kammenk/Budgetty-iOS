@@ -25,6 +25,7 @@ enum UserStore {
         LineItem.self, Receipt.self, Category.self, Budget.self, Recurring.self, CategoryRule.self,
         BudgetRollover.self, SavingsGoal.self, SavingsContribution.self, IgnoredSubscription.self,
         BuyingLimit.self, WellbeingScoreEntity.self, Tag.self, Trip.self, Template.self,
+        Warranty.self,
     ]
 
     private static var containers: [String: ModelContainer] = [:]

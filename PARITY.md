@@ -2052,3 +2052,20 @@ Simulator) green. Pure presentation; no device run needed (matches the approved 
 **Scope notes (minor):** drag-to-reorder in Manage and the "Save as Template" entry from a receipt's ··· menu weren't ported (createdAt ordering + the New-template form cover the create path); the emoji is entered as text (no dedicated emoji picker). Behaviour is otherwise faithful.
 
 **iOS files:** `Model/Template.swift` (new), `Data/UserStore.swift` (register), `Scenes/Scan/AddExpenseSheet.swift` (new), `Scenes/Templates/TemplatesView.swift` (new — manage + edit), `Scenes/Scan/ScanFlowView.swift` (`ScanEntry` mode + `startFromTemplate`), `Scenes/RootView.swift` (Scan→Add sheet→cover handoff), `Scenes/Account/AccountView.swift` (Templates row), `Data/Backup.swift` (TemplateDTO).
+
+## Android → iOS — Warranties — 2026-10-07
+**Status:** PORTED (2026-10-07, sim-verified iPhone 17 Pro) — Account → Warranties: urgency-grouped list with elapsed rings + countdown chips, add/edit with a segmented coverage length, free-tier cap, backup.
+
+**Android:** `feat/warranties`. Track warranties on electronics/appliances; see what's expiring at a glance. Free users get 5; adding past that routes to the paywall. No photo is kept (no-image-storage rule) and nothing is scheduled — the app has no push notifications, so warranties surface in-app only (Android omitted reminders too).
+
+**Behaviour rules (ported):**
+- `Warranty` @Model (name, emoji, store, category, `purchaseDate`, `durationMonths`, coverageNote, `receiptId`, createdAt); additive migration. Expiry is **derived** (purchaseDate + durationMonths), never stored, so a length edit never leaves a stale date.
+- `WarrantyStatus.status()` is a 1:1 port of Android's `WarrantyStatus.kt`: `expiryDate`, `elapsedFraction` (0…1, clamped), `daysLeft`, `monthsLeft` (floored, min 0), and `state` — `expired` (daysLeft < 0) / `expiringSoon` (≤ 30 days) / `active`. `Warranties.freeLimit = 5`, `expiringSoonDays = 30`.
+- List grouped EXPIRING SOON (daysLeft asc) → ACTIVE (daysLeft asc) → EXPIRED (expiryDate desc), matching `WarrantiesViewModel`. Each row: emoji tile, name, "store (or category) · purchase date", a state-coloured countdown chip ("Expires in N days" / "N months left" / "Expired <date>"), and an elapsed ring (`Circle().trim` to `elapsedFraction`, good/warn/muted) with centre %. Expired rows dim + grayscale the tile.
+- Add/edit (`WarrantyEditSheet`, mockup 1d/1e): product, emoji (defaults 🛡️), category picker, purchase `DatePicker`, coverage length as a segmented **1 yr / 2 yr / 3 yr / Custom** control (12/24/36/custom months), a live "Covered until <date> · <chip>" footer in the state colour, optional store + coverage note, and Delete when editing. Sim-verified: MacBook Pro / 2 yr → "Covered until Oct 7, 2028 · 24 months left", saved into ACTIVE with a 0% ring.
+- Cap: `atCap = !premium && count >= 5` turns the ＋ toolbar button into a lock that opens the paywall; a "N of 5 free" caption shows for free users. (Test account is Premium, so the cap path was reasoned, not tapped.)
+- Backup round-trips warranties (`WarrantyDTO`, additive; expiry re-derives on restore).
+
+**Scope notes (minor):** the mockup's reminder toggle and "add from a scanned receipt" auto-offer weren't ported — both are absent from Android (no notifications; `receiptId` is kept on the model for a future link but nothing writes it yet). Emoji is entered as text (no dedicated picker), same as Templates. Behaviour is otherwise faithful.
+
+**iOS files:** `Model/Warranty.swift` (new), `Scenes/Warranties/WarrantyStatus.swift` (new — pure math + cap), `Scenes/Warranties/WarrantiesView.swift` (new — grouped list + ring + edit sheet), `Data/UserStore.swift` (register), `Scenes/Account/AccountView.swift` (Warranties row), `Data/Backup.swift` (WarrantyDTO).
