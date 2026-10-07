@@ -219,6 +219,8 @@ struct SettingsDTO: Codable, Equatable {
     var recapFrequency: String? = nil
     var hideAmounts: Bool? = nil
     var hideAmountsOnBackground: Bool? = nil
+    var budgetCadence: String? = nil
+    var fortnightAnchor: Int? = nil
 
     /// Snapshot the current effective preferences. Reads the same defaults the app's `@AppStorage`
     /// declarations use, so a user who never touched a setting still exports the value they actually see
@@ -245,7 +247,9 @@ struct SettingsDTO: Codable, Equatable {
             recapEnabled: flag(SettingsKey.recapEnabled, true),
             recapFrequency: d.string(forKey: SettingsKey.recapFrequency) ?? RecapFrequency.both.rawValue,
             hideAmounts: flag(SettingsKey.hideAmounts, false),
-            hideAmountsOnBackground: flag(SettingsKey.hideAmountsOnBackground, false)
+            hideAmountsOnBackground: flag(SettingsKey.hideAmountsOnBackground, false),
+            budgetCadence: d.string(forKey: SettingsKey.budgetCadence) ?? "",
+            fortnightAnchor: int(SettingsKey.fortnightAnchor, 0)
         )
     }
 
@@ -275,6 +279,8 @@ struct SettingsDTO: Codable, Equatable {
         if let recapFrequency { d.set(recapFrequency, forKey: SettingsKey.recapFrequency) }
         if let hideAmounts { d.set(hideAmounts, forKey: SettingsKey.hideAmounts) }
         if let hideAmountsOnBackground { d.set(hideAmountsOnBackground, forKey: SettingsKey.hideAmountsOnBackground) }
+        if let budgetCadence { d.set(budgetCadence, forKey: SettingsKey.budgetCadence) }
+        if let fortnightAnchor { d.set(fortnightAnchor, forKey: SettingsKey.fortnightAnchor) }
         if d === UserDefaults.standard, let accent, let option = AccentOption(rawValue: accent) {
             AppTheme.shared.accent = option
         }
