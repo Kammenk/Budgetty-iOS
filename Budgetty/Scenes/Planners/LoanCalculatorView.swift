@@ -126,7 +126,9 @@ struct LoanCalculatorView: View {
 
     private func tableCell(_ text: String, header: Bool = false, end: Bool = false,
                            bold: Bool = false, color: Color = Palette.label, year: Bool = false) -> some View {
-        Text(text)
+        // Headers are fixed terms (Year/Principal/Interest/Balance) → localize via the catalog; data
+        // cells (numbers/money) render verbatim.
+        (header ? Text(LocalizedStringKey(text)) : Text(text))
             .font(header ? .caption2 : .caption)
             .fontWeight(header || bold ? .bold : .regular)
             .foregroundStyle(header ? Palette.secondaryLabel : color)

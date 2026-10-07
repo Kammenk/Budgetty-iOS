@@ -168,10 +168,12 @@ struct ForecastView: View {
 
     private func troughCallout(_ result: ForecastResult) -> some View {
         let color = result.dipsBelowComfort ? Palette.warn : Palette.good
-        let text = result.dipsBelowComfort
-            ? "Dips to \(result.trough.formatMoney()) on \(Self.dayLabel(result.troughDate))"
-            : "Lowest point \(result.trough.formatMoney()) on \(Self.dayLabel(result.troughDate))"
-        return Text(text).font(.subheadline).fontWeight(.medium).foregroundStyle(color)
+        let money = result.trough.formatMoney()
+        let day = Self.dayLabel(result.troughDate)
+        let label: LocalizedStringKey = result.dipsBelowComfort
+            ? "Dips to \(money) · \(day)"
+            : "Lowest point \(money) · \(day)"
+        return Text(label).font(.subheadline).fontWeight(.medium).foregroundStyle(color)
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, 12).padding(.vertical, 8)
             .background(color.opacity(0.14), in: RoundedCornerShape14())
