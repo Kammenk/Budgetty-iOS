@@ -162,6 +162,7 @@ struct InsightsView: View {
             if showRecapEntry && dynamicType < .accessibility1 {
                 RecapToolbarButton { showRecapReopen = true }
             }
+            HideAmountsEye()
         }
     }
 
@@ -244,8 +245,7 @@ struct InsightsView: View {
         VStack(alignment: .leading, spacing: 0) {
             Text("Total spent").font(.caption).foregroundStyle(Palette.secondaryLabel)
             HStack(alignment: .bottom, spacing: 8) {
-                Text(totalSpent.formatMoney())
-                    .font(.system(size: 36, weight: .bold)).foregroundStyle(Palette.label)
+                MoneyText(amount: totalSpent, size: 36, weight: .bold)
                 overviewDelta
             }
             overviewWithBills

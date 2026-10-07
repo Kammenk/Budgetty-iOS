@@ -9,17 +9,31 @@
 import Foundation
 
 extension Decimal {
-    /// Format as currency for display. Defaults to the user's chosen currency (Account → Currency),
-    /// falling back to EUR. The default argument is re-read on every call, so changing the setting
-    /// updates formatting app-wide.
-    func formatMoney(currencyCode: String = UserDefaults.standard.string(forKey: SettingsKey.currency) ?? "EUR",
-                     locale: Locale = .current) -> String {
+    /// Format as currency for display — the real figure, never masked. Use for amounts the user is
+    /// actively setting (filter bounds, entry-field echoes) that must stay readable even in Hide-amounts
+    /// mode; everything that *displays* spending uses `formatMoney` instead. Android: `formatMoneyRaw`.
+    func formatMoneyRaw(currencyCode: String = UserDefaults.standard.string(forKey: SettingsKey.currency) ?? "EUR",
+                        locale: Locale = .current) -> String {
         let n = self as NSDecimalNumber
         let f = NumberFormatter()
         f.numberStyle = .currency
         f.currencyCode = currencyCode
         f.locale = locale
         return f.string(from: n) ?? "\(n)"
+    }
+
+    /// Format as currency for display (Account → Currency, default EUR), or a privacy mask (e.g.
+    /// "•••• €") while "Hide amounts" is on. The default `currencyCode` is re-read on every call so a
+    /// currency change updates formatting app-wide; reading `MoneyVisibility.shared.hidden` here is what
+    /// lets flipping the eye re-mask every on-screen amount in one pass (see `MoneyVisibility`). The mask
+    /// drops the sign and magnitude so neither leaks; the currency symbol stays so the slot still reads
+    /// as money. `MoneyText` renders the approved frosted-pill variant for prominent amounts.
+    func formatMoney(currencyCode: String = UserDefaults.standard.string(forKey: SettingsKey.currency) ?? "EUR",
+                     locale: Locale = .current) -> String {
+        if MoneyVisibility.shared.hidden {
+            return "•••• \(CurrencyOption.symbol(currencyCode))"
+        }
+        return formatMoneyRaw(currencyCode: currencyCode, locale: locale)
     }
 
     /// `Decimal` multiplied by an integer quantity — the line total for a purchased item

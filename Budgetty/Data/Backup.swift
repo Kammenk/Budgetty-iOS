@@ -217,6 +217,8 @@ struct SettingsDTO: Codable, Equatable {
     var insightsSectionOrder: [String]? = nil
     var recapEnabled: Bool? = nil
     var recapFrequency: String? = nil
+    var hideAmounts: Bool? = nil
+    var hideAmountsOnBackground: Bool? = nil
 
     /// Snapshot the current effective preferences. Reads the same defaults the app's `@AppStorage`
     /// declarations use, so a user who never touched a setting still exports the value they actually see
@@ -241,7 +243,9 @@ struct SettingsDTO: Codable, Equatable {
             homeSectionOrder: list(d.string(forKey: HomeLayoutStore.orderKey) ?? ""),
             insightsSectionOrder: list(d.string(forKey: InsightsLayoutStore.orderKey) ?? ""),
             recapEnabled: flag(SettingsKey.recapEnabled, true),
-            recapFrequency: d.string(forKey: SettingsKey.recapFrequency) ?? RecapFrequency.both.rawValue
+            recapFrequency: d.string(forKey: SettingsKey.recapFrequency) ?? RecapFrequency.both.rawValue,
+            hideAmounts: flag(SettingsKey.hideAmounts, false),
+            hideAmountsOnBackground: flag(SettingsKey.hideAmountsOnBackground, false)
         )
     }
 
@@ -269,9 +273,13 @@ struct SettingsDTO: Codable, Equatable {
         if let insightsSectionOrder { d.set(insightsSectionOrder.joined(separator: ","), forKey: InsightsLayoutStore.orderKey) }
         if let recapEnabled { d.set(recapEnabled, forKey: SettingsKey.recapEnabled) }
         if let recapFrequency { d.set(recapFrequency, forKey: SettingsKey.recapFrequency) }
+        if let hideAmounts { d.set(hideAmounts, forKey: SettingsKey.hideAmounts) }
+        if let hideAmountsOnBackground { d.set(hideAmountsOnBackground, forKey: SettingsKey.hideAmountsOnBackground) }
         if d === UserDefaults.standard, let accent, let option = AccentOption(rawValue: accent) {
             AppTheme.shared.accent = option
         }
+        // The live money-mask flag mirrors UserDefaults — nudge it after a restore writes the key.
+        if d === UserDefaults.standard { MoneyVisibility.shared.refreshFromDefaults() }
     }
 }
 

@@ -160,6 +160,7 @@ struct HistoryView: View {
                     Text("History").font(.largeTitle).fontWeight(.bold)
                         .foregroundStyle(Palette.label)
                     Spacer()
+                    HideAmountsEye()
                 }
                 .padding(.top, 2)
             }

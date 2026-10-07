@@ -63,7 +63,7 @@ struct PriceRangeSheet: View {
             HStack {
                 Text(title).font(.footnote).foregroundStyle(Palette.secondaryLabel)
                 Spacer()
-                Text(Decimal(value.wrappedValue).formatMoney())
+                Text(Decimal(value.wrappedValue).formatMoneyRaw())
                     .font(.headline).foregroundStyle(Palette.label)
             }
             Slider(value: value, in: 0...bound, step: 1)
