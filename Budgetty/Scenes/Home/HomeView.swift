@@ -44,6 +44,7 @@ struct HomeView: View {
     @Query private var budgets: [Budget]
     @Query private var recurrings: [Recurring]
     @Query private var rollovers: [BudgetRollover]
+    @Query private var trips: [Trip]
     // Wellbeing banner inputs (the score derives on-device from these + receipts/budgets/recurrings).
     @Query(sort: \SavingsGoal.createdAt) private var goals: [SavingsGoal]
     @Query private var contributions: [SavingsContribution]
@@ -130,7 +131,8 @@ struct HomeView: View {
             ScrollView {
                 VStack(spacing: 0) {
                     homeHeader
-                        .padding(.bottom, 14)
+                        .padding(.bottom, activeTrip == nil ? 14 : 10)
+                    if let trip = activeTrip { tripCapsule(trip).padding(.bottom, 12) }
                     compactStack
                 }
                 .padding(.horizontal, 20)
@@ -183,6 +185,53 @@ struct HomeView: View {
             .buttonStyle(.plain)
             .accessibilityLabel("Account")
             .accessibilityIdentifier(A11y.Home.account)
+        }
+    }
+
+    // MARK: - Active trip capsule (Travel mode, mockup 3c)
+
+    private var activeTrip: Trip? { trips.filter { $0.active }.max { $0.createdAt < $1.createdAt } }
+
+    /// A tinted glass capsule under the title showing the running trip's name, total, day counter and
+    /// a tiny pace bar. Tap opens Account → Trips. Shown only while a trip is active.
+    private func tripCapsule(_ trip: Trip) -> some View {
+        let items = receipts.flatMap(\.items).filter { li in li.tags.contains { $0.name == trip.tag } }
+        let spent = items.reduce(Decimal.zero) { $0 + $1.lineTotal }
+        let stats = TripStats.compute(trip, spent: spent)
+        return NavigationLink { TripsView() } label: {
+            HStack(spacing: 10) {
+                Text("✈️").font(.system(size: 17))
+                Text(tripCapsuleText(trip, spent: spent, stats: stats))
+                    .font(.system(size: 15, weight: .semibold)).foregroundStyle(Palette.label).lineLimit(1)
+                Spacer(minLength: 6)
+                if let pace = stats.pace {
+                    Capsule().fill(Palette.fill).frame(width: 40, height: 5)
+                        .overlay(alignment: .leading) {
+                            Capsule().fill(tripPaceColor(pace.state)).frame(width: 40 * pace.fill, height: 5)
+                        }
+                }
+                Image(systemName: "chevron.right").font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(Palette.secondaryLabel)
+            }
+            .padding(.leading, 14).padding(.trailing, 12).padding(.vertical, 10)
+            .background(Palette.tintSoft, in: Capsule())
+            .overlay(Capsule().strokeBorder(Palette.glassBorder, lineWidth: 1))
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Active trip \(trip.name)")
+    }
+
+    private func tripCapsuleText(_ trip: Trip, spent: Decimal, stats: TripStatsResult) -> String {
+        var parts = [trip.name, spent.formatMoney()]
+        if let total = stats.totalDays { parts.append(String(localized: "day \(stats.daysElapsed) of \(total)")) }
+        return parts.joined(separator: " · ")
+    }
+
+    private func tripPaceColor(_ s: TripPaceState) -> Color {
+        switch s {
+        case .underPace: Palette.good
+        case .overPace: Palette.warn
+        case .overBudget: Palette.bad
         }
     }
 

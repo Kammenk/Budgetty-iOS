@@ -14,6 +14,10 @@ struct ReviewView: View {
     @Bindable var draft: ReceiptDraft
     var onCancel: () -> Void
     var onSave: () -> Void
+    /// When a trip is active (new receipts only), its name + tag — drives the "trip is on" banner and
+    /// renders the pre-applied trip tag as a filled ✈️ capsule on each item (Travel mode, mockup 3e).
+    var tripName: String? = nil
+    var tripTag: String? = nil
 
     @State private var categoryTarget: DraftItem?
     @State private var oldCategory = ""
@@ -77,6 +81,7 @@ struct ReviewView: View {
             header
             ScrollView {
                 VStack(spacing: 10) {
+                    if let tripName { tripBanner(tripName) }
                     storeAndDate
                     if let anchor = overReadAnchor, !noticeDismissed {
                         mismatchNotice(anchor)
@@ -85,7 +90,7 @@ struct ReviewView: View {
                         inflatedNotice(inflated)
                     }
                     ForEach(draft.items) { item in
-                        ItemCard(item: item, onDelete: { draft.remove(item) },
+                        ItemCard(item: item, tripTag: tripTag, onDelete: { draft.remove(item) },
                                  onEditCategory: { oldCategory = item.category; categoryTarget = item })
                     }
                     addItemButton
@@ -261,6 +266,18 @@ struct ReviewView: View {
         )
     }
 
+    // MARK: - Trip banner (Travel mode)
+
+    /// The tint strip saying the active trip will tag these expenses (mockup 3e).
+    private func tripBanner(_ name: String) -> some View {
+        HStack(spacing: 6) {
+            Text("✈️ \(name) trip is on · this will be tagged")
+                .font(.system(size: 13, weight: .semibold)).foregroundStyle(Palette.tint)
+        }
+        .frame(maxWidth: .infinity).padding(.vertical, 8).padding(.horizontal, 12)
+        .background(Palette.tintSoft, in: Capsule())
+    }
+
     // MARK: - Add item
 
     private var addItemButton: some View {
@@ -322,6 +339,7 @@ struct ReviewView: View {
 /// One editable line-item card.
 private struct ItemCard: View {
     @Bindable var item: DraftItem
+    var tripTag: String? = nil
     var onDelete: () -> Void
     var onEditCategory: () -> Void
     @State private var showTagSheet = false
@@ -386,7 +404,7 @@ private struct ItemCard: View {
             label("Tags")
             FlowLayout(spacing: 8, lineSpacing: 8) {
                 ForEach(item.tags, id: \.self) { tag in
-                    RemovableTagChip(tag: tag) { item.tags.removeAll { $0 == tag } }
+                    RemovableTagChip(tag: tag, isTrip: tag == tripTag) { item.tags.removeAll { $0 == tag } }
                 }
                 AddTagButton { showTagSheet = true }
             }

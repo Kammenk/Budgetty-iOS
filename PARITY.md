@@ -1961,3 +1961,26 @@ Simulator) green. Pure presentation; no device run needed (matches the approved 
 **Strings:** English-first (SwiftUI `LocalizedStringKey` literals auto-extract into the String Catalog); Crowdin translation is a later sync, exactly as Android ships these English-first with `tools:ignore="MissingTranslation"`.
 
 **iOS files:** `Model/Tag.swift` (new), `Model/LineItem.swift` (+`tags`), `Data/UserStore.swift` (register `Tag.self`), `Data/TagOps.swift` (new), `Data/Backup.swift`, `Scenes/Tags/{TagComponents,TagInputSheet,TagsView}.swift` (new), `Scenes/Scan/{ReceiptDraft,ReviewView}.swift`, `Scenes/History/{HistoryView,HistoryFilters}.swift`, `Scenes/Insights/{InsightsCustomize,InsightsView,TransactionsSheets}.swift`, `Scenes/Home/HomeView.swift` (`ReceiptRowView` + tags/amount override), `Scenes/Account/AccountView.swift` (Tags row).
+
+## Android → iOS — Travel mode (trips as a tag layer) — 2026-10-07
+**Status:** PORTED (2026-10-07, sim-verified iPhone 17 Pro) — start sheet, active summary (day strip + pace bar + tick), backfill, auto-tag on new expenses, Home capsule, Account → Trips, backup round-trip.
+
+**Android:** `feat/travel-mode` (built on `feat/tags`). DB v29 adds a `trips` table. FREE. A trip is metadata over ONE tag — a name, optional dates, optional budget, an `active` flag — so the History filter, Insights "By tag" and rename/merge all keep working on a trip's expenses for free.
+
+**Model:** `Trip` @Model (name, tag, startDate?, endDate?, budgetAmount?, active, createdAt, endedAt?). `tag` is a normalized `Tag.normalize` key that also lives in the catalog, kept as a plain string (not a relationship) so a trip survives its tag being deleted from Manage. Additive → lightweight migration. At most one trip active (enforced in `TripOps.start`; `activeTrip` picks the newest active defensively).
+
+**Behaviour rules (ported):**
+- **TripStats** (pure, `Scenes/Trips/TripStats.swift`) — a 1:1 port of Android's `TripStats`: day 1 = start day, clamp into [1, totalDays]; `perDay`, `dayStrip` (bool per day), and a `pace` (fill = spent/budget, tickFraction = daysElapsed/totalDays, state under/over/over-budget, `suggestedDaily` = remaining/daysLeft). Sim-verified live: 1840 of 30000, "On track", 4693.33/day = (30000−1840)/6. ✓
+- **Start** (`TripOps.start`): derive tag = `normalize(name)-year`, ensure the catalog row, deactivate any other active trip, insert, and — if asked — backfill by tagging every expense since the start day. Sim-verified: backfill count ("1 expense already added since the start date") and the backfilled expense showing in the trip total. ✓
+- **Auto-tag** (`ScanFlowView.seedTrip`): while a trip is active, its tag is pre-applied to each new review row — shown as a filled ✈️ removable capsule, with a "trip is on · this will be tagged" banner (mockup 3e). Not used when editing an existing receipt. Sim-verified. ✓
+- **Active summary** (Account → Trips): hero total + €/day + day strip, the shared budget pace bar with the even-pace tick, top categories, a "Show expenses" row (opens the tag's transactions sheet — the iOS drill-down idiom), and a destructive End trip (native alert). Past trips list with per-day + budget result; context menu Resume / Delete.
+- **Home active-trip capsule** (mockup 3c, iOS addition): a tinted glass capsule under the title — "✈️ Name · €total · day X of Y" + a mini pace bar — linking to Trips. Shown only while a trip is active. Sim-verified. ✓
+- **End / Resume / Delete** keep the tag + expenses; nothing is deleted. Backup round-trips trips (`TripDTO`, optional for old files; `.replace` clears the table; restore ensures the tag catalog row exists).
+
+**Spend basis:** a trip's spend = Σ of its tagged line items' lineTotal — the same basis as the Insights "By tag" card, so the two agree. (Android additionally folds in each receipt's apportioned tax/fees/discount via `paidAdjustmentOf`; the iOS simplification keeps trip and by-tag totals consistent and differs only by small receipt-level add-ons.)
+
+**Minor visual deferral:** the trip tag renders as the filled ✈️ capsule on the review surface, the trip summary and the Home capsule (where it's the design focus); on ordinary History/Home rows it renders as a normal outlined #capsule (threading the trip-tag set through every row was out of scope). Behaviour is unaffected.
+
+**UX improvements made in passing:** the Start sheet got a keyboard "Done" toolbar + `.scrollDismissesKeyboard(.interactively)`; `BackupService.export/restore` are now `@MainActor` (they read `@Model` objects), clearing a batch of actor-isolation warnings.
+
+**iOS files:** `Model/Trip.swift` (new), `Data/UserStore.swift` (register), `Data/Backup.swift` (TripDTO), `Scenes/Trips/{TripStats,TripOps,TripsView,StartTripSheet}.swift` (new), `Scenes/Scan/{ScanFlowView,ReviewView}.swift` (auto-tag + banner + trip chip), `Scenes/Tags/TagComponents.swift` (filled ✈️ chip), `Scenes/Home/HomeView.swift` (active-trip capsule), `Scenes/Account/AccountView.swift` (Trips row).

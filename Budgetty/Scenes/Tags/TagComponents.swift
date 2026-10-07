@@ -30,27 +30,46 @@ struct TagPill: View {
     }
 }
 
-/// A removable "#tag ⓧ" capsule for the review surface's Tags section (mockup 2a).
+/// A removable "#tag ⓧ" capsule for the review surface's Tags section (mockup 2a). When `isTrip` it
+/// renders as the active-trip tag does everywhere it's prominent: a filled tint capsule with ✈️
+/// (mockup 3e) — still removable, so the user can leave a single expense out of the trip.
 struct RemovableTagChip: View {
     let tag: String
+    var isTrip = false
     let onRemove: () -> Void
 
     var body: some View {
+        if isTrip { tripChip } else { plainChip }
+    }
+
+    private var plainChip: some View {
         HStack(spacing: 5) {
             HStack(spacing: 1) {
                 Text(verbatim: "#").foregroundStyle(Palette.tint)
                 Text(tag).foregroundStyle(Palette.label)
             }
             .font(.system(size: 15))
-            Button(action: onRemove) {
-                Image(systemName: "xmark.circle.fill")
-                    .font(.system(size: 16)).foregroundStyle(Palette.tertiaryLabel)
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Remove #\(tag)")
+            removeButton(color: Palette.tertiaryLabel)
         }
         .padding(.leading, 12).padding(.trailing, 7).frame(height: 32)
         .overlay(Capsule().strokeBorder(Palette.separatorStrong, lineWidth: 1))
+    }
+
+    private var tripChip: some View {
+        HStack(spacing: 5) {
+            Text("✈️ #\(tag)").font(.system(size: 15, weight: .semibold)).foregroundStyle(.white)
+            removeButton(color: .white.opacity(0.85))
+        }
+        .padding(.leading, 12).padding(.trailing, 7).frame(height: 32)
+        .background(Palette.tint, in: Capsule())
+    }
+
+    private func removeButton(color: Color) -> some View {
+        Button(action: onRemove) {
+            Image(systemName: "xmark.circle.fill").font(.system(size: 16)).foregroundStyle(color)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Remove #\(tag)")
     }
 }
 
