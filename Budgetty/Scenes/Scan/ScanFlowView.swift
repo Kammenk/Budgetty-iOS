@@ -17,6 +17,10 @@ struct ScanFlowView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.requestReview) private var requestReview
     @Environment(BuyingLimitNudgeCenter.self) private var buyingLimitNudge
+    @Query private var trips: [Trip]
+
+    /// The running trip, if any — new receipts here get its tag pre-applied (Travel mode).
+    private var activeTrip: Trip? { trips.filter { $0.active }.max { $0.createdAt < $1.createdAt } }
 
     private enum Phase: Equatable { case capture, reading, review, failed(String) }
     @State private var phase: Phase = .capture
@@ -84,7 +88,8 @@ struct ScanFlowView: View {
         switch phase {
         case .capture: captureView
         case .reading: ReadingView()
-        case .review: ReviewView(draft: draft, onCancel: { dismiss() }, onSave: save)
+        case .review: ReviewView(draft: draft, onCancel: { dismiss() }, onSave: save,
+                                 tripName: activeTrip?.name, tripTag: activeTrip?.tag)
         case .failed(let message): failedView(message)
         }
     }
@@ -267,6 +272,7 @@ struct ScanFlowView: View {
                 let result = try await AppServices.receiptExtractor.extract(image)
                 let d = ReceiptDraft(from: result)
                 applyRules(to: d)
+                seedTrip(d)
                 draft = d
                 phase = .review
             } catch {
@@ -288,9 +294,17 @@ struct ScanFlowView: View {
         let d = ReceiptDraft()
         d.date = .now
         d.addItem()
+        seedTrip(d)
         draft = d
         isManual = true
         phase = .review
+    }
+
+    /// Pre-applies the active trip's tag to every row of a fresh draft (Travel mode auto-tag). Shown
+    /// as a normal removable chip — the user can take it off any single expense. No-op with no trip.
+    private func seedTrip(_ draft: ReceiptDraft) {
+        guard let tag = activeTrip?.tag else { return }
+        for item in draft.items where !item.tags.contains(tag) { item.tags.append(tag) }
     }
 
     /// The quota-exhausted takeover riding the viewfinder (mockup): lock badge, message, Premium CTA.

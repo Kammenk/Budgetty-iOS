@@ -230,6 +230,11 @@ struct AccountView: View {
                 row("Tags", "tag.fill", Color(argb: 0xFF00C7BE)) { chevron }
             }
             .buttonStyle(.plain)
+            divider
+            NavigationLink { TripsView() } label: {
+                row("Trips", "airplane", Color(argb: 0xFF5856D6)) { chevron }
+            }
+            .buttonStyle(.plain)
         }
         .contentCard(cornerRadius: 14)
     }

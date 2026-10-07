@@ -33,6 +33,9 @@ struct BackupFile: Codable {
     /// periodId clash keeps the on-device row (IGNORE), so a backup never overwrites the honest,
     /// first-computed snapshot — mirrors Android's `WellbeingScoreDao.insertAll(onConflict = IGNORE)`.
     var wellbeingScores: [WellbeingScoreDTO]? = []
+    /// Travel-mode trips (metadata over a tag). Optional for forward-compat; the tag links ride on the
+    /// line items, so a restored trip reconnects to its expenses through the tag.
+    var trips: [TripDTO]? = []
     /// The user's DISPLAY / DATA-INTERPRETATION preferences (currency, month-start day, theme, …), so a
     /// full `.replace` restore reproduces the account faithfully on a new device — most importantly the
     /// currency (the app appends a symbol and never converts amounts, so the same numbers under the wrong
@@ -148,6 +151,21 @@ struct BuyingLimitDTO: Codable {
     init(_ l: BuyingLimit) {
         emoji = l.emoji; label = l.label; keywords = l.keywords
         timeframeRaw = l.timeframeRaw; count = l.count; createdAt = l.createdAt
+    }
+}
+
+struct TripDTO: Codable {
+    var name: String
+    var tag: String
+    var startDate: Date?
+    var endDate: Date?
+    var budgetAmount: Decimal?
+    var active: Bool
+    var createdAt: Date
+    var endedAt: Date?
+    init(_ t: Trip) {
+        name = t.name; tag = t.tag; startDate = t.startDate; endDate = t.endDate
+        budgetAmount = t.budgetAmount; active = t.active; createdAt = t.createdAt; endedAt = t.endedAt
     }
 }
 
@@ -283,7 +301,9 @@ enum BackupService {
         return d
     }
 
-    /// Snapshot the whole store to JSON.
+    /// Snapshot the whole store to JSON. Main-actor: it reads SwiftData `@Model` objects (and their
+    /// relationships), which are main-actor-isolated; every caller is a SwiftUI view method already.
+    @MainActor
     static func export(from context: ModelContext) throws -> Data {
         let file = BackupFile(
             receipts: try context.fetch(FetchDescriptor<Receipt>()).map(ReceiptDTO.init),
@@ -294,6 +314,7 @@ enum BackupService {
             savingsGoals: try context.fetch(FetchDescriptor<SavingsGoal>()).map(SavingsGoalDTO.init),
             buyingLimits: try context.fetch(FetchDescriptor<BuyingLimit>()).map(BuyingLimitDTO.init),
             wellbeingScores: try context.fetch(FetchDescriptor<WellbeingScoreEntity>()).map(WellbeingScoreDTO.init),
+            trips: try context.fetch(FetchDescriptor<Trip>()).map(TripDTO.init),
             settings: SettingsDTO.current()
         )
         return try encoder().encode(file)
@@ -312,6 +333,7 @@ enum BackupService {
     /// Display / interpretation preferences (`file.settings`) are applied on `.replace` ONLY — a merge is
     /// additive and must never clobber the current device's currency, theme, layout, etc. `defaults` is
     /// injectable so tests can exercise the apply against an isolated store instead of `.standard`.
+    @MainActor
     static func restore(_ file: BackupFile, into context: ModelContext, mode: ImportMode,
                         defaults: UserDefaults = .standard) throws {
         if mode == .replace {
@@ -324,6 +346,7 @@ enum BackupService {
             for l in try context.fetch(FetchDescriptor<BuyingLimit>()) { context.delete(l) }
             for s in try context.fetch(FetchDescriptor<WellbeingScoreEntity>()) { context.delete(s) }
             for t in try context.fetch(FetchDescriptor<Tag>()) { context.delete(t) }
+            for t in try context.fetch(FetchDescriptor<Trip>()) { context.delete(t) }
             try context.save() // flush deletes before re-inserting unique-keyed rows
         }
 
@@ -416,6 +439,16 @@ enum BackupService {
         for dto in file.wellbeingScores ?? [] where seenPeriods.insert(dto.periodId).inserted {
             context.insert(WellbeingScoreEntity(periodId: dto.periodId, score: dto.score, band: dto.band,
                                                 componentsJson: dto.componentsJson, computedAt: dto.computedAt))
+        }
+
+        // Trips — additive metadata over a tag. Make sure the trip's tag is in the catalog even if
+        // nothing carries it yet (an open trip with no expenses), so auto-tagging works on resume.
+        for dto in file.trips ?? [] {
+            let normalized = Tag.normalize(dto.tag)
+            _ = tag(normalized)
+            context.insert(Trip(name: dto.name, tag: normalized, startDate: dto.startDate,
+                                endDate: dto.endDate, budgetAmount: dto.budgetAmount, active: dto.active,
+                                createdAt: dto.createdAt, endedAt: dto.endedAt))
         }
 
         try context.save()
