@@ -43,6 +43,8 @@ struct BackupFile: Codable {
     var warranties: [WarrantyDTO]? = []
     /// Named budget envelopes (multiple budgets). Optional for forward-compat; additive on restore.
     var budgetEnvelopes: [BudgetEnvelopeDTO]? = []
+    /// Debt-payoff planner debts. Optional for forward-compat; additive on restore.
+    var debts: [DebtDTO]? = []
     /// The user's DISPLAY / DATA-INTERPRETATION preferences (currency, month-start day, theme, …), so a
     /// full `.replace` restore reproduces the account faithfully on a new device — most importantly the
     /// currency (the app appends a symbol and never converts amounts, so the same numbers under the wrong
@@ -205,6 +207,19 @@ struct BudgetEnvelopeDTO: Codable {
         name = e.name; emoji = e.emoji; limitAmount = e.limitAmount
         startDate = e.startDate; endDate = e.endDate; categories = e.categories
         sortOrder = e.sortOrder; createdAt = e.createdAt
+    }
+}
+
+struct DebtDTO: Codable {
+    var emoji: String
+    var name: String
+    var balance: Decimal
+    var aprPercent: Decimal
+    var minPayment: Decimal
+    var createdAt: Date
+    init(_ d: Debt) {
+        emoji = d.emoji; name = d.name; balance = d.balance
+        aprPercent = d.aprPercent; minPayment = d.minPayment; createdAt = d.createdAt
     }
 }
 
@@ -386,6 +401,7 @@ enum BackupService {
             templates: try context.fetch(FetchDescriptor<Template>()).map(TemplateDTO.init),
             warranties: try context.fetch(FetchDescriptor<Warranty>()).map(WarrantyDTO.init),
             budgetEnvelopes: try context.fetch(FetchDescriptor<BudgetEnvelope>()).map(BudgetEnvelopeDTO.init),
+            debts: try context.fetch(FetchDescriptor<Debt>()).map(DebtDTO.init),
             settings: SettingsDTO.current()
         )
         return try encoder().encode(file)
@@ -421,6 +437,7 @@ enum BackupService {
             for t in try context.fetch(FetchDescriptor<Template>()) { context.delete(t) }
             for w in try context.fetch(FetchDescriptor<Warranty>()) { context.delete(w) }
             for e in try context.fetch(FetchDescriptor<BudgetEnvelope>()) { context.delete(e) }
+            for d in try context.fetch(FetchDescriptor<Debt>()) { context.delete(d) }
             try context.save() // flush deletes before re-inserting unique-keyed rows
         }
 
@@ -546,6 +563,12 @@ enum BackupService {
                                           startDate: dto.startDate, endDate: dto.endDate,
                                           categories: dto.categories, sortOrder: dto.sortOrder,
                                           createdAt: dto.createdAt))
+        }
+
+        // Debts (debt-payoff planner) — additive with fresh rows.
+        for dto in file.debts ?? [] {
+            context.insert(Debt(emoji: dto.emoji, name: dto.name, balance: dto.balance,
+                                aprPercent: dto.aprPercent, minPayment: dto.minPayment, createdAt: dto.createdAt))
         }
 
         try context.save()
