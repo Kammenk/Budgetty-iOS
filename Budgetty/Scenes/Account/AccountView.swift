@@ -225,6 +225,11 @@ struct AccountView: View {
                 row("Manage categories", "square.grid.3x3.fill", Color(argb: 0xFFFF9F0A)) { chevron }
             }
             .buttonStyle(.plain)
+            divider
+            NavigationLink { TagsView() } label: {
+                row("Tags", "tag.fill", Color(argb: 0xFF00C7BE)) { chevron }
+            }
+            .buttonStyle(.plain)
         }
         .contentCard(cornerRadius: 14)
     }

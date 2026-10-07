@@ -37,9 +37,12 @@ struct HistoryView: View {
     @State private var priceLo: Double?
     @State private var priceHi: Double?
     @State private var categoryFilter: Set<String> = []
+    @State private var tagFilter: Set<String> = []
+    @State private var tagMatchAll = false
     @State private var showDate = false
     @State private var showPrice = false
     @State private var showCategory = false
+    @State private var showTag = false
     /// Selected receipt in the iPad-landscape two-pane detail view.
     @State private var selectedID: PersistentIdentifier?
     // Rows tapped open in single-column mode (keyed by SwiftData id): receipts reveal their top items,
@@ -58,6 +61,10 @@ struct HistoryView: View {
             .sheet(isPresented: $showDate) { DateRangeSheet(range: $dateRange) }
             .sheet(isPresented: $showPrice) { PriceRangeSheet(lower: $priceLo, upper: $priceHi, bound: priceBound) }
             .sheet(isPresented: $showCategory) { CategoryFilterSheet(selected: $categoryFilter) }
+            .sheet(isPresented: $showTag) {
+                TagFilterSheet(selected: $tagFilter, matchAll: $tagMatchAll,
+                               options: tagOptions, resultCount: tagFilterResultCount)
+            }
         }
     }
 
@@ -200,6 +207,10 @@ struct HistoryView: View {
                             chipLabel(categoryFilter.isEmpty ? "Category" : "Category (\(categoryFilter.count))",
                                       active: !categoryFilter.isEmpty, trailing: "chevron.down")
                         }
+                        Button { showTag = true } label: {
+                            chipLabel(tagFilter.isEmpty ? "Tags" : "Tags (\(tagFilter.count))",
+                                      active: !tagFilter.isEmpty, trailing: "chevron.down")
+                        }
                         Button { showPrice = true } label: {
                             chipLabel("Price", active: priceLo != nil || priceHi != nil, trailing: "chevron.down")
                         }
@@ -239,13 +250,68 @@ struct HistoryView: View {
     // MARK: - Filtering
 
     private var hasActiveFilters: Bool {
-        dateRange != nil || priceLo != nil || priceHi != nil || !categoryFilter.isEmpty || !search.isEmpty
+        dateRange != nil || priceLo != nil || priceHi != nil || !categoryFilter.isEmpty
+            || !tagFilter.isEmpty || !search.isEmpty
     }
     private func clearFilters() {
-        dateRange = nil; priceLo = nil; priceHi = nil; categoryFilter = []; search = ""
+        dateRange = nil; priceLo = nil; priceHi = nil; categoryFilter = []
+        tagFilter = []; tagMatchAll = false; search = ""
     }
     private var priceBound: Double {
         max(100, (receipts.map { ($0.paidTotal as NSDecimalNumber).doubleValue }.max() ?? 100).rounded(.up))
+    }
+
+    // MARK: - Tag filter (Android parity: HistoryFilters.tags / tagMatchAll)
+
+    private var tagActive: Bool { !tagFilter.isEmpty }
+
+    /// Distinct tags across the whole ledger, A–Z — the Tag filter sheet's choices.
+    private var tagOptions: [String] {
+        Set(allItems.flatMap { $0.tags.map(\.name) }).sorted()
+    }
+
+    /// The live result count the Tag sheet's CTA shows, for whichever list the user is on.
+    private var tagFilterResultCount: Int {
+        mode == .items ? filteredItems.count : filteredReceipts.count
+    }
+
+    /// Whether an item satisfies the tag filter: trivially true when none is set, otherwise all of
+    /// (match-all) or any of (match-any) the chosen tags appear among the item's own tags.
+    private func matchesTags(_ item: LineItem) -> Bool {
+        guard tagActive else { return true }
+        let names = Set(item.tags.map(\.name))
+        return tagMatchAll ? tagFilter.isSubset(of: names) : !tagFilter.isDisjoint(with: names)
+    }
+
+    /// A receipt's items, narrowed to the ones matching the tag filter (all of them when none is set).
+    private func matchingItems(_ r: Receipt) -> [LineItem] {
+        tagActive ? r.items.filter { matchesTags($0) } : r.items
+    }
+
+    /// The amount a receipt row shows: its whole paid total, or — under a tag filter — just the sum of
+    /// its matching items, so the list answers "how much of this receipt was tagged #x" and the total
+    /// matches Insights (Android's `buildReceipts` narrowing).
+    private func receiptAmount(_ r: Receipt) -> Decimal {
+        tagActive ? matchingItems(r).reduce(.zero) { $0 + $1.lineTotal } : r.paidTotal
+    }
+
+    /// The distinct tags across a receipt's (possibly narrowed) items, first-seen order.
+    private func receiptTags(_ r: Receipt) -> [String] {
+        var seen = Set<String>(); var out: [String] = []
+        for it in matchingItems(r) {
+            for name in it.tags.map(\.name) where seen.insert(name).inserted { out.append(name) }
+        }
+        return out
+    }
+
+    /// Stable "first tag A–Z, untagged last, then newest-first" comparator for the Tag A–Z sort.
+    private func tagSortLess(_ a: (tags: [String], date: Date), _ b: (tags: [String], date: Date)) -> Bool {
+        switch (a.tags.min(), b.tags.min()) {
+        case let (x?, y?): return x != y ? x < y : a.date > b.date
+        case (nil, _?): return false
+        case (_?, nil): return true
+        case (nil, nil): return a.date > b.date
+        }
     }
 
     private func inDate(_ d: Date) -> Bool {
@@ -270,18 +336,23 @@ struct HistoryView: View {
             && (search.isEmpty || r.store.localizedCaseInsensitiveContains(search)
                 || r.items.contains { $0.name.localizedCaseInsensitiveContains(search) })
             && (categoryFilter.isEmpty || r.items.contains { inCategory($0.category) })
+            && (!tagActive || r.items.contains { matchesTags($0) })
         }
         switch sort {
         case .newest: return base.sorted { $0.createdAt > $1.createdAt }
         case .oldest: return base.sorted { $0.createdAt < $1.createdAt }
-        case .priceHigh: return base.sorted { $0.paidTotal > $1.paidTotal }
-        case .priceLow: return base.sorted { $0.paidTotal < $1.paidTotal }
+        case .priceHigh: return base.sorted { receiptAmount($0) > receiptAmount($1) }
+        case .priceLow: return base.sorted { receiptAmount($0) < receiptAmount($1) }
+        case .tagAZ: return base.sorted {
+            tagSortLess((tags: receiptTags($0), date: $0.createdAt),
+                        (tags: receiptTags($1), date: $1.createdAt))
+        }
         }
     }
 
     private var filteredItems: [LineItem] {
         let base = allItems.filter { it in
-            inDate(it.createdAt) && inPrice(it.lineTotal) && inCategory(it.category)
+            inDate(it.createdAt) && inPrice(it.lineTotal) && inCategory(it.category) && matchesTags(it)
             && (search.isEmpty || it.name.localizedCaseInsensitiveContains(search)
                 || (it.receipt?.store.localizedCaseInsensitiveContains(search) ?? false))
         }
@@ -290,6 +361,10 @@ struct HistoryView: View {
         case .oldest: return base.sorted { $0.createdAt < $1.createdAt }
         case .priceHigh: return base.sorted { $0.lineTotal > $1.lineTotal }
         case .priceLow: return base.sorted { $0.lineTotal < $1.lineTotal }
+        case .tagAZ: return base.sorted {
+            tagSortLess((tags: $0.tags.map(\.name), date: $0.createdAt),
+                        (tags: $1.tags.map(\.name), date: $1.createdAt))
+        }
         }
     }
 
@@ -300,20 +375,20 @@ struct HistoryView: View {
             if filteredReceipts.isEmpty {
                 HistoryEmpty(symbol: "receipt", text: hasActiveFilters ? "No matching receipts" : "No receipts yet")
             } else {
-                let maxByMonth = monthMax(filteredReceipts, date: \.createdAt) { $0.paidTotal }
+                let maxByMonth = monthMax(filteredReceipts, date: \.createdAt) { receiptAmount($0) }
                 LazyVStack(spacing: 0) {
-                    if let summary = monthSummary(filteredReceipts, date: \.createdAt, amount: { $0.paidTotal }) {
+                    if let summary = monthSummary(filteredReceipts, date: \.createdAt, amount: { receiptAmount($0) }) {
                         summaryStrip(summary, countText: receiptCountLabel(summary.count))
                     }
                     ForEach(dayGroups(of: filteredReceipts, date: \.createdAt), id: \.date) { group in
                         sectionHeader(DayFormat.label(group.date, dateFormat),
-                                      trailing: group.items.reduce(Decimal.zero) { $0 + $1.paidTotal }.formatMoney())
+                                      trailing: group.items.reduce(Decimal.zero) { $0 + receiptAmount($1) }.formatMoney())
                         card {
                             ForEach(Array(group.items.enumerated()), id: \.element.persistentModelID) { idx, r in
                                 let open = !selecting && expandedReceipts.contains(r.persistentModelID)
                                 VStack(spacing: 0) {
                                     receiptRow(r, selecting: selecting, expanded: open,
-                                               fraction: fraction(r.paidTotal, maxByMonth[monthKey(r.createdAt)]))
+                                               fraction: fraction(receiptAmount(r), maxByMonth[monthKey(r.createdAt)]))
                                     if open { receiptExpansion(r) }
                                 }
                                 if idx < group.items.count - 1 { Divider().padding(.leading, 64) }
@@ -332,9 +407,13 @@ struct HistoryView: View {
     /// with a magnitude bar underneath showing the receipt's share of the month's biggest.
     @ViewBuilder
     private func receiptRow(_ r: Receipt, selecting: Bool, expanded: Bool, fraction: Double) -> some View {
+        let amountOverride = tagActive ? receiptAmount(r) : nil
+        let tags = receiptTags(r)
         VStack(spacing: 0) {
             if selecting {
-                Button { selectedID = r.persistentModelID } label: { ReceiptRowView(receipt: r) }
+                Button { selectedID = r.persistentModelID } label: {
+                    ReceiptRowView(receipt: r, amountOverride: amountOverride, tags: tags)
+                }
                     .buttonStyle(.plain)
                     .background(selectedID == r.persistentModelID ? Palette.tintSoft : Color.clear)
             } else {
@@ -343,7 +422,10 @@ struct HistoryView: View {
                         if expandedReceipts.contains(r.persistentModelID) { expandedReceipts.remove(r.persistentModelID) }
                         else { expandedReceipts.insert(r.persistentModelID) }
                     }
-                } label: { ReceiptRowView(receipt: r, expandable: true, expanded: expanded) }
+                } label: {
+                    ReceiptRowView(receipt: r, expandable: true, expanded: expanded,
+                                   amountOverride: amountOverride, tags: tags)
+                }
                     .buttonStyle(.plain)
             }
             magnitudeBar(fraction, leading: 64)
@@ -418,6 +500,7 @@ struct HistoryView: View {
                 Text(item.name).font(.subheadline).foregroundStyle(Palette.label)
                 Text("\(Categories.displayName(item.category)) · \(item.receipt?.store ?? "")")
                     .font(.caption).foregroundStyle(Palette.secondaryLabel).lineLimit(1)
+                TagRowStrip(tags: item.tags.map(\.name)).padding(.top, 3)
             }
             Spacer(minLength: 8)
             Text(item.lineTotal.formatMoney()).font(.subheadline).fontWeight(.semibold)

@@ -324,6 +324,7 @@ private struct ItemCard: View {
     @Bindable var item: DraftItem
     var onDelete: () -> Void
     var onEditCategory: () -> Void
+    @State private var showTagSheet = false
 
     var body: some View {
         VStack(spacing: 10) {
@@ -371,9 +372,26 @@ private struct ItemCard: View {
                 .frame(width: 100)
                 .glassControl(cornerRadius: 10)
             }
+            tagsRow
         }
         .padding(14)
         .background(Palette.tertiaryBackground, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .sheet(isPresented: $showTagSheet) { TagInputSheet(tags: $item.tags) }
+    }
+
+    /// Outlined #capsules + a tinted "＋ Tag" affordance (mockup 2a), wrapping under the item fields.
+    /// Tags are orthogonal to the category — the footnote in the sheet says they don't change it.
+    private var tagsRow: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            label("Tags")
+            FlowLayout(spacing: 8, lineSpacing: 8) {
+                ForEach(item.tags, id: \.self) { tag in
+                    RemovableTagChip(tag: tag) { item.tags.removeAll { $0 == tag } }
+                }
+                AddTagButton { showTagSheet = true }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private func label(_ text: LocalizedStringKey) -> some View {

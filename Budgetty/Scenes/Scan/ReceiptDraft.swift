@@ -16,9 +16,12 @@ final class DraftItem: Identifiable {
     var quantity: Int
     var price: Decimal
     var category: String
+    /// Free-form tags (normalized names) carried by this row; persisted to the line item on save.
+    var tags: [String]
 
-    init(name: String, quantity: Int, price: Decimal, category: String) {
+    init(name: String, quantity: Int, price: Decimal, category: String, tags: [String] = []) {
         self.name = name; self.quantity = quantity; self.price = price; self.category = category
+        self.tags = tags
     }
 
     var lineTotal: Decimal { price * Decimal(quantity) }
@@ -59,7 +62,8 @@ final class ReceiptDraft: Identifiable {
         extraCharges = receipt.extraCharges
         items = receipt.items
             .sorted { $0.name < $1.name }
-            .map { DraftItem(name: $0.name, quantity: $0.quantity, price: $0.price, category: $0.category) }
+            .map { DraftItem(name: $0.name, quantity: $0.quantity, price: $0.price, category: $0.category,
+                             tags: $0.tags.map(\.name).sorted()) }
     }
 
     init(from r: ExtractionResult) {
@@ -126,6 +130,9 @@ final class ReceiptDraft: Identifiable {
                               category: it.category)
             li.receipt = receipt
             context.insert(li)
+            // Link the row's tags, creating any missing catalog rows. Editing deleted the old items
+            // above (their links cascaded), so this re-creates them from what each row now carries.
+            TagOps.setTags(context, on: li, names: it.tags)
         }
         try? context.save()
         return stamp

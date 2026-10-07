@@ -68,10 +68,14 @@ struct LineItemDTO: Codable {
     var price: Decimal
     var quantity: Int
     var category: String
+    /// The line item's free-form tags (normalized names). Optional so a pre-tags backup still decodes;
+    /// read with `?? []` on restore.
+    var tags: [String]? = nil
 
     init(_ i: LineItem) {
         name = i.name; createdAt = i.createdAt; price = i.price
         quantity = i.quantity; category = i.category
+        tags = i.tags.map(\.name)
     }
 }
 
@@ -319,10 +323,24 @@ enum BackupService {
             for g in try context.fetch(FetchDescriptor<SavingsGoal>()) { context.delete(g) } // cascades to contributions
             for l in try context.fetch(FetchDescriptor<BuyingLimit>()) { context.delete(l) }
             for s in try context.fetch(FetchDescriptor<WellbeingScoreEntity>()) { context.delete(s) }
+            for t in try context.fetch(FetchDescriptor<Tag>()) { context.delete(t) }
             try context.save() // flush deletes before re-inserting unique-keyed rows
         }
 
-        // Receipts (+ their line items). Always additive.
+        // Tag catalog, keyed by normalized name — fetch-or-create as line items reference them, so a
+        // merge reuses the device's existing rows and never duplicates. `Tag.name` is unique.
+        var tagsByName = Dictionary(
+            uniqueKeysWithValues: try context.fetch(FetchDescriptor<Tag>()).map { ($0.name, $0) })
+        func tag(_ rawName: String) -> Tag? {
+            let key = Tag.normalize(rawName)
+            guard !key.isEmpty else { return nil }
+            if let existing = tagsByName[key] { return existing }
+            let created = Tag(name: key)
+            context.insert(created); tagsByName[key] = created
+            return created
+        }
+
+        // Receipts (+ their line items, with their tags). Always additive.
         for dto in file.receipts {
             let receipt = Receipt(createdAt: dto.createdAt, store: dto.store, date: dto.date,
                                   discount: dto.discount, isManual: dto.isManual,
@@ -332,6 +350,8 @@ enum BackupService {
                 let item = LineItem(name: i.name, createdAt: i.createdAt, price: i.price,
                                     quantity: i.quantity, category: i.category, receipt: receipt)
                 context.insert(item)
+                var seen = Set<String>()
+                item.tags = (i.tags ?? []).compactMap { tag($0) }.filter { seen.insert($0.name).inserted }
             }
         }
 

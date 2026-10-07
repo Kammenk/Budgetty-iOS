@@ -24,7 +24,7 @@ enum UserStore {
     static let models: [any PersistentModel.Type] = [
         LineItem.self, Receipt.self, Category.self, Budget.self, Recurring.self, CategoryRule.self,
         BudgetRollover.self, SavingsGoal.self, SavingsContribution.self, IgnoredSubscription.self,
-        BuyingLimit.self, WellbeingScoreEntity.self,
+        BuyingLimit.self, WellbeingScoreEntity.self, Tag.self,
     ]
 
     private static var containers: [String: ModelContainer] = [:]

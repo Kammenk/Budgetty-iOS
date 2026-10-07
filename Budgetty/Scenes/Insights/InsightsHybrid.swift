@@ -44,7 +44,7 @@ extension InsightSection {
     var tab: InsightsTab {
         switch self {
         case .stats: .overview
-        case .breakdown, .topCategories, .topStores, .biggestPurchases, .subscriptions: .spending
+        case .breakdown, .topCategories, .topStores, .biggestPurchases, .byTag, .subscriptions: .spending
         case .income, .needsWantsSavings: .money
         case .trend, .comparison, .highlights: .trends
         }
