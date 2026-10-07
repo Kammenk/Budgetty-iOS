@@ -237,6 +237,11 @@ struct AccountView: View {
                 row("Trips", "airplane", Color(argb: 0xFF5856D6)) { chevron }
             }
             .buttonStyle(.plain)
+            divider
+            NavigationLink { TemplatesView() } label: {
+                row("Templates", "bolt.fill", Color(argb: 0xFFFF9500)) { chevron }
+            }
+            .buttonStyle(.plain)
         }
         .contentCard(cornerRadius: 14)
     }

@@ -12,12 +12,21 @@ import SwiftData
 import PhotosUI
 import StoreKit
 
+/// How the scan flow was entered, chosen in the Add Expense sheet: the capture screen, straight to the
+/// library picker, an empty manual entry, or a manual entry pre-filled from a saved template.
+enum ScanEntry: Equatable {
+    case capture, library, manual
+    case template(PersistentIdentifier)
+}
+
 struct ScanFlowView: View {
+    var mode: ScanEntry = .capture
     @Environment(\.modelContext) private var context
     @Environment(\.dismiss) private var dismiss
     @Environment(\.requestReview) private var requestReview
     @Environment(BuyingLimitNudgeCenter.self) private var buyingLimitNudge
     @Query private var trips: [Trip]
+    @State private var didRoute = false
 
     /// The running trip, if any — new receipts here get its tag pre-applied (Travel mode).
     private var activeTrip: Trip? { trips.filter { $0.active }.max { $0.createdAt < $1.createdAt } }
@@ -54,7 +63,7 @@ struct ScanFlowView: View {
 
     var body: some View {
         content
-            .onAppear(perform: maybeAutostart)
+            .onAppear { maybeAutostart(); routeInitialMode() }
             .fullScreenCover(isPresented: $showCamera) {
                 CameraPicker { handle($0) }.ignoresSafeArea()
             }
@@ -294,6 +303,36 @@ struct ScanFlowView: View {
         let d = ReceiptDraft()
         d.date = .now
         d.addItem()
+        seedTrip(d)
+        draft = d
+        isManual = true
+        phase = .review
+    }
+
+    /// Routes the initial Add-sheet choice once: library picker, empty manual, or template prefill.
+    private func routeInitialMode() {
+        guard !didRoute else { return }
+        didRoute = true
+        switch mode {
+        case .capture: break   // stay on the capture screen
+        case .library: showLibrary = true
+        case .manual: startManual()
+        case .template(let id): startFromTemplate(id)
+        }
+    }
+
+    /// Starts a manual entry pre-filled from a saved template: one row with its name, category and
+    /// amount (blank for an ask-amount template), plus the template's store. Android: `startManual(id)`.
+    private func startFromTemplate(_ id: PersistentIdentifier) {
+        let d = ReceiptDraft()
+        d.date = .now
+        if let t = (try? context.fetch(FetchDescriptor<Template>()))?.first(where: { $0.persistentModelID == id }) {
+            d.store = t.store
+            d.items = [DraftItem(name: t.name, quantity: 1, price: t.prefillAmount,
+                                 category: t.category.isEmpty ? Categories.defaultName : t.category)]
+        } else {
+            d.addItem()
+        }
         seedTrip(d)
         draft = d
         isManual = true
