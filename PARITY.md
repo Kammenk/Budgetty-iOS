@@ -2099,3 +2099,20 @@ Simulator) green. Pure presentation; no device run needed (matches the approved 
 **Structural notes:** the 4 assumption values persist via `@AppStorage` (`forecastStartBalance`/`…ComfortThreshold`/`…Discretionary`/`…HorizonMonths`). Unlike most iOS prefs (device-global), these are per-user financial data, so they're added to `UserState.clear()` and wiped on sign-out (Android parity: SettingsStore clears them per-user; kept out of backup — a stored balance goes stale). Entry pushed via `navigationDestination` from the Trends tab (`.underFloatingDock()` so content clears the Scan dock); "Go to Budget" uses the `selectTab` environment action.
 
 **iOS files:** `Data/CashFlowForecast.swift` (new — pure projection + `toForecastEvents`), `Scenes/Forecast/ForecastView.swift` (new — screen + states + assumptions sheet + `ForecastChart`), `Scenes/Insights/InsightsView.swift` (Trends entry card + navigationDestination), `App/Settings.swift` (4 keys + UserState.clear).
+
+## Android → iOS — Multiple budgets (Envelopes) — 2026-10-07
+**Status:** PORTED (2026-10-07, sim-verified iPhone 17 Pro) — Budget → Multiple budgets: named spending budgets beyond the single main budget, each with its own window, scope and live pace bar.
+
+**Android:** `feat/budgets-pace` (Room v28 `budget_envelopes`, **`limitAmount` not `limit`**). An "envelope" is a `limitAmount` over an inclusive date window, scoped to all spending or a set of categories. Spend is summed live from transactions in the window matching the scope (same net-spend + paid-adjustment math as the main budget); nothing is denormalised. Free tier = 1 extra budget; Premium unlimited.
+
+**Behaviour rules (ported):**
+- `BudgetPace.compute` is a 1:1 port: on/below a 1.0 spent-vs-elapsed ratio is on pace, up to 1.15 is slightly ahead, beyond that (or past 100% spent) is over; derives the bar fill, the "today" tick, remaining, days-left, daily allowance, average/day and projected total.
+- `BudgetEnvelope` @Model (name, emoji 🧾, limitAmount, start/end, `categories: [String]` empty = all, sortOrder, createdAt). Per-envelope spend = Σ line totals in [start, end] matching the scope + each matched receipt's paid adjustment (on-top charges − discount, counted once via `Receipt.additiveCharges`/`discount`) — mirrors Android's `spend() + paidAdjustmentOf`.
+- List screen: intro (empty), a card per envelope (emoji, name, "range · scope", `spent / limit` in the pace colour, the pace bar, the pace subtitle), and either a New-budget button or — at the free cap — the cap note + Unlock-unlimited paywall button. Sim-verified: a Groceries-scoped Oct budget showed 1 882,80 € / 2 000,00 € **over pace**, "117,20 € left, 24 days", with the fill far ahead of the today-tick.
+- Edit sheet: emoji grid (14), name, amount, a date range (via the shared `DateRangeSheet`) with a "This month" quick-set, and a scope toggle (All spending / Some categories) that reveals a category multi-select (predefined + custom) in a `FlowLayout`. Delete when editing.
+- `PaceBar` is a SwiftUI `Canvas` port (track, coloured fill with a min width, haloed "today" tick). Colours: green on pace, amber ahead, red over.
+- Backup round-trips envelopes (`BudgetEnvelopeDTO`, additive).
+
+**Structural notes:** relationship-based spend (each matched `LineItem.receipt` deduped by `persistentModelID`). Free cap = 1 (`envelopeFreeLimit`); the test account is Premium so the cap path was reasoned, not tapped. Pushed via `NavigationLink` from the Budget screen (`.underFloatingDock()`); amount uses `.number` formatting like the main budget sheets.
+
+**iOS files:** `Scenes/Budgets/BudgetPace.swift` (new — pure pace math), `Model/BudgetEnvelope.swift` (new), `Scenes/Budgets/BudgetEnvelopesView.swift` (new — list + pace bar + edit sheet), `Scenes/Budget/BudgetView.swift` (Multiple-budgets entry card), `Data/UserStore.swift` (register), `Data/Backup.swift` (BudgetEnvelopeDTO).

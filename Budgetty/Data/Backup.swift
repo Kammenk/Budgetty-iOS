@@ -41,6 +41,8 @@ struct BackupFile: Codable {
     /// Tracked product warranties. Optional for forward-compat; additive on restore. Expiry is derived
     /// from purchaseDate + durationMonths, so nothing date-stale carries over.
     var warranties: [WarrantyDTO]? = []
+    /// Named budget envelopes (multiple budgets). Optional for forward-compat; additive on restore.
+    var budgetEnvelopes: [BudgetEnvelopeDTO]? = []
     /// The user's DISPLAY / DATA-INTERPRETATION preferences (currency, month-start day, theme, …), so a
     /// full `.replace` restore reproduces the account faithfully on a new device — most importantly the
     /// currency (the app appends a symbol and never converts amounts, so the same numbers under the wrong
@@ -187,6 +189,22 @@ struct WarrantyDTO: Codable {
         name = w.name; emoji = w.emoji; store = w.store; category = w.category
         purchaseDate = w.purchaseDate; durationMonths = w.durationMonths
         coverageNote = w.coverageNote; receiptId = w.receiptId; createdAt = w.createdAt
+    }
+}
+
+struct BudgetEnvelopeDTO: Codable {
+    var name: String
+    var emoji: String
+    var limitAmount: Decimal
+    var startDate: Date
+    var endDate: Date
+    var categories: [String]
+    var sortOrder: Int
+    var createdAt: Date
+    init(_ e: BudgetEnvelope) {
+        name = e.name; emoji = e.emoji; limitAmount = e.limitAmount
+        startDate = e.startDate; endDate = e.endDate; categories = e.categories
+        sortOrder = e.sortOrder; createdAt = e.createdAt
     }
 }
 
@@ -367,6 +385,7 @@ enum BackupService {
             trips: try context.fetch(FetchDescriptor<Trip>()).map(TripDTO.init),
             templates: try context.fetch(FetchDescriptor<Template>()).map(TemplateDTO.init),
             warranties: try context.fetch(FetchDescriptor<Warranty>()).map(WarrantyDTO.init),
+            budgetEnvelopes: try context.fetch(FetchDescriptor<BudgetEnvelope>()).map(BudgetEnvelopeDTO.init),
             settings: SettingsDTO.current()
         )
         return try encoder().encode(file)
@@ -401,6 +420,7 @@ enum BackupService {
             for t in try context.fetch(FetchDescriptor<Trip>()) { context.delete(t) }
             for t in try context.fetch(FetchDescriptor<Template>()) { context.delete(t) }
             for w in try context.fetch(FetchDescriptor<Warranty>()) { context.delete(w) }
+            for e in try context.fetch(FetchDescriptor<BudgetEnvelope>()) { context.delete(e) }
             try context.save() // flush deletes before re-inserting unique-keyed rows
         }
 
@@ -518,6 +538,14 @@ enum BackupService {
                                     category: dto.category, purchaseDate: dto.purchaseDate,
                                     durationMonths: dto.durationMonths, coverageNote: dto.coverageNote,
                                     receiptId: dto.receiptId, createdAt: dto.createdAt))
+        }
+
+        // Budget envelopes — additive with fresh rows.
+        for dto in file.budgetEnvelopes ?? [] {
+            context.insert(BudgetEnvelope(name: dto.name, emoji: dto.emoji, limitAmount: dto.limitAmount,
+                                          startDate: dto.startDate, endDate: dto.endDate,
+                                          categories: dto.categories, sortOrder: dto.sortOrder,
+                                          createdAt: dto.createdAt))
         }
 
         try context.save()
