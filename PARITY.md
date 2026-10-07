@@ -2003,3 +2003,18 @@ Simulator) green. Pure presentation; no device run needed (matches the approved 
 **Header layout:** adding the eye to Home crowded the title, so the "Customize" pill became a compact glass-circle icon button (consistent trailing cluster: customize · eye · avatar), and the title is pinned to one line.
 
 **iOS files:** `Theme/MoneyVisibility.swift` (new), `Model/Money.swift` (`formatMoney` mask + `formatMoneyRaw`), `Scenes/Components/HideAmounts.swift` (new — `MoneyText` + `HideAmountsEye`), `App/Settings.swift` (keys), `Scenes/Home/HomeView.swift` (eye + header + hero pills + ReceiptRowView pill), `Scenes/History/HistoryView.swift` (eye), `Scenes/Insights/InsightsView.swift` (eye + hero pill), `Scenes/Account/AccountView.swift` (Privacy toggle + auto-hide + footnote), `Scenes/History/HistoryFilters.swift` (raw price labels), `BudgettyApp.swift` (auto-hide), `Data/Backup.swift` (SettingsDTO).
+
+## Android → iOS — Habit category suggestions — 2026-10-07
+**Status:** PORTED (2026-10-07, sim-verified iPhone 17 Pro) — "Suggested for you" / "Common picks" row in the category picker, habit-ranked + context lead.
+
+**Android:** `feat/habit-category-suggestions`. FREE. The category picker gains a "Suggested for you" row above the grid: the user's categories ranked by recent use, with a learned-rule match for the item being categorised floated first ("because you usually…"). Needs no new data model.
+
+**Behaviour rules (ported):**
+- `CategorySuggester.rank` (pure, `Category/CategorySuggester.swift`) — a 1:1 port: each categorised line item adds `0.5^(ageDays/30)` to its category's score (30-day recency half-life), top-5 returned, ties by name. Under 5 categorised items it returns generic `commonPicks` (Groceries / Restaurant & Dining / Coffee & Cafés / Public Transport / Fuel, filtered to names still in the taxonomy) labelled "Common picks".
+- `CategoryPickerSheet` reads recent `LineItem`s (category + date, capped 500) and `CategoryRule`s via `@Query`; the row shows the context lead first when the opened item's name matches a learned rule, then the ranked chips (de-duped, capped), a "Because you usually file '…' as …" reason or the common-picks hint, and a divider. Only on the browse view (hidden while searching). The lead/selected chips take the tint outline. Android parity: `SuggestionRow`/`SuggestionChip`.
+- Shown in both the review-screen picker (with `contextName` = the item name) and the Budget bill picker (no context), since both use `CategoryPickerSheet` — matching Android adding it to Upload + Budget.
+- Sim-verified: "SUGGESTED FOR YOU" with the personalized ranked chips from real usage.
+
+**Strings:** English-first (String Catalog), Crowdin later — as Android ships them.
+
+**iOS files:** `Category/CategorySuggester.swift` (new), `Scenes/Scan/CategoryPickerSheet.swift` (suggestion row + queries + `contextName`), `Scenes/Scan/ReviewView.swift` (passes `contextName`).
