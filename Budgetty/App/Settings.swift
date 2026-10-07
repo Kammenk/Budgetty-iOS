@@ -17,6 +17,11 @@ enum SettingsKey {
     static let monthStartDay = "pref.monthStartDay"
     /// Unspent budget carries into the next period (opt-in, default off). See `BudgetRolloverMath`.
     static let budgetRolloverEnabled = "pref.budgetRolloverEnabled"
+    /// The governing budget cadence ("WEEKLY"/"FORTNIGHTLY"/"MONTHLY"); blank → derive from which key
+    /// is set (legacy). See `BudgetCadence`.
+    static let budgetCadence = "pref.budgetCadence"
+    /// Pinned fortnight anchor as an epoch day (0 = none yet). See `PayCycle.fortnight`.
+    static let fortnightAnchor = "pref.fortnightAnchor"
     static let accent = "pref.accent"             // Premium accent theme (see AccentOption/AppTheme)
     static let faceID = "pref.faceID"
     /// App lock (PIN gate) on/off; the PIN hash itself lives in the Keychain (see `PinLock`).

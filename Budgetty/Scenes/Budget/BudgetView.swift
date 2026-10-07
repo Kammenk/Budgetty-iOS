@@ -10,14 +10,44 @@
 import SwiftUI
 import SwiftData
 
+/// The governing budget cadence — the toggle order Weekly · Fortnightly · Monthly, matching Android's
+/// `BudgetCadence`. Persisted by `key` (= the budget key = the Android enum name).
 private enum BudgetPeriod: String, CaseIterable, Identifiable {
-    case monthly = "Monthly", weekly = "Weekly"
+    case weekly = "Weekly", fortnightly = "Fortnightly", monthly = "Monthly"
     var id: String { rawValue }
     /// Localized period word, for interpolating into the "%@ budget" strings.
     var localized: String {
         switch self {
-        case .monthly: String(localized: "Monthly")
         case .weekly: String(localized: "Weekly")
+        case .fortnightly: String(localized: "Fortnightly")
+        case .monthly: String(localized: "Monthly")
+        }
+    }
+    /// The budget key (and persisted cadence name) for this period.
+    var key: String {
+        switch self {
+        case .weekly: Budget.weeklyKey
+        case .fortnightly: Budget.fortnightlyKey
+        case .monthly: Budget.monthlyKey
+        }
+    }
+    /// The "/ week|fortnight|month" suffix on the amount.
+    var perUnit: LocalizedStringKey {
+        switch self {
+        case .weekly: "/ week"
+        case .fortnightly: "/ fortnight"
+        case .monthly: "/ month"
+        }
+    }
+    /// The active cadence for a user who hasn't explicitly chosen one (blank pref): derived from which
+    /// legacy key is set — Weekly only when it alone is set, Monthly otherwise. Fortnightly is never
+    /// auto-derived (it needs an anchor). Android parity: `BudgetCadence.resolve`.
+    static func resolve(_ prefName: String, hasMonthly: Bool, hasWeekly: Bool) -> BudgetPeriod {
+        switch prefName {
+        case Budget.weeklyKey: return .weekly
+        case Budget.fortnightlyKey: return .fortnightly
+        case Budget.monthlyKey: return .monthly
+        default: return (hasWeekly && !hasMonthly) ? .weekly : .monthly
         }
     }
 }
@@ -40,7 +70,11 @@ struct BudgetView: View {
     /// effective (budget + carried) progress; toggling it reconciles the stored carry rows.
     @AppStorage(SettingsKey.budgetRolloverEnabled) private var rolloverEnabled = false
 
-    @State private var period: BudgetPeriod = .monthly
+    /// The governing cadence, persisted (blank → derived from which key is set). `fortnightAnchor` pins
+    /// the 14-day grid so fortnights don't drift. Android: `SettingsStore.budgetCadence` + anchor.
+    @AppStorage(SettingsKey.budgetCadence) private var cadenceRaw = ""
+    @AppStorage(SettingsKey.fortnightAnchor) private var fortnightAnchor = 0
+    @State private var showFortnightSwitch = false
     @State private var showPaywall = false
     @State private var savingsDetail: SavingsGoal?
     @State private var showNewGoal = false
@@ -85,6 +119,12 @@ struct BudgetView: View {
             .sheet(isPresented: $showPaywall) { NavigationStack { PaywallView() } }
             .sheet(item: $savingsDetail) { SavingsGoalDetailView(goal: $0) }
             .sheet(isPresented: $showNewGoal) { SavingsGoalEditSheet(existing: nil) }
+            .alert("Switch to fortnightly?", isPresented: $showFortnightSwitch) {
+                Button("Cancel", role: .cancel) {}
+                Button("Use fortnightly") { confirmFortnightly() }
+            } message: {
+                Text("Your budget and bills keep their monthly figures — Budgetty just shows them per fortnight. Nothing is deleted, and past periods stay as they were.")
+            }
         }
     }
 
@@ -100,7 +140,8 @@ struct BudgetView: View {
     }
 
     private var periodPicker: some View {
-        GlassSegmentedControl(options: Array(BudgetPeriod.allCases), selection: $period) {
+        GlassSegmentedControl(options: Array(BudgetPeriod.allCases),
+                              selection: Binding(get: { period }, set: { selectPeriod($0) })) {
             LocalizedStringKey($0.rawValue)
         }
         .accessibilityIdentifier(A11y.Budget.periodToggle)
@@ -125,24 +166,59 @@ struct BudgetView: View {
 
     // MARK: - Derived data
 
-    private var isWeekly: Bool { period == .weekly }
-    private var overallKey: String { isWeekly ? Budget.weeklyKey : Budget.monthlyKey }
+    /// The governing cadence, resolved from the persisted pref (or derived for a legacy user).
+    private var period: BudgetPeriod {
+        BudgetPeriod.resolve(cadenceRaw,
+                             hasMonthly: budgets.contains { $0.key == Budget.monthlyKey },
+                             hasWeekly: budgets.contains { $0.key == Budget.weeklyKey })
+    }
+    private var overallKey: String { period.key }
     private var overallBudget: Budget? { budgets.first { $0.key == overallKey } }
+    /// The pinned fortnight anchor, or a default derived from this pay-cycle month.
+    private var effectiveAnchor: Int {
+        fortnightAnchor > 0 ? fortnightAnchor : PayCycle.defaultFortnightAnchor(startDay: monthStartDay)
+    }
 
     private var allItems: [LineItem] { receipts.flatMap(\.items) }
 
     private var spent: Decimal {
-        if isWeekly {
+        switch period {
+        case .weekly:
+            // Weekly stays calendar-aligned (the locale week).
             let cal = Calendar.current
             return receipts
                 .filter { cal.isDate($0.createdAt, equalTo: .now, toGranularity: .weekOfYear) }
                 .reduce(.zero) { $0 + $1.paidTotal }
+        case .fortnightly:
+            let window = PayCycle.fortnightInterval(anchorEpochDay: effectiveAnchor)
+            return receipts.filter { window.contains($0.createdAt) }.reduce(.zero) { $0 + $1.paidTotal }
+        case .monthly:
+            // The monthly budget resets on the user's pay day (see PayCycle).
+            let window = PayCycle.monthInterval(startDay: monthStartDay)
+            return receipts.filter { window.contains($0.createdAt) }.reduce(.zero) { $0 + $1.paidTotal }
         }
-        // The monthly budget resets on the user's pay day (see PayCycle); weekly stays calendar-aligned.
-        let window = PayCycle.monthInterval(startDay: monthStartDay)
-        return receipts
-            .filter { window.contains($0.createdAt) }
-            .reduce(.zero) { $0 + $1.paidTotal }
+    }
+
+    /// First-time switch to Fortnightly shows the explainer; other switches apply immediately.
+    private func selectPeriod(_ p: BudgetPeriod) {
+        if p == .fortnightly && period != .fortnightly {
+            showFortnightSwitch = true
+        } else {
+            cadenceRaw = p.key
+        }
+    }
+
+    /// Pins the fortnight anchor (so the 14-day grid is fixed), pre-fills the fortnightly budget from
+    /// the monthly (prorated × 12 ÷ 26) if none is set, then switches cadence. Android parity: the
+    /// switch confirm + `saveCadenceBudget`.
+    private func confirmFortnightly() {
+        if fortnightAnchor == 0 { fortnightAnchor = PayCycle.defaultFortnightAnchor(startDay: monthStartDay) }
+        if !budgets.contains(where: { $0.key == Budget.fortnightlyKey }),
+           let monthly = budgets.first(where: { $0.key == Budget.monthlyKey })?.amount, monthly > 0 {
+            context.insert(Budget(key: Budget.fortnightlyKey, amount: Budget.monthlyToFortnightly(monthly)))
+            try? context.save()
+        }
+        cadenceRaw = BudgetPeriod.fortnightly.key
     }
 
     private func categorySpent(_ group: String) -> Decimal {
@@ -236,7 +312,7 @@ struct BudgetView: View {
                     HStack(alignment: .firstTextBaseline, spacing: 6) {
                         Text(b.amount.formatMoney())
                             .font(.system(size: 40, weight: .bold)).foregroundStyle(Palette.label)
-                        Text(isWeekly ? "/ week" : "/ month")
+                        Text(period.perUnit)
                             .font(.subheadline).foregroundStyle(Palette.secondaryLabel)
                     }
                     .padding(.bottom, carried > 0 ? 4 : 14)

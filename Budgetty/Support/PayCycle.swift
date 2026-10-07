@@ -53,6 +53,53 @@ enum PayCycle {
         return DateInterval(start: cal.startOfDay(for: start), end: endExclusive)
     }
 
+    // MARK: - Fortnight (Android parity: PayCycle.fortnight — the Fortnightly budget cadence)
+
+    /// A fortnight is a fixed 14-day block, unlike the 28–31-day pay-cycle month.
+    static let fortnightDays = 14
+
+    /// Days between a fixed reference (1970-01-01, local) and `date`'s start of day — the "epoch day"
+    /// used to persist a fortnight anchor in `UserDefaults` (Android's `LocalDate.toEpochDay`).
+    static func epochDay(_ date: Date, _ cal: Calendar = .current) -> Int {
+        let ref = cal.startOfDay(for: Date(timeIntervalSince1970: 0))
+        return cal.dateComponents([.day], from: ref, to: cal.startOfDay(for: date)).day ?? 0
+    }
+    private static func date(fromEpochDay day: Int, _ cal: Calendar = .current) -> Date {
+        let ref = cal.startOfDay(for: Date(timeIntervalSince1970: 0))
+        return cal.date(byAdding: .day, value: day, to: ref)!
+    }
+
+    /// The 14-day fortnight `offset` fortnights from the one containing `today`, as an inclusive
+    /// `[start, end]` day pair. Fortnights run continuously every 14 days from `anchorEpochDay` (a
+    /// reference pay day), so — unlike `month` — they keep the same length across month boundaries and
+    /// never re-anchor; the block containing today is found by snapping down to the nearest 14-day
+    /// boundary (floor division, so a today before the anchor still resolves to its containing block).
+    static func fortnight(_ today: Date = .now, anchorEpochDay: Int, offset: Int = 0,
+                          calendar cal: Calendar = .current) -> (start: Date, end: Date) {
+        let anchor = date(fromEpochDay: anchorEpochDay, cal)
+        let daysBetween = cal.dateComponents([.day], from: anchor, to: cal.startOfDay(for: today)).day ?? 0
+        let blocks = Int(floor(Double(daysBetween) / Double(fortnightDays)))
+        let start = cal.date(byAdding: .day, value: (blocks + offset) * fortnightDays, to: anchor)!
+        let end = cal.date(byAdding: .day, value: fortnightDays - 1, to: start)!
+        return (start, end)
+    }
+
+    /// Half-open interval of the fortnight, for `interval.contains` filters.
+    static func fortnightInterval(_ today: Date = .now, anchorEpochDay: Int, offset: Int = 0,
+                                  calendar cal: Calendar = .current) -> DateInterval {
+        let (start, end) = fortnight(today, anchorEpochDay: anchorEpochDay, offset: offset, calendar: cal)
+        let endExclusive = cal.date(byAdding: .day, value: 1, to: cal.startOfDay(for: end))!
+        return DateInterval(start: cal.startOfDay(for: start), end: endExclusive)
+    }
+
+    /// A stable default fortnight anchor (epoch day) when none is persisted: the start of the pay-cycle
+    /// month containing `today`. Pinned once so fortnights don't drift (re-deriving monthly would jump
+    /// the anchor by a non-multiple of 14 days). Android: `defaultFortnightAnchor`.
+    static func defaultFortnightAnchor(_ today: Date = .now, startDay: Int = PayCycle.startDay,
+                                       calendar cal: Calendar = .current) -> Int {
+        epochDay(month(today, startDay: startDay, calendar: cal).start, cal)
+    }
+
     /// First day (start-of-day) of the calendar month containing `date`.
     private static func firstOfMonth(_ date: Date, _ cal: Calendar) -> Date {
         cal.date(from: cal.dateComponents([.year, .month], from: date))!

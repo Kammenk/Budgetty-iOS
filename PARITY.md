@@ -2018,3 +2018,19 @@ Simulator) green. Pure presentation; no device run needed (matches the approved 
 **Strings:** English-first (String Catalog), Crowdin later — as Android ships them.
 
 **iOS files:** `Category/CategorySuggester.swift` (new), `Scenes/Scan/CategoryPickerSheet.swift` (suggestion row + queries + `contextName`), `Scenes/Scan/ReviewView.swift` (passes `contextName`).
+
+## Android → iOS — Fortnightly budget cadence — 2026-10-07
+**Status:** PORTED (2026-10-07, sim-verified iPhone 17 Pro) — 3-up Weekly·Fortnightly·Monthly toggle, switch dialog, prorated fortnightly budget, 14-day spend window, persistence, backup.
+
+**Android:** `feat/budget-cadence`. FREE (extends the existing Monthly|Weekly toggle, not a new screen). A fortnight is a fixed 14-day window anchored on a reference pay day; monthly figures prorate × 12 ÷ 26 so 26 fortnights sum to a year.
+
+**Behaviour rules (ported):**
+- `PayCycle.fortnight(anchorEpochDay:offset:)` + `fortnightInterval` + `defaultFortnightAnchor` — a 1:1 port: continuous 14-day blocks via floor-division from the anchor (pinned to this pay-cycle month's start so they don't drift). `Budget.monthlyToFortnightly` / `fortnightlyToMonthly` use 26 ÷ 12 (the ÷2 shortcut overstates by ≈8%).
+- `BudgetPeriod` is now Weekly · Fortnightly · Monthly, persisted via `SettingsKey.budgetCadence`; `resolve` derives the period from which key is set for a legacy user (Weekly only when it alone is set, else Monthly — Fortnightly never auto-derived). The governing cadence — not "which key is set" — is the source of truth. Android: `BudgetCadence.resolve`.
+- The overall budget card keys off `period.key` (new `Budget.fortnightlyKey`), labels "Fortnightly budget" / "/ fortnight", and its spend sums the current 14-day window.
+- Switching to Fortnightly shows a confirm ("Switch to fortnightly? … keep their monthly figures, shown per fortnight, nothing deleted"); on confirm it pins the anchor and pre-fills the fortnightly budget from the monthly (prorated) if none is set. Sim-verified: €1200/month → €553.85/fortnight, over-budget on the current fortnight.
+- Backup round-trips `budgetCadence` + `fortnightAnchor` in `SettingsDTO`.
+
+**Scope notes (minor):** the Fortnightly segment's "New" badge and the Android window-date header weren't ported (the iOS `GlassSegmentedControl` is generic and the iOS Budget card has no window label); the Home Safe-to-Spend hero stays monthly (the cadence surfaces on the Budget screen, its primary surface). Behaviour is otherwise faithful.
+
+**iOS files:** `Support/PayCycle.swift` (fortnight), `Model/Budget.swift` (`fortnightlyKey` + conversions), `App/Settings.swift` (keys), `Scenes/Budget/BudgetView.swift` (3-up toggle + period resolution/persistence + switch dialog + fortnight window), `Data/Backup.swift` (SettingsDTO).
