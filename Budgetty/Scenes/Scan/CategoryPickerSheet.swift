@@ -14,6 +14,9 @@ import SwiftData
 
 struct CategoryPickerSheet: View {
     @Binding var selection: String
+    /// The name of the item being categorised (the review row), if any — lets the "Suggested for you"
+    /// row float a learned-rule match first with a "because you usually…" reason. nil elsewhere.
+    var contextName: String? = nil
     /// Called with the chosen category name (in addition to updating the binding).
     var onPicked: ((String) -> Void)?
     @Environment(\.dismiss) private var dismiss
@@ -21,6 +24,10 @@ struct CategoryPickerSheet: View {
 
     @Query(filter: #Predicate<Category> { $0.isCustom }, sort: \Category.createdAt)
     private var customCategories: [Category]
+    /// Recent line items (category + date) the habit ranking reads from, and the learned rules the
+    /// context lead reads from — both power the Suggested row (see `CategorySuggester`).
+    @Query(sort: \LineItem.createdAt, order: .reverse) private var recentItems: [LineItem]
+    @Query private var rules: [CategoryRule]
 
     @State private var search = ""
     @State private var showCreate = false
@@ -50,6 +57,7 @@ struct CategoryPickerSheet: View {
         NavigationStack {
             ScrollView {
                 if search.isEmpty {
+                    suggestionRow
                     yourCategoriesSection
                     ForEach(primaryCustoms, id: \.name) { c in
                         gridSection(c.name, names: [c.name] + Categories.childNames(of: c.name))
@@ -101,6 +109,76 @@ struct CategoryPickerSheet: View {
     private var filteredNames: [String] {
         let all = Categories.predefined.map(\.name) + customCategories.map(\.name)
         return all.filter { $0.localizedCaseInsensitiveContains(search) }
+    }
+
+    // MARK: - Suggested for you (habit-based)
+
+    private var suggestions: CategorySuggester.Ranked {
+        CategorySuggester.rank(recentItems.prefix(500).map { (category: $0.category, date: $0.createdAt) })
+    }
+    /// A learned-rule category for the opened item's name, if any — the context lead.
+    private var leadMatch: String? {
+        guard let name = contextName?.trimmingCharacters(in: .whitespaces), !name.isEmpty else { return nil }
+        let key = CategoryRule.key(name)
+        return rules.first { $0.name == key }?.category
+    }
+    /// The lead (if any) first, then the ranked categories, de-duped and capped.
+    private var suggestionChips: [String] {
+        var out: [String] = []
+        if let lead = leadMatch { out.append(lead) }
+        for name in suggestions.categories where !out.contains(where: { $0.caseInsensitiveCompare(name) == .orderedSame }) {
+            out.append(name)
+        }
+        return Array(out.prefix(CategorySuggester.limit))
+    }
+
+    /// The "Suggested for you" / "Common picks" row above the grid (Android parity: `SuggestionRow`).
+    @ViewBuilder
+    private var suggestionRow: some View {
+        let chips = suggestionChips
+        if !chips.isEmpty {
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(spacing: 6) {
+                    Text(verbatim: "✦").font(.system(size: 12, weight: .black)).foregroundStyle(Palette.tint)
+                    Text(suggestions.personalized ? "Suggested for you" : "Common picks")
+                        .font(.caption2).fontWeight(.bold).textCase(.uppercase).tracking(0.7)
+                        .foregroundStyle(Palette.tint)
+                }
+                FlowLayout(spacing: 6, lineSpacing: 6) {
+                    ForEach(chips, id: \.self) { suggestionChip($0) }
+                }
+                if let lead = leadMatch, let ctx = contextName?.trimmingCharacters(in: .whitespaces), !ctx.isEmpty {
+                    HStack(alignment: .top, spacing: 6) {
+                        Text(verbatim: "✦").font(.system(size: 11)).foregroundStyle(Palette.tint)
+                        Text("Because you usually file \u{2018}\(ctx)\u{2019} as \(Categories.displayName(lead))")
+                            .font(.caption).foregroundStyle(Palette.secondaryLabel)
+                    }
+                } else if !suggestions.personalized {
+                    Text("These become your own suggestions after a few expenses.")
+                        .font(.caption).foregroundStyle(Palette.secondaryLabel)
+                }
+                Divider().padding(.top, 4)
+            }
+            .padding(.horizontal, 20).padding(.top, 8)
+        }
+    }
+
+    private func suggestionChip(_ name: String) -> some View {
+        let isLead = name.caseInsensitiveCompare(leadMatch ?? "\u{0}") == .orderedSame
+        let isSelected = name.caseInsensitiveCompare(selection) == .orderedSame
+        return Button {
+            selection = name; onPicked?(name); dismiss()
+        } label: {
+            HStack(spacing: 6) {
+                Text(Categories.emoji(for: name)).font(.system(size: 14))
+                Text(Categories.displayName(name)).font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(Palette.label).lineLimit(1)
+            }
+            .padding(.horizontal, 10).padding(.vertical, 7)
+            .background(Capsule().fill(isLead || isSelected ? Palette.tintSoft : Palette.fill))
+            .overlay(Capsule().strokeBorder(isLead || isSelected ? Palette.tint : .clear, lineWidth: 1))
+        }
+        .buttonStyle(.plain)
     }
 
     private var yourCategoriesSection: some View {

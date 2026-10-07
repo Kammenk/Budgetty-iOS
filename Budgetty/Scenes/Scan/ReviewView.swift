@@ -112,6 +112,7 @@ struct ReviewView: View {
         .sheet(item: $categoryTarget) { target in
             CategoryPickerSheet(
                 selection: Binding(get: { target.category }, set: { target.category = $0 }),
+                contextName: target.name,
                 onPicked: { newCat in
                     guard newCat != oldCategory else { return }
                     let captured = MemoryCtx(item: target, old: oldCategory, new: newCat)
