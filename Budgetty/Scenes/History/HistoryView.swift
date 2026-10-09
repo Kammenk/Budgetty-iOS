@@ -122,6 +122,9 @@ struct HistoryView: View {
 
     /// The fixed header's Liquid Glass panel: a `matHeader` wash over blur so the canvas's ambient
     /// glows shimmer through (the mockup's soft violet gradient), closed by a `sep2` hairline.
+    /// Runs under the side insets too, like a system bar: the iPhone Duo's cover screen keeps its
+    /// status bar in a column down the trailing edge, and a panel stopping at that inset left the
+    /// top band two-toned.
     private var headerGlass: some View {
         Rectangle().fill(.ultraThinMaterial)
             .overlay(Palette.matHeader)
@@ -129,7 +132,7 @@ struct HistoryView: View {
             .overlay(alignment: .bottom) {
                 Rectangle().fill(Palette.separatorStrong).frame(height: 0.5)
             }
-            .ignoresSafeArea(edges: .top)
+            .ignoresSafeArea(edges: [.top, .horizontal])
     }
 
     // MARK: - Two-pane master–detail (iPad landscape)

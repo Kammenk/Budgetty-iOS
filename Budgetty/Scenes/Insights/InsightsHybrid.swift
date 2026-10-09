@@ -175,6 +175,11 @@ struct InsightsTabBar: View {
                 .frame(width: 24)
                 .allowsHitTesting(false)
             }
+            // End the strip at the safe area, where the fade sits. A full-width scroll view otherwise
+            // scrolls on into a side inset — on the iPhone Duo's cover screen that's the status column,
+            // which left the last pill parked under the clock. A no-op without side insets; taller
+            // than the strip so the selected pill's shadow isn't clipped.
+            .mask { Rectangle().padding(.vertical, -16) }
             .onChange(of: selection) { _, tab in
                 withAnimation(.snappy(duration: 0.25)) { proxy.scrollTo(tab, anchor: .center) }
             }
