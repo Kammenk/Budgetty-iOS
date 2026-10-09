@@ -345,10 +345,13 @@ extension WellbeingScoreDTO {
 /// enums' raw values, which are also their case names), so an iOS→iOS round-trip reads back cleanly and
 /// an unrecognized value falls back to the on-device default on read.
 ///
-/// JSON keys and string-case enum encoding mirror the Android backup for cross-platform parity:
-/// `currency, dateFormat, language, themeMode, accent, monthStartDay, budgetRolloverEnabled,
-/// hiddenHomeSections, hiddenInsightsSections, homeSectionOrder, insightsSectionOrder, recapEnabled,
-/// recapFrequency`. (`themeMode` is the on-disk name for the iOS `pref.appearance` key.)
+/// JSON KEYS mirror the Android backup (`currency, dateFormat, language, themeMode, accent,
+/// monthStartDay, budgetRolloverEnabled, hiddenHomeSections, hiddenInsightsSections, homeSectionOrder,
+/// insightsSectionOrder, customInsightsSections, recapEnabled, recapFrequency, …`; `themeMode` is the
+/// on-disk name for the iOS `pref.appearance` key), but most VALUES are each platform's own vocabulary
+/// (iOS `system` / `dmy` / `de` vs Android `SYSTEM` / `DAY_MONTH_YEAR` / `GERMAN`, camelCase vs
+/// snake_case section keys). An Android file is therefore never applied as-is: `AndroidBackup` maps it
+/// onto these iOS values first, dropping anything without an iOS equivalent.
 ///
 /// DELIBERATELY EXCLUDED — never written into a shareable, plaintext backup file:
 ///  • App lock — the PIN / its hash (Keychain, not UserDefaults), biometric-enabled, auto-lock minutes.
@@ -376,6 +379,8 @@ struct SettingsDTO: Codable, Equatable {
     var hideAmountsOnBackground: Bool? = nil
     var budgetCadence: String? = nil
     var fortnightAnchor: Int? = nil
+    /// The Insights Custom tab's membership (`InsightSection` raw values, in order); `[]` = cleared.
+    var customInsightsSections: [String]? = nil
 
     /// Snapshot the current effective preferences. Reads the same defaults the app's `@AppStorage`
     /// declarations use, so a user who never touched a setting still exports the value they actually see
@@ -404,7 +409,8 @@ struct SettingsDTO: Codable, Equatable {
             hideAmounts: flag(SettingsKey.hideAmounts, false),
             hideAmountsOnBackground: flag(SettingsKey.hideAmountsOnBackground, false),
             budgetCadence: d.string(forKey: SettingsKey.budgetCadence) ?? "",
-            fortnightAnchor: int(SettingsKey.fortnightAnchor, 0)
+            fortnightAnchor: int(SettingsKey.fortnightAnchor, 0),
+            customInsightsSections: list(d.string(forKey: SettingsKey.insightsCustomSections) ?? InsightsCustomStore.seedCSV)
         )
     }
 
@@ -436,6 +442,9 @@ struct SettingsDTO: Codable, Equatable {
         if let hideAmountsOnBackground { d.set(hideAmountsOnBackground, forKey: SettingsKey.hideAmountsOnBackground) }
         if let budgetCadence { d.set(budgetCadence, forKey: SettingsKey.budgetCadence) }
         if let fortnightAnchor { d.set(fortnightAnchor, forKey: SettingsKey.fortnightAnchor) }
+        if let customInsightsSections {
+            d.set(customInsightsSections.joined(separator: ","), forKey: SettingsKey.insightsCustomSections)
+        }
         if d === UserDefaults.standard, let accent, let option = AccentOption(rawValue: accent) {
             AppTheme.shared.accent = option
         }
@@ -499,11 +508,13 @@ enum BackupService {
         return try encoder().encode(file)
     }
 
+    /// Decodes an iOS backup — or, failing that, an ANDROID backup (flat `transactions`, epoch-millis
+    /// numbers, Kotlin enum names), converted to the iOS shape by `AndroidBackup` so a user switching
+    /// platforms can restore. Anything else is `invalidFile`.
     static func decode(_ data: Data) throws -> BackupFile {
-        guard let file = try? decoder().decode(BackupFile.self, from: data) else {
-            throw BackupError.invalidFile
-        }
-        return file
+        if let file = try? decoder().decode(BackupFile.self, from: data) { return file }
+        if AndroidBackup.looksLikeAndroid(data), let file = try? AndroidBackup.convert(data) { return file }
+        throw BackupError.invalidFile
     }
 
     /// Restore a decoded backup. `.replace` wipes existing user data first; `.merge` keeps it,
