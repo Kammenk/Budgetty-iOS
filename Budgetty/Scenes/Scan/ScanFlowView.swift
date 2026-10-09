@@ -328,8 +328,8 @@ struct ScanFlowView: View {
         d.date = .now
         if let t = (try? context.fetch(FetchDescriptor<Template>()))?.first(where: { $0.persistentModelID == id }) {
             d.store = t.store
-            d.items = [DraftItem(name: t.name, quantity: 1, price: t.prefillAmount,
-                                 category: t.category.isEmpty ? Categories.defaultName : t.category)]
+            // The template's own category (blank stays blank → "Select category", like Android).
+            d.items = [DraftItem(name: t.name, quantity: 1, price: t.prefillAmount, category: t.category)]
         } else {
             d.addItem()
         }

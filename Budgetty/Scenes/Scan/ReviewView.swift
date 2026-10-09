@@ -90,8 +90,13 @@ struct ReviewView: View {
                         inflatedNotice(inflated)
                     }
                     ForEach(draft.items) { item in
+                        // An unpicked row's effective category is the default it saves as, so the
+                        // "remember this change?" prompt compares against (and shows) that.
                         ItemCard(item: item, tripTag: tripTag, onDelete: { draft.remove(item) },
-                                 onEditCategory: { oldCategory = item.category; categoryTarget = item })
+                                 onEditCategory: {
+                                     oldCategory = item.category.isEmpty ? Categories.defaultName : item.category
+                                     categoryTarget = item
+                                 })
                     }
                     addItemButton
                 }
@@ -344,6 +349,11 @@ private struct ItemCard: View {
     var onDelete: () -> Void
     var onEditCategory: () -> Void
     @State private var showTagSheet = false
+    /// The price exactly as typed. String-backed on purpose: `TextField(value:format:)` only writes the
+    /// model on commit and parses with the region's number format, so tapping Save straight after typing
+    /// "2,80" stored 2. This writes `item.price` on every keystroke through the app's tolerant amount
+    /// parser (`CsvImport.parseAmount` — comma or dot decimals), so Save always sees what's on screen.
+    @State private var priceText = ""
 
     var body: some View {
         VStack(spacing: 10) {
@@ -367,10 +377,16 @@ private struct ItemCard: View {
                     HStack {
                         VStack(alignment: .leading, spacing: 2) {
                             label("Category")
-                            HStack(spacing: 4) {
-                                Text(Categories.emoji(for: item.category))
-                                Text(Categories.displayName(item.category)).font(.system(size: 14)).foregroundStyle(Palette.label)
+                            if item.category.isEmpty {
+                                // Nothing pre-picked on a fresh row (Android parity); saves as the default.
+                                Text("Select category").font(.system(size: 14)).foregroundStyle(Palette.secondaryLabel)
                                     .lineLimit(1)
+                            } else {
+                                HStack(spacing: 4) {
+                                    Text(Categories.emoji(for: item.category))
+                                    Text(Categories.displayName(item.category)).font(.system(size: 14)).foregroundStyle(Palette.label)
+                                        .lineLimit(1)
+                                }
                             }
                         }
                         Spacer()
@@ -384,8 +400,14 @@ private struct ItemCard: View {
 
                 VStack(alignment: .leading, spacing: 2) {
                     label("Price")
-                    TextField("0", value: $item.price, format: .number)
+                    // A zero price shows empty under a "0,00" placeholder (not a prefilled "0" that
+                    // typing appends to, giving "018.50").
+                    TextField(Self.pricePlaceholder, text: $priceText)
                         .font(.system(size: 14)).keyboardType(.decimalPad)
+                        .onChange(of: priceText) { _, text in
+                            if text.trimmingCharacters(in: .whitespaces).isEmpty { item.price = 0 }
+                            else if let typed = CsvImport.parseAmount(text) { item.price = typed }
+                        }
                 }
                 .padding(.vertical, 10).padding(.horizontal, 12)
                 .frame(width: 100)
@@ -396,6 +418,19 @@ private struct ItemCard: View {
         .padding(14)
         .background(Palette.tertiaryBackground, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
         .sheet(isPresented: $showTagSheet) { TagInputSheet(tags: $item.tags) }
+        .onAppear { priceText = Self.priceText(item.price) }
+        // Follow a price set from elsewhere, but never rewrite the field while it already means that
+        // price (mid-typing "2," parses to 2 — reformatting it would eat the comma).
+        .onChange(of: item.price) { _, price in
+            if (CsvImport.parseAmount(priceText) ?? 0) != price { priceText = Self.priceText(price) }
+        }
+    }
+
+    /// "0,00" / "0.00" in the user's region — the same separator the decimal pad offers.
+    private static let pricePlaceholder = Decimal.zero.formatted(.number.precision(.fractionLength(2)))
+    /// At least two decimals ("2,10", matching the placeholder), more only when the price has them.
+    private static func priceText(_ price: Decimal) -> String {
+        price == 0 ? "" : price.formatted(.number.grouping(.never).precision(.fractionLength(2...6)))
     }
 
     /// Outlined #capsules + a tinted "＋ Tag" affordance (mockup 2a), wrapping under the item fields.

@@ -87,8 +87,11 @@ final class ReceiptDraft: Identifiable {
     /// What will be recorded as paid: net items − discount + on-top charges.
     var total: Decimal { subtotal - discount + additiveCharges }
 
+    /// A blank row. Its category starts EMPTY — the review card prompts "Select category" rather than
+    /// pre-picking Groceries — and an unpicked row falls back to the default on save. Android parity:
+    /// `UploadViewModel.addRow` / `ParsedTransaction(category = "")` resolved in `finalizeUpload`.
     func addItem() {
-        items.append(DraftItem(name: "", quantity: 1, price: 0, category: Categories.defaultName))
+        items.append(DraftItem(name: "", quantity: 1, price: 0, category: ""))
     }
 
     func remove(_ item: DraftItem) { items.removeAll { $0.id == item.id } }
@@ -126,8 +129,9 @@ final class ReceiptDraft: Identifiable {
         }
 
         for it in items where !it.name.trimmingCharacters(in: .whitespaces).isEmpty {
+            let category = it.category.trimmingCharacters(in: .whitespaces)
             let li = LineItem(name: it.name, createdAt: stamp, price: it.price, quantity: it.quantity,
-                              category: it.category)
+                              category: category.isEmpty ? Categories.defaultName : category)
             li.receipt = receipt
             context.insert(li)
             // Link the row's tags, creating any missing catalog rows. Editing deleted the old items

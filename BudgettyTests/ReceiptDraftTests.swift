@@ -2,12 +2,13 @@
 //  ReceiptDraftTests.swift
 //  BudgettyTests
 //
-//  The editable draft's money math: subtotal, on-top charges, and the paid `total`. Pure computed
-//  properties — no ModelContext needed (persist() is the only part that touches SwiftData).
+//  The editable draft's money math: subtotal, on-top charges, and the paid `total` — pure computed
+//  properties, no ModelContext needed — plus how `persist()` resolves an unpicked category.
 //
 
 import Testing
 import Foundation
+import SwiftData
 @testable import Budgetty
 
 struct ReceiptDraftTests {
@@ -64,8 +65,25 @@ struct ReceiptDraftTests {
         #expect(d.items.isEmpty)
         d.addItem()
         #expect(d.items.count == 1)
-        #expect(d.items[0].category == Categories.defaultName)
+        // A fresh row pre-picks nothing — the card prompts "Select category" (Android parity).
+        #expect(d.items[0].category.isEmpty)
         d.remove(d.items[0])
         #expect(d.items.isEmpty)
+    }
+
+    /// An unpicked category is never blocking: it saves as the default, exactly like Android's
+    /// `finalizeUpload` (`category.ifBlank { Categories.DEFAULT }`); a picked one is kept as-is.
+    @MainActor
+    @Test func unpickedCategorySavesAsTheDefault() throws {
+        let container = try ModelContainer(for: Schema(UserStore.models),
+                                           configurations: ModelConfiguration(isStoredInMemoryOnly: true))
+        let ctx = ModelContext(container)
+        let d = draft(items: [
+            DraftItem(name: "Taxi", quantity: 1, price: 12, category: ""),
+            DraftItem(name: "Bread", quantity: 1, price: 2, category: "Bakery"),
+        ])
+        d.persist(into: ctx, isManual: true)
+        let items = try ctx.fetch(FetchDescriptor<LineItem>(sortBy: [SortDescriptor(\.name)]))
+        #expect(items.map(\.category) == ["Bakery", Categories.defaultName])
     }
 }
