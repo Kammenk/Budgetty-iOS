@@ -45,6 +45,11 @@ struct HistoryView: View {
     @State private var showTag = false
     /// Selected receipt in the iPad-landscape two-pane detail view.
     @State private var selectedID: PersistentIdentifier?
+    /// True once the user picks a receipt in the two-pane list, as opposed to the automatic first-row
+    /// selection — only a picked receipt is carried over (pushed) when the layout collapses to a column.
+    @State private var paneReceiptPicked = false
+    /// Receipts pushed in single-column mode, so an open one can be carried into the two-pane detail.
+    @State private var path: [PersistentIdentifier] = []
     // Rows tapped open in single-column mode (keyed by SwiftData id): receipts reveal their top items,
     // items reveal that product's price history.
     @State private var expandedReceipts: Set<PersistentIdentifier> = []
@@ -58,6 +63,7 @@ struct HistoryView: View {
             Group {
                 if twoPane { twoPaneLayout } else { singleColumn }
             }
+            .onChange(of: twoPane) { _, nowTwoPane in carryOpenReceipt(intoTwoPane: nowTwoPane) }
             .sheet(isPresented: $showDate) { DateRangeSheet(range: $dateRange) }
             .sheet(isPresented: $showPrice) { PriceRangeSheet(lower: $priceLo, upper: $priceHi, bound: priceBound) }
             .sheet(isPresented: $showCategory) { CategoryFilterSheet(selected: $categoryFilter) }
@@ -71,7 +77,7 @@ struct HistoryView: View {
     // MARK: - Single column (iPhone / iPad portrait)
 
     private var singleColumn: some View {
-        NavigationStack {
+        NavigationStack(path: $path) {
             VStack(spacing: 0) {
                 header(showTitle: true)
                     .adaptiveReadableWidth()
@@ -88,6 +94,29 @@ struct HistoryView: View {
             // toggle and chips all on one material), which the system large-title bar can't do —
             // same pattern as Home's custom header row.
             .toolbar(.hidden, for: .navigationBar)
+            .navigationDestination(for: PersistentIdentifier.self) { id in
+                if let receipt = receipts.first(where: { $0.persistentModelID == id }) {
+                    ReceiptDetailView(receipt: receipt)
+                }
+            }
+        }
+    }
+
+    /// Carries the open receipt across the single-column ⇄ two-pane switch (an iPhone Duo folding or
+    /// unfolding, an iPad rotating), so the receipt on screen stays on screen: one pushed in the column
+    /// becomes the pane's selection, and one the user picked in the pane is pushed when it collapses.
+    private func carryOpenReceipt(intoTwoPane twoPane: Bool) {
+        if twoPane {
+            if let open = path.last {
+                selectedID = open
+                paneReceiptPicked = true
+            }
+            path = []
+        } else if paneReceiptPicked, let picked = selectedID {
+            paneReceiptPicked = false
+            var noAnimation = Transaction()
+            noAnimation.disablesAnimations = true // already open — don't replay the push
+            withTransaction(noAnimation) { path = [picked] }
         }
     }
 
@@ -412,7 +441,7 @@ struct HistoryView: View {
         let tags = receiptTags(r)
         VStack(spacing: 0) {
             if selecting {
-                Button { selectedID = r.persistentModelID } label: {
+                Button { selectedID = r.persistentModelID; paneReceiptPicked = true } label: {
                     ReceiptRowView(receipt: r, amountOverride: amountOverride, tags: tags)
                 }
                     .buttonStyle(.plain)
@@ -477,7 +506,7 @@ struct HistoryView: View {
     private func itemRow(_ item: LineItem, selecting: Bool, expandable: Bool, expanded: Bool, fraction: Double) -> some View {
         VStack(spacing: 0) {
             if selecting {
-                Button { selectedID = item.receipt?.persistentModelID } label: { itemRowLabel(item, expandable: false, expanded: false) }
+                Button { selectedID = item.receipt?.persistentModelID; paneReceiptPicked = true } label: { itemRowLabel(item, expandable: false, expanded: false) }
                     .buttonStyle(.plain)
             } else if expandable {
                 Button {
@@ -750,7 +779,7 @@ struct HistoryView: View {
                     Text("+\(more) more items").font(.caption).foregroundStyle(Palette.secondaryLabel)
                 }
                 Spacer()
-                NavigationLink { ReceiptDetailView(receipt: r) } label: {
+                NavigationLink(value: r.persistentModelID) {
                     HStack(spacing: 3) {
                         Text("Open receipt").font(.caption).fontWeight(.semibold)
                         Image(systemName: "chevron.right").font(.system(size: 10, weight: .bold))

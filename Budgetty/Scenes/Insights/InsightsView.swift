@@ -86,14 +86,11 @@ struct InsightsView: View {
                 // The Hybrid five-tab model on both idioms: iPhone full-bleed, iPad the same column
                 // capped to a readable width and centred (the extra landscape room becomes side margin
                 // rather than a second pane — a platform-native simplification; see PARITY.md).
-                Group {
-                    if hSize == .compact {
-                        phoneHybrid
-                    } else {
-                        phoneHybrid.adaptiveReadableWidth()
-                    }
-                }
-                .padding(.top, 6).padding(.bottom, 24)
+                // `adaptiveReadableWidth` is a no-op on iPhone, and unlike branching on the size class
+                // it keeps the column's state when the width flips under it (iPhone Duo fold/unfold).
+                phoneHybrid
+                    .adaptiveReadableWidth()
+                    .padding(.top, 6).padding(.bottom, 24)
             }
             .underFloatingDock()
             .trackWideLandscape($wide)
