@@ -462,7 +462,7 @@ enum BackupService {
         case invalidFile
         var errorDescription: String? {
             switch self {
-            case .invalidFile: "That file isn't a valid Budgetty backup."
+            case .invalidFile: String(localized: "That file isn't a valid Budgetty backup.")
             }
         }
     }

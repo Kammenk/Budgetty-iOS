@@ -539,13 +539,15 @@ struct AccountView: View {
             exportDoc = BackupDocument(data: try BackupService.export(from: context))
             showExporter = true
         } catch {
-            backupError = "Couldn't prepare the export."
+            backupError = String(localized: "Couldn't prepare the export.")
         }
     }
 
+    /// Localized explicitly: `confirmationDialog` takes a `String` title verbatim (no catalog lookup),
+    /// which is how "Import 113 receipts and 345 items?" stayed English in a German UI.
     private var importDialogTitle: String {
-        guard let f = pendingImport else { return "Import backup?" }
-        return "Import \(f.receipts.count) receipts and \(f.itemCount) items?"
+        guard let f = pendingImport else { return String(localized: "Import backup?") }
+        return String(localized: "Import \(f.receipts.count) receipts and \(f.itemCount) items?")
     }
 
     private func handleImport(_ result: Result<URL, Error>) {
@@ -558,7 +560,7 @@ struct AccountView: View {
                 importChoice = true
             } catch {
                 backupError = (error as? LocalizedError)?.errorDescription
-                    ?? "That file isn't a valid Budgetty backup."
+                    ?? String(localized: "That file isn't a valid Budgetty backup.")
             }
         case .failure(let error):
             backupError = error.localizedDescription
