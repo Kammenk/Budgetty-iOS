@@ -97,7 +97,7 @@ struct CategoryBudgetSheet: View {
     private func spent(_ name: String) -> Decimal {
         let window = PayCycle.monthInterval(startDay: monthStartDay)
         return receipts.flatMap(\.items)
-            .filter { window.contains($0.createdAt) }
+            .filter { window.contains($0.purchaseDate) }
             .filter { $0.category.caseInsensitiveCompare(name) == .orderedSame }
             .reduce(.zero) { $0 + $1.lineTotal }
     }

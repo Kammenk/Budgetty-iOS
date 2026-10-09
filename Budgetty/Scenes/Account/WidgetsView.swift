@@ -22,7 +22,7 @@ struct WidgetsView: View {
     @State private var showPaywall = false
 
     private var monthWindow: DateInterval { PayCycle.monthInterval(startDay: monthStartDay) }
-    private var monthReceipts: [Receipt] { receipts.filter { monthWindow.contains($0.createdAt) } }
+    private var monthReceipts: [Receipt] { receipts.filter { monthWindow.contains($0.date) } }
     private var monthSpent: Decimal {
         monthReceipts.reduce(.zero) { $0 + $1.paidTotal }
     }
@@ -34,7 +34,7 @@ struct WidgetsView: View {
         let start = c.dateInterval(of: .weekOfYear, for: .now)?.start ?? Calendar.current.startOfDay(for: .now)
         let end = c.date(byAdding: .day, value: 7, to: start) ?? .now
         let window = DateInterval(start: start, end: end)
-        return receipts.filter { window.contains($0.createdAt) }.reduce(.zero) { $0 + $1.paidTotal }
+        return receipts.filter { window.contains($0.date) }.reduce(.zero) { $0 + $1.paidTotal }
     }
 
     /// This month's top category groups by spend, for the Top Categories preview.

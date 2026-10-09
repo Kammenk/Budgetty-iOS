@@ -39,7 +39,7 @@ enum WidgetSharing {
         // Honor the user's pay-cycle "Month starts on" setting so the widgets agree with the app.
         let startDay = PayCycle.startDay
         let monthWindow = PayCycle.monthInterval(startDay: startDay, calendar: cal)
-        let month = receipts.filter { monthWindow.contains($0.createdAt) }
+        let month = receipts.filter { monthWindow.contains($0.date) }
         let spent = month.reduce(Decimal.zero) { $0 + $1.paidTotal }
 
         // This week vs last (Mon–Sun, matching Android) for the This Week widget face.
@@ -48,9 +48,9 @@ enum WidgetSharing {
         let thisWeekStart = weekCal.dateInterval(of: .weekOfYear, for: .now)?.start ?? cal.startOfDay(for: .now)
         let nextWeekStart = weekCal.date(byAdding: .day, value: 7, to: thisWeekStart) ?? .now
         let lastWeekStart = weekCal.date(byAdding: .day, value: -7, to: thisWeekStart) ?? thisWeekStart
-        let weekThis = receipts.filter { $0.createdAt >= thisWeekStart && $0.createdAt < nextWeekStart }
+        let weekThis = receipts.filter { $0.date >= thisWeekStart && $0.date < nextWeekStart }
             .reduce(Decimal.zero) { $0 + $1.paidTotal }
-        let weekLast = receipts.filter { $0.createdAt >= lastWeekStart && $0.createdAt < thisWeekStart }
+        let weekLast = receipts.filter { $0.date >= lastWeekStart && $0.date < thisWeekStart }
             .reduce(Decimal.zero) { $0 + $1.paidTotal }
 
         let budgets = (try? context.fetch(FetchDescriptor<Budget>())) ?? []

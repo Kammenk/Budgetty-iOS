@@ -40,7 +40,7 @@ struct ExportSheet: View {
             generatedLabel: String(localized: "Generated \(today.string(from: .now)) · \(currencySymbol) · \(receiptCount) receipts"),
             totalRowLabel: String(localized: "Total · \(periodLabelText)"))
     }
-    private var receiptCount: Int { receipts.filter { interval.contains($0.createdAt) }.count }
+    private var receiptCount: Int { receipts.filter { interval.contains($0.date) }.count }
 
     var body: some View {
         NavigationStack {

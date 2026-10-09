@@ -113,7 +113,7 @@ enum WellbeingScan {
         // ── Windowed spend helpers (pay-cycle months) ──────────────────────────────
         func monthReceipts(_ offset: Int) -> [Receipt] {
             let iv = PayCycle.monthInterval(today, startDay: monthStartDay, offset: offset)
-            return receipts.filter { iv.contains($0.createdAt) }
+            return receipts.filter { iv.contains($0.date) }
         }
         func monthSpend(_ offset: Int) -> Decimal {
             monthReceipts(offset).reduce(Decimal.zero) { $0 + $1.paidTotal }
@@ -124,7 +124,7 @@ enum WellbeingScan {
 
         // Distinct calendar months with any logged item — gates subscription data + trend history.
         let monthsTracked = Set(receipts.flatMap(\.items)
-            .map { cal.dateComponents([.year, .month], from: $0.createdAt) }).count
+            .map { cal.dateComponents([.year, .month], from: $0.purchaseDate) }).count
 
         // Subscriptions (global, from all receipts) — one charge per receipt, minus ignored merchants.
         let subScan = SubscriptionScan.run(receipts: receipts, ignored: ignoredSubs, today: today)
@@ -165,7 +165,7 @@ enum WellbeingScan {
         // ── Per-month inputs to the engine ─────────────────────────────────────────
         func inputsFor(_ offset: Int, withDetail: Bool) -> WellbeingInputs {
             let interval = PayCycle.monthInterval(today, startDay: monthStartDay, offset: offset)
-            let monthRcpts = receipts.filter { interval.contains($0.createdAt) }
+            let monthRcpts = receipts.filter { interval.contains($0.date) }
             let monthItems = monthRcpts.flatMap(\.items)
             let spend = monthRcpts.reduce(Decimal.zero) { $0 + $1.paidTotal }
 
@@ -244,7 +244,7 @@ enum WellbeingScan {
 
         func spend(from start: Date, to end: Date) -> ([Receipt], Decimal) {
             let iv = DateInterval(start: start, end: end)
-            let rs = receipts.filter { iv.contains($0.createdAt) }
+            let rs = receipts.filter { iv.contains($0.date) }
             return (rs, rs.reduce(Decimal.zero) { $0 + $1.paidTotal })
         }
         let weekEndExclusive = cal.date(byAdding: .day, value: 7, to: weekStart) ?? weekEnd
@@ -341,7 +341,7 @@ enum WellbeingScan {
         func monthInterval(_ offset: Int) -> DateInterval {
             PayCycle.monthInterval(today, startDay: monthStartDay, offset: offset, calendar: cal)
         }
-        func receiptsIn(_ interval: DateInterval) -> [Receipt] { receipts.filter { interval.contains($0.createdAt) } }
+        func receiptsIn(_ interval: DateInterval) -> [Receipt] { receipts.filter { interval.contains($0.date) } }
         func paidSpend(_ list: [Receipt]) -> Decimal { list.reduce(Decimal.zero) { $0 + $1.paidTotal } }
         func netSpend(_ items: [LineItem]) -> Decimal { items.reduce(Decimal.zero) { $0 + $1.lineTotal } }
 

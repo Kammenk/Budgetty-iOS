@@ -13,14 +13,14 @@
 //  aware, so Cyrillic folds too); there is no diacritic stripping.
 //
 //  Windows follow the rest of the app: MONTHLY on the pay-cycle month (`PayCycle`), WEEKLY on the
-//  locale's first day of week. Line items are windowed by `createdAt` — the timestamp Home/Insights
-//  already filter and group by on iOS — so a limit's "this month" matches what the user sees elsewhere.
+//  locale's first day of week. Line items are windowed by `purchaseDate` (the receipt's printed date) —
+//  what Home/Insights filter and group by — so a limit's "this month" matches what the user sees elsewhere.
 //
 
 import Foundation
 
 /// A single purchased line reduced to what a buying-limit needs: the item `name` as printed, its
-/// `quantity`, and the timestamp it's windowed by (`LineItem.createdAt`). Kept separate from the
+/// `quantity`, and the timestamp it's windowed by (`LineItem.purchaseDate`). Kept separate from the
 /// SwiftData `@Model` so the counting logic stays pure and testable.
 struct CountableItem {
     let name: String

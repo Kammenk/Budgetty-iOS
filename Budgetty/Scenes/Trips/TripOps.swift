@@ -77,10 +77,13 @@ enum TripOps {
         return base.hasSuffix(suffix) ? base : base + suffix
     }
 
-    /// Line items from `floor` (start of a day) onward — the backfill set and the start-sheet count.
+    /// Line items bought from `floor` (start of a day) onward — the backfill set and the start-sheet
+    /// count. By purchase date (the receipt's printed `date`), not upload time, so a receipt from the
+    /// trip scanned later is still caught; Android back-fills over transaction timestamps the same way.
     @MainActor
     static func itemsSince(_ context: ModelContext, _ floor: Date) -> [LineItem] {
-        (try? context.fetch(FetchDescriptor<LineItem>(predicate: #Predicate { $0.createdAt >= floor }))) ?? []
+        let receipts = (try? context.fetch(FetchDescriptor<Receipt>(predicate: #Predicate { $0.date >= floor }))) ?? []
+        return receipts.flatMap(\.items)
     }
 
     private static func activeTrips(_ context: ModelContext) -> [Trip] {

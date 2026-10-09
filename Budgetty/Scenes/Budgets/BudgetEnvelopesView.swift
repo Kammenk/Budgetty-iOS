@@ -80,7 +80,8 @@ struct BudgetEnvelopesView: View {
         let endExclusive = cal.date(byAdding: .day, value: 1, to: cal.startOfDay(for: env.endDate)) ?? env.endDate
         let scope = Set(env.categories)
         let inRange = items.filter {
-            $0.createdAt >= startDay && $0.createdAt < endExclusive && (env.isAllSpending || scope.contains($0.category))
+            $0.purchaseDate >= startDay && $0.purchaseDate < endExclusive
+                && (env.isAllSpending || scope.contains($0.category))
         }
         let itemsSum = inRange.reduce(Decimal.zero) { $0 + $1.lineTotal }
         var seen = Set<PersistentIdentifier>()

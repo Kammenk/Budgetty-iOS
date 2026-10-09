@@ -151,7 +151,7 @@ struct SubscriptionScan {
             let cats = r.items.map(\.category)
             let dominant = mostCommon(cats) ?? cats.first ?? Categories.defaultName
             return MerchantCharge(merchant: merchant, emoji: Categories.emoji(for: dominant),
-                                  amount: r.paidTotal, date: r.createdAt)
+                                  amount: r.paidTotal, date: r.date)
         }
     }
 

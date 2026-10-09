@@ -14,8 +14,8 @@ final class LineItem {
     /// Product name as printed on the receipt.
     var name: String
 
-    /// The upload moment — what Home/History filter and group by (Android's `timestamp`).
-    /// Denormalized onto the item (as well as the receipt) so date-range `@Query`s stay simple.
+    /// The upload moment, denormalized from the receipt (its `createdAt`). Creation-time only —
+    /// recency ordering, never period bucketing: periods and windows go by `purchaseDate`.
     var createdAt: Date
 
     /// Unit price. The line total shown to the user is `price × quantity` (see `lineTotal`).
@@ -55,4 +55,10 @@ final class LineItem {
 
     /// Price × quantity — the amount this line contributes to spend.
     var lineTotal: Decimal { price.times(quantity) }
+
+    /// When this was bought: the parent receipt's printed `date` (falling back to the upload moment
+    /// for an orphan row). What every period / window filter buckets an item by, so a receipt dated
+    /// in June but scanned in October counts in June, and editing a receipt's date moves its items.
+    /// Android parity: `TransactionEntity.timestamp` (the receipt's made-date).
+    var purchaseDate: Date { receipt?.date ?? createdAt }
 }

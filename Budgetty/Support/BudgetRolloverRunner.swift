@@ -73,7 +73,7 @@ enum BudgetRolloverRunner {
                               items: [LineItem], startDay: Int, cal: Calendar) -> Decimal {
         let window = BudgetRolloverMath.periodWindow(period, startDay: startDay, calendar: cal)
         return items
-            .filter { window.start <= $0.createdAt && $0.createdAt < window.end }
+            .filter { window.start <= $0.purchaseDate && $0.purchaseDate < window.end }
             .filter { category == nil || $0.category == category }
             .reduce(Decimal.zero) { $0 + $1.lineTotal }
     }

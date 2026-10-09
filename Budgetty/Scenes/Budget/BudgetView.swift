@@ -208,15 +208,15 @@ struct BudgetView: View {
             // Weekly stays calendar-aligned (the locale week).
             let cal = Calendar.current
             return receipts
-                .filter { cal.isDate($0.createdAt, equalTo: .now, toGranularity: .weekOfYear) }
+                .filter { cal.isDate($0.date, equalTo: .now, toGranularity: .weekOfYear) }
                 .reduce(.zero) { $0 + $1.paidTotal }
         case .fortnightly:
             let window = PayCycle.fortnightInterval(anchorEpochDay: effectiveAnchor)
-            return receipts.filter { window.contains($0.createdAt) }.reduce(.zero) { $0 + $1.paidTotal }
+            return receipts.filter { window.contains($0.date) }.reduce(.zero) { $0 + $1.paidTotal }
         case .monthly:
             // The monthly budget resets on the user's pay day (see PayCycle).
             let window = PayCycle.monthInterval(startDay: monthStartDay)
-            return receipts.filter { window.contains($0.createdAt) }.reduce(.zero) { $0 + $1.paidTotal }
+            return receipts.filter { window.contains($0.date) }.reduce(.zero) { $0 + $1.paidTotal }
         }
     }
 
@@ -245,7 +245,7 @@ struct BudgetView: View {
     private func categorySpent(_ group: String) -> Decimal {
         let window = PayCycle.monthInterval(startDay: monthStartDay)
         return allItems
-            .filter { window.contains($0.createdAt) }
+            .filter { window.contains($0.purchaseDate) }
             .filter { Categories.groupOf($0.category).caseInsensitiveCompare(group) == .orderedSame
                 || $0.category.caseInsensitiveCompare(group) == .orderedSame }
             .reduce(.zero) { $0 + $1.lineTotal }
@@ -275,7 +275,7 @@ struct BudgetView: View {
         var txns: [StreakTxn] = []
         for idx in 0..<StreakEngine.maxStreak {
             let interval = PayCycle.monthInterval(startDay: monthStartDay, offset: -(idx + 1), calendar: cal)
-            let monthItems = allItems.filter { interval.contains($0.createdAt) }
+            let monthItems = allItems.filter { interval.contains($0.purchaseDate) }
             guard !monthItems.isEmpty else { continue }   // empty month → no data at this index (breaks a run)
             txns.append(contentsOf: monthItems.map {
                 StreakTxn(periodIndex: idx, category: $0.category, amount: $0.lineTotal)
@@ -283,7 +283,7 @@ struct BudgetView: View {
         }
         let liveInterval = PayCycle.monthInterval(startDay: monthStartDay, offset: 0, calendar: cal)
         let live = LiveBudgetPeriod(transactions: allItems
-            .filter { liveInterval.contains($0.createdAt) }
+            .filter { liveInterval.contains($0.purchaseDate) }
             .map { StreakTxn(periodIndex: 0, category: $0.category, amount: $0.lineTotal) })
         let streaks = StreakEngine.budgetStreaks(BudgetStreakInput(
             transactions: txns, categoryBudgets: catBudgets, monthlyBudget: nil,

@@ -247,7 +247,7 @@ struct BiggestPurchasesCard: View {
     }
 
     private func caption(_ entry: (item: LineItem, store: String)) -> String {
-        let date = entry.item.createdAt.formatted(.dateTime.day().month(.abbreviated))
+        let date = entry.item.purchaseDate.formatted(.dateTime.day().month(.abbreviated))
         return entry.store.isEmpty ? date : "\(entry.store) · \(date)"
     }
 }

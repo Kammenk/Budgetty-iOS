@@ -94,8 +94,8 @@ final class ReceiptDraft: Identifiable {
     func remove(_ item: DraftItem) { items.removeAll { $0.id == item.id } }
 
     /// Save as a real receipt. When editing, update in place (keeping the original upload moment);
-    /// otherwise insert a new receipt with `createdAt` = now. Returns the timestamp the line items
-    /// were stamped with, so the caller can window the save-time buying-limit nudge on the same moment.
+    /// otherwise insert a new receipt with `createdAt` = now. Returns the upload moment the line items
+    /// were stamped with (their `createdAt`; periods bucket by the printed `date` instead).
     @MainActor
     @discardableResult
     func persist(into context: ModelContext, isManual: Bool = false) -> Date {
