@@ -13,6 +13,9 @@ import SwiftData
 import UniformTypeIdentifiers
 
 // MARK: - DTOs (the on-disk JSON shape; independent of the SwiftData @Model types)
+//
+// Each DTO's `init(_ model)` lives in an extension so Swift keeps synthesizing the memberwise init —
+// the Android-backup adapter (`AndroidBackup.swift`) and the tests build DTOs field by field.
 
 struct BackupFile: Codable {
     var version = 1
@@ -45,6 +48,20 @@ struct BackupFile: Codable {
     var budgetEnvelopes: [BudgetEnvelopeDTO]? = []
     /// Debt-payoff planner debts. Optional for forward-compat; additive on restore.
     var debts: [DebtDTO]? = []
+    /// Merchants the user dismissed from subscription detection. Optional for forward-compat; upserted
+    /// by merchant on restore (a merge never duplicates). Same key + shape Android writes
+    /// (`ignoredSubscriptions: [{merchant, ignoredAt}]`).
+    var ignoredSubscriptions: [IgnoredSubscriptionDTO]? = []
+    /// The tag catalog (name + first-seen time). Line items carry their tag NAMES, so this only adds
+    /// what those can't: tags nothing carries yet, and each tag's original `createdAt`. Optional for
+    /// forward-compat; fetch-or-create by name on restore. Same key Android writes (`tags`).
+    var tags: [TagDTO]? = []
+    /// The user's overrides on BUILT-IN categories — a re-homed `parent` and/or an explicit
+    /// needs/wants/savings `bucket`. Custom categories carry these on `CategoryDTO`; built-ins aren't
+    /// exported as rows (they're seeded), so without this a restore silently reset every built-in the
+    /// user had nested or bucket-tagged. Optional: `nil` (an older backup) leaves the device's built-ins
+    /// untouched; a present list on `.replace` resets built-ins to their defaults first.
+    var categoryOverrides: [CategoryOverrideDTO]? = nil
     /// The user's DISPLAY / DATA-INTERPRETATION preferences (currency, month-start day, theme, …), so a
     /// full `.replace` restore reproduces the account faithfully on a new device — most importantly the
     /// currency (the app appends a symbol and never converts amounts, so the same numbers under the wrong
@@ -65,7 +82,8 @@ struct ReceiptDTO: Codable {
     var taxOnTop: Bool
     var extraCharges: Decimal
     var items: [LineItemDTO]
-
+}
+extension ReceiptDTO {
     init(_ r: Receipt) {
         createdAt = r.createdAt; store = r.store; date = r.date
         discount = r.discount; isManual = r.isManual
@@ -83,7 +101,8 @@ struct LineItemDTO: Codable {
     /// The line item's free-form tags (normalized names). Optional so a pre-tags backup still decodes;
     /// read with `?? []` on restore.
     var tags: [String]? = nil
-
+}
+extension LineItemDTO {
     init(_ i: LineItem) {
         name = i.name; createdAt = i.createdAt; price = i.price
         quantity = i.quantity; category = i.category
@@ -94,6 +113,8 @@ struct LineItemDTO: Codable {
 struct BudgetDTO: Codable {
     var key: String
     var amount: Decimal
+}
+extension BudgetDTO {
     init(_ b: Budget) { key = b.key; amount = b.amount }
 }
 
@@ -106,15 +127,28 @@ struct RecurringDTO: Codable {
     var dueDay: Int
     var createdAt: Date
     var active: Bool
+    /// Bills only: auto-mark paid once the due day passes. Optional so a pre-autopay backup still
+    /// decodes (read as `false`) — without it every restore silently switched Autopay off.
+    var autoPay: Bool? = nil
+    /// The mark-as-paid stamp (see `RecurringMath`): a bill marked paid this cycle stays paid after a
+    /// restore. Optional / `nil` = never marked.
+    var lastPosted: Date? = nil
+    /// Reserved for the auto-posting phase; carried so the row round-trips whole.
+    var nextDue: Date? = nil
+}
+extension RecurringDTO {
     init(_ r: Recurring) {
         label = r.label; amount = r.amount; isIncome = r.isIncome; category = r.category
         cadenceRaw = r.cadenceRaw; dueDay = r.dueDay; createdAt = r.createdAt; active = r.active
+        autoPay = r.autoPay; lastPosted = r.lastPosted; nextDue = r.nextDue
     }
 }
 
 struct RuleDTO: Codable {
     var name: String
     var category: String
+}
+extension RuleDTO {
     init(_ r: CategoryRule) { name = r.name; category = r.category }
 }
 
@@ -124,9 +158,43 @@ struct CategoryDTO: Codable {
     var icon: String
     var createdAt: Date
     var parent: String?   // optional so older backups (no key) still decode as top-level
+    /// Explicit needs/wants/savings bucket (`CategoryBucket` raw value); `nil` = derive the default.
+    /// Optional so a pre-bucket backup still decodes.
+    var bucket: String? = nil
+}
+extension CategoryDTO {
     init(_ c: Category) {
-        name = c.name; colorArgb = c.colorArgb; icon = c.icon; createdAt = c.createdAt; parent = c.parent
+        name = c.name; colorArgb = c.colorArgb; icon = c.icon; createdAt = c.createdAt
+        parent = c.parent; bucket = c.bucket
     }
+}
+
+/// A user override on a BUILT-IN category (see `BackupFile.categoryOverrides`).
+struct CategoryOverrideDTO: Codable, Equatable {
+    var name: String
+    var parent: String?
+    var bucket: String?
+}
+extension CategoryOverrideDTO {
+    init(_ c: Category) { name = c.name; parent = c.parent; bucket = c.bucket }
+}
+
+/// A merchant dismissed from subscription detection — Android's `IgnoredSubscriptionEntity` shape.
+struct IgnoredSubscriptionDTO: Codable, Equatable {
+    var merchant: String
+    var ignoredAt: Date
+}
+extension IgnoredSubscriptionDTO {
+    init(_ s: IgnoredSubscription) { merchant = s.merchant; ignoredAt = s.ignoredAt }
+}
+
+/// One tag-catalog row — Android's `TagEntity` shape.
+struct TagDTO: Codable, Equatable {
+    var name: String
+    var createdAt: Date
+}
+extension TagDTO {
+    init(_ t: Tag) { name = t.name; createdAt = t.createdAt }
 }
 
 struct SavingsGoalDTO: Codable {
@@ -136,6 +204,8 @@ struct SavingsGoalDTO: Codable {
     var targetDate: Date?
     var createdAt: Date
     var contributions: [SavingsContributionDTO]
+}
+extension SavingsGoalDTO {
     init(_ g: SavingsGoal) {
         name = g.name; emoji = g.emoji; targetAmount = g.targetAmount
         targetDate = g.targetDate; createdAt = g.createdAt
@@ -147,6 +217,8 @@ struct SavingsContributionDTO: Codable {
     var amount: Decimal
     var note: String
     var date: Date
+}
+extension SavingsContributionDTO {
     init(_ c: SavingsContribution) { amount = c.amount; note = c.note; date = c.date }
 }
 
@@ -157,6 +229,8 @@ struct BuyingLimitDTO: Codable {
     var timeframeRaw: String
     var count: Int
     var createdAt: Date
+}
+extension BuyingLimitDTO {
     init(_ l: BuyingLimit) {
         emoji = l.emoji; label = l.label; keywords = l.keywords
         timeframeRaw = l.timeframeRaw; count = l.count; createdAt = l.createdAt
@@ -171,6 +245,8 @@ struct TemplateDTO: Codable {
     var store: String
     var askAmount: Bool
     var createdAt: Date
+}
+extension TemplateDTO {
     init(_ t: Template) {
         emoji = t.emoji; name = t.name; amount = t.amount; category = t.category
         store = t.store; askAmount = t.askAmount; createdAt = t.createdAt
@@ -187,6 +263,8 @@ struct WarrantyDTO: Codable {
     var coverageNote: String
     var receiptId: Double
     var createdAt: Date
+}
+extension WarrantyDTO {
     init(_ w: Warranty) {
         name = w.name; emoji = w.emoji; store = w.store; category = w.category
         purchaseDate = w.purchaseDate; durationMonths = w.durationMonths
@@ -203,6 +281,8 @@ struct BudgetEnvelopeDTO: Codable {
     var categories: [String]
     var sortOrder: Int
     var createdAt: Date
+}
+extension BudgetEnvelopeDTO {
     init(_ e: BudgetEnvelope) {
         name = e.name; emoji = e.emoji; limitAmount = e.limitAmount
         startDate = e.startDate; endDate = e.endDate; categories = e.categories
@@ -217,6 +297,8 @@ struct DebtDTO: Codable {
     var aprPercent: Decimal
     var minPayment: Decimal
     var createdAt: Date
+}
+extension DebtDTO {
     init(_ d: Debt) {
         emoji = d.emoji; name = d.name; balance = d.balance
         aprPercent = d.aprPercent; minPayment = d.minPayment; createdAt = d.createdAt
@@ -232,6 +314,8 @@ struct TripDTO: Codable {
     var active: Bool
     var createdAt: Date
     var endedAt: Date?
+}
+extension TripDTO {
     init(_ t: Trip) {
         name = t.name; tag = t.tag; startDate = t.startDate; endDate = t.endDate
         budgetAmount = t.budgetAmount; active = t.active; createdAt = t.createdAt; endedAt = t.endedAt
@@ -244,6 +328,8 @@ struct WellbeingScoreDTO: Codable {
     var band: String
     var componentsJson: String
     var computedAt: Date
+}
+extension WellbeingScoreDTO {
     init(_ e: WellbeingScoreEntity) {
         periodId = e.periodId; score = e.score; band = e.band
         componentsJson = e.componentsJson; computedAt = e.computedAt
@@ -402,6 +488,12 @@ enum BackupService {
             warranties: try context.fetch(FetchDescriptor<Warranty>()).map(WarrantyDTO.init),
             budgetEnvelopes: try context.fetch(FetchDescriptor<BudgetEnvelope>()).map(BudgetEnvelopeDTO.init),
             debts: try context.fetch(FetchDescriptor<Debt>()).map(DebtDTO.init),
+            ignoredSubscriptions: try context.fetch(FetchDescriptor<IgnoredSubscription>())
+                .map(IgnoredSubscriptionDTO.init),
+            tags: try context.fetch(FetchDescriptor<Tag>()).map(TagDTO.init),
+            categoryOverrides: try context.fetch(FetchDescriptor<Category>())
+                .filter { !$0.isCustom && ($0.parent != nil || $0.bucket != nil) }
+                .map(CategoryOverrideDTO.init),
             settings: SettingsDTO.current()
         )
         return try encoder().encode(file)
@@ -438,6 +530,19 @@ enum BackupService {
             for w in try context.fetch(FetchDescriptor<Warranty>()) { context.delete(w) }
             for e in try context.fetch(FetchDescriptor<BudgetEnvelope>()) { context.delete(e) }
             for d in try context.fetch(FetchDescriptor<Debt>()) { context.delete(d) }
+            // Budget carry-over is derived state that isn't backed up: a stale pre-restore leftover
+            // (e.g. last month's 1,200 € under MONTHLY) must not survive onto the restored budgets —
+            // rollover restarts from zero for the restored data.
+            for r in try context.fetch(FetchDescriptor<BudgetRollover>()) { context.delete(r) }
+            for s in try context.fetch(FetchDescriptor<IgnoredSubscription>()) { context.delete(s) }
+            // Built-in category overrides: a backup that carries the list reproduces the account's
+            // nesting / bucket choices exactly, so reset every built-in to its code default first. An
+            // older backup (`nil`) leaves the device's built-ins as they are.
+            if file.categoryOverrides != nil {
+                for c in try context.fetch(FetchDescriptor<Category>()) where !c.isCustom {
+                    c.parent = nil; c.bucket = nil
+                }
+            }
             try context.save() // flush deletes before re-inserting unique-keyed rows
         }
 
@@ -445,14 +550,17 @@ enum BackupService {
         // merge reuses the device's existing rows and never duplicates. `Tag.name` is unique.
         var tagsByName = Dictionary(
             uniqueKeysWithValues: try context.fetch(FetchDescriptor<Tag>()).map { ($0.name, $0) })
-        func tag(_ rawName: String) -> Tag? {
+        func tag(_ rawName: String, createdAt: Date = .now) -> Tag? {
             let key = Tag.normalize(rawName)
             guard !key.isEmpty else { return nil }
             if let existing = tagsByName[key] { return existing }
-            let created = Tag(name: key)
+            let created = Tag(name: key, createdAt: createdAt)
             context.insert(created); tagsByName[key] = created
             return created
         }
+        // The backed-up catalog first, so each tag keeps its original `createdAt` and a tag nothing
+        // carries yet still comes back. An existing device row wins (merge).
+        for dto in file.tags ?? [] { _ = tag(dto.name, createdAt: dto.createdAt) }
 
         // Receipts (+ their line items, with their tags). Always additive.
         for dto in file.receipts {
@@ -469,11 +577,15 @@ enum BackupService {
             }
         }
 
-        // Recurring — no unique key; additive.
+        // Recurring — no unique key; additive. Autopay goes through `autoPayEligible` (as the edit sheet
+        // does) so a yearly / one-off / income row can never restore with a stuck flag.
         for dto in file.recurring {
             let r = Recurring(label: dto.label, amount: dto.amount, isIncome: dto.isIncome,
                               category: dto.category, cadence: Cadence(rawValue: dto.cadenceRaw) ?? .monthly,
                               dueDay: dto.dueDay, createdAt: dto.createdAt, active: dto.active)
+            r.autoPay = (dto.autoPay ?? false) && r.autoPayEligible
+            r.lastPosted = dto.lastPosted
+            r.nextDue = dto.nextDue
             context.insert(r)
         }
 
@@ -496,10 +608,22 @@ enum BackupService {
         for dto in file.categories {
             if let e = cats.first(where: { $0.name == dto.name }) {
                 e.colorArgb = dto.colorArgb; e.icon = dto.icon; e.isCustom = true; e.parent = dto.parent
+                e.bucket = dto.bucket
             } else {
                 context.insert(Category(name: dto.name, colorArgb: dto.colorArgb, icon: dto.icon,
-                                        isCustom: true, createdAt: dto.createdAt, parent: dto.parent))
+                                        isCustom: true, createdAt: dto.createdAt, parent: dto.parent,
+                                        bucket: dto.bucket))
             }
+        }
+
+        // Built-in category overrides (nesting / bucket). Only fills what the device hasn't set: on
+        // `.replace` the built-ins were reset above, so this reproduces the backup exactly; on `.merge`
+        // it's additive and never overrides the device's own choices. A name the device doesn't know as
+        // a built-in is skipped (built-ins are seeded, never created by a restore).
+        for dto in file.categoryOverrides ?? [] {
+            guard let e = cats.first(where: { $0.name == dto.name && !$0.isCustom }) else { continue }
+            if e.parent == nil { e.parent = dto.parent }
+            if e.bucket == nil { e.bucket = dto.bucket }
         }
 
         // Savings goals (+ their contributions). Additive; contributions attach to the fresh goal.
@@ -569,6 +693,15 @@ enum BackupService {
         for dto in file.debts ?? [] {
             context.insert(Debt(emoji: dto.emoji, name: dto.name, balance: dto.balance,
                                 aprPercent: dto.aprPercent, minPayment: dto.minPayment, createdAt: dto.createdAt))
+        }
+
+        // Ignored subscriptions — unique `merchant`; upsert, so a merge never duplicates a dismissal.
+        let ignored = try context.fetch(FetchDescriptor<IgnoredSubscription>())
+        var ignoredByMerchant = Dictionary(ignored.map { ($0.merchant, $0) }, uniquingKeysWith: { a, _ in a })
+        for dto in file.ignoredSubscriptions ?? [] where !dto.merchant.isEmpty {
+            if let e = ignoredByMerchant[dto.merchant] { e.ignoredAt = dto.ignoredAt; continue }
+            let row = IgnoredSubscription(merchant: dto.merchant, ignoredAt: dto.ignoredAt)
+            context.insert(row); ignoredByMerchant[dto.merchant] = row
         }
 
         try context.save()
