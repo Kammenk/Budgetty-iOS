@@ -66,10 +66,15 @@ enum TripOps {
     }
 
     /// "lisbon-2026" from "Lisbon" + the start year (or this year) — a normalized, year-stamped tag.
-    static func tripTag(_ name: String, _ startDate: Date?) -> String {
-        let year = Calendar.current.component(.year, from: startDate ?? Date())
-        let base = Tag.normalize(name)
-        return "\(base.isEmpty ? "trip" : base)-\(year)"
+    /// A name that already ends in that year ("Lisbon 2026") isn't stamped twice (`lisbon-2026`, not
+    /// `lisbon-2026-2026`); any other trailing number still gets the year. Android parity:
+    /// `TripsViewModel.tripTag`.
+    static func tripTag(_ name: String, _ startDate: Date?, calendar: Calendar = .current) -> String {
+        let year = calendar.component(.year, from: startDate ?? Date())
+        let normalized = Tag.normalize(name)
+        let base = normalized.isEmpty ? "trip" : normalized
+        let suffix = "-\(year)"
+        return base.hasSuffix(suffix) ? base : base + suffix
     }
 
     /// Line items from `floor` (start of a day) onward — the backfill set and the start-sheet count.
