@@ -12,13 +12,15 @@ import SwiftData
 
 @Model
 final class Receipt {
-    /// The upload moment, shared with this receipt's line items (Android's `timestamp` PK).
+    /// The upload moment, shared with this receipt's line items (Android's `timestamp` PK). Identity
+    /// and recency ("recent receipts") only — periods and windows bucket by `date`.
     var createdAt: Date
 
     /// Store name.
     var store: String
 
-    /// The receipt's own printed date.
+    /// The receipt's own printed date — what every period / window filter buckets by (Android's
+    /// transaction `timestamp`), so a late-scanned receipt lands in the month it was made.
     var date: Date
 
     /// Total savings printed on the receipt.

@@ -127,7 +127,7 @@ enum RecapBuilder {
         }
 
         private func receipts(in interval: DateInterval) -> [Receipt] {
-            receipts.filter { interval.contains($0.createdAt) }
+            receipts.filter { interval.contains($0.date) }
         }
 
         private func paidSpend(_ list: [Receipt]) -> Decimal {
@@ -467,7 +467,7 @@ enum RecapBuilder {
         /// cap asks "did you keep every week under it" via the worst week's count.
         private func limitOutcomes(window: DateInterval, weekly: Bool = false) -> [RecapLimitChip] {
             let items = receipts.flatMap(\.items).map {
-                CountableItem(name: $0.name, quantity: $0.quantity, timestamp: $0.createdAt)
+                CountableItem(name: $0.name, quantity: $0.quantity, timestamp: $0.purchaseDate)
             }
             return limits.map { limit in
                 let bought: Int
@@ -539,7 +539,7 @@ enum RecapBuilder {
 
         private func wellbeingInputs(_ offset: Int) -> WellbeingInputs {
             let monthsTracked = Set(receipts.flatMap(\.items)
-                .map { cal.dateComponents([.year, .month], from: $0.createdAt) }).count
+                .map { cal.dateComponents([.year, .month], from: $0.purchaseDate) }).count
 
             let subScan = SubscriptionScan.run(receipts: receipts, ignored: ignoredSubs, today: today)
             let subsMonthly = subScan.monthlyTotal

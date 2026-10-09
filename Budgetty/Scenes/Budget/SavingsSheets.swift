@@ -38,8 +38,7 @@ struct SavingsContributionSheet: View {
                     HStack {
                         Text("Amount")
                         Spacer()
-                        TextField("0", value: $amount, format: .number)
-                            .keyboardType(.decimalPad).multilineTextAlignment(.trailing)
+                        AmountField(value: $amount).multilineTextAlignment(.trailing)
                     }
                     TextField("What was it for?", text: $note)
                         .textInputAutocapitalization(.sentences)
@@ -120,8 +119,7 @@ struct SavingsGoalEditSheet: View {
                     HStack {
                         Text("Target amount")
                         Spacer()
-                        TextField("0", value: $target, format: .number)
-                            .keyboardType(.decimalPad).multilineTextAlignment(.trailing)
+                        AmountField(value: $target).multilineTextAlignment(.trailing)
                     }
                 }
                 Section {

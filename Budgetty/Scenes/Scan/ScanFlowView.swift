@@ -328,8 +328,8 @@ struct ScanFlowView: View {
         d.date = .now
         if let t = (try? context.fetch(FetchDescriptor<Template>()))?.first(where: { $0.persistentModelID == id }) {
             d.store = t.store
-            d.items = [DraftItem(name: t.name, quantity: 1, price: t.prefillAmount,
-                                 category: t.category.isEmpty ? Categories.defaultName : t.category)]
+            // The template's own category (blank stays blank → "Select category", like Android).
+            d.items = [DraftItem(name: t.name, quantity: 1, price: t.prefillAmount, category: t.category)]
         } else {
             d.addItem()
         }
@@ -380,13 +380,14 @@ struct ScanFlowView: View {
         // receipt (a duplicate) and double-counting the scan quota. Mirrors Android's finalize guard.
         guard !draft.hasSaved else { return }
         let isNew = draft.isNewReceipt
-        let stamp = draft.persist(into: context, isManual: isManual)
+        draft.persist(into: context, isManual: isManual)
         // Save-time buying-limit nudge — new receipts only (an edit re-save doesn't re-nudge), computed
         // off the just-saved rows against the live store. Non-blocking: the receipt is already saved.
         if isNew {
+            // Windowed by the receipt's printed date, like every stored row (`LineItem.purchaseDate`).
             let savedItems = draft.items
                 .map { CountableItem(name: $0.name.trimmingCharacters(in: .whitespaces),
-                                     quantity: $0.quantity, timestamp: stamp) }
+                                     quantity: $0.quantity, timestamp: draft.date) }
                 .filter { !$0.name.isEmpty }
             if let nudge = BuyingLimitNudger.evaluate(savedItems: savedItems, in: context) {
                 buyingLimitNudge.post(nudge)

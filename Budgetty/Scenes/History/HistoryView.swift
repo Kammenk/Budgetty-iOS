@@ -333,38 +333,38 @@ struct HistoryView: View {
 
     private var filteredReceipts: [Receipt] {
         let base = receipts.filter { r in
-            inDate(r.createdAt) && inPrice(r.paidTotal)
+            inDate(r.date) && inPrice(r.paidTotal)
             && (search.isEmpty || r.store.localizedCaseInsensitiveContains(search)
                 || r.items.contains { $0.name.localizedCaseInsensitiveContains(search) })
             && (categoryFilter.isEmpty || r.items.contains { inCategory($0.category) })
             && (!tagActive || r.items.contains { matchesTags($0) })
         }
         switch sort {
-        case .newest: return base.sorted { $0.createdAt > $1.createdAt }
-        case .oldest: return base.sorted { $0.createdAt < $1.createdAt }
+        case .newest: return base.sorted { $0.date > $1.date }
+        case .oldest: return base.sorted { $0.date < $1.date }
         case .priceHigh: return base.sorted { receiptAmount($0) > receiptAmount($1) }
         case .priceLow: return base.sorted { receiptAmount($0) < receiptAmount($1) }
         case .tagAZ: return base.sorted {
-            tagSortLess((tags: receiptTags($0), date: $0.createdAt),
-                        (tags: receiptTags($1), date: $1.createdAt))
+            tagSortLess((tags: receiptTags($0), date: $0.date),
+                        (tags: receiptTags($1), date: $1.date))
         }
         }
     }
 
     private var filteredItems: [LineItem] {
         let base = allItems.filter { it in
-            inDate(it.createdAt) && inPrice(it.lineTotal) && inCategory(it.category) && matchesTags(it)
+            inDate(it.purchaseDate) && inPrice(it.lineTotal) && inCategory(it.category) && matchesTags(it)
             && (search.isEmpty || it.name.localizedCaseInsensitiveContains(search)
                 || (it.receipt?.store.localizedCaseInsensitiveContains(search) ?? false))
         }
         switch sort {
-        case .newest: return base.sorted { $0.createdAt > $1.createdAt }
-        case .oldest: return base.sorted { $0.createdAt < $1.createdAt }
+        case .newest: return base.sorted { $0.purchaseDate > $1.purchaseDate }
+        case .oldest: return base.sorted { $0.purchaseDate < $1.purchaseDate }
         case .priceHigh: return base.sorted { $0.lineTotal > $1.lineTotal }
         case .priceLow: return base.sorted { $0.lineTotal < $1.lineTotal }
         case .tagAZ: return base.sorted {
-            tagSortLess((tags: $0.tags.map(\.name), date: $0.createdAt),
-                        (tags: $1.tags.map(\.name), date: $1.createdAt))
+            tagSortLess((tags: $0.tags.map(\.name), date: $0.purchaseDate),
+                        (tags: $1.tags.map(\.name), date: $1.purchaseDate))
         }
         }
     }
@@ -376,12 +376,12 @@ struct HistoryView: View {
             if filteredReceipts.isEmpty {
                 HistoryEmpty(symbol: "receipt", text: hasActiveFilters ? "No matching receipts" : "No receipts yet")
             } else {
-                let maxByMonth = monthMax(filteredReceipts, date: \.createdAt) { receiptAmount($0) }
+                let maxByMonth = monthMax(filteredReceipts, date: \.date) { receiptAmount($0) }
                 LazyVStack(spacing: 0) {
-                    if let summary = monthSummary(filteredReceipts, date: \.createdAt, amount: { receiptAmount($0) }) {
+                    if let summary = monthSummary(filteredReceipts, date: \.date, amount: { receiptAmount($0) }) {
                         summaryStrip(summary, countText: receiptCountLabel(summary.count))
                     }
-                    ForEach(dayGroups(of: filteredReceipts, date: \.createdAt), id: \.date) { group in
+                    ForEach(dayGroups(of: filteredReceipts, date: \.date), id: \.date) { group in
                         sectionHeader(DayFormat.label(group.date, dateFormat),
                                       trailing: group.items.reduce(Decimal.zero) { $0 + receiptAmount($1) }.formatMoney())
                         card {
@@ -389,7 +389,7 @@ struct HistoryView: View {
                                 let open = !selecting && expandedReceipts.contains(r.persistentModelID)
                                 VStack(spacing: 0) {
                                     receiptRow(r, selecting: selecting, expanded: open,
-                                               fraction: fraction(receiptAmount(r), maxByMonth[monthKey(r.createdAt)]))
+                                               fraction: fraction(receiptAmount(r), maxByMonth[monthKey(r.date)]))
                                     if open { receiptExpansion(r) }
                                 }
                                 if idx < group.items.count - 1 { Divider().padding(.leading, 64) }
@@ -442,13 +442,13 @@ struct HistoryView: View {
             if filteredItems.isEmpty {
                 HistoryEmpty(symbol: "list.bullet", text: hasActiveFilters ? "No matching items" : "No items yet")
             } else {
-                let maxByMonth = monthMax(filteredItems, date: \.createdAt) { $0.lineTotal }
+                let maxByMonth = monthMax(filteredItems, date: \.purchaseDate) { $0.lineTotal }
                 let stats = productStats
                 LazyVStack(spacing: 0) {
-                    if let summary = monthSummary(filteredItems, date: \.createdAt, amount: { $0.lineTotal }) {
+                    if let summary = monthSummary(filteredItems, date: \.purchaseDate, amount: { $0.lineTotal }) {
                         summaryStrip(summary, countText: itemCountLabel(summary.count))
                     }
-                    ForEach(dayGroups(of: filteredItems, date: \.createdAt), id: \.date) { group in
+                    ForEach(dayGroups(of: filteredItems, date: \.purchaseDate), id: \.date) { group in
                         sectionHeader(DayFormat.label(group.date, dateFormat),
                                       trailing: group.items.reduce(Decimal.zero) { $0 + $1.lineTotal }.formatMoney())
                         card {
@@ -458,7 +458,7 @@ struct HistoryView: View {
                                 let open = !selecting && expandable && expandedItems.contains(item.persistentModelID)
                                 VStack(spacing: 0) {
                                     itemRow(item, selecting: selecting, expandable: expandable, expanded: open,
-                                            fraction: fraction(item.lineTotal, maxByMonth[monthKey(item.createdAt)]))
+                                            fraction: fraction(item.lineTotal, maxByMonth[monthKey(item.purchaseDate)]))
                                     if open, let stat { itemPriceHistory(stat) }
                                 }
                                 if idx < group.items.count - 1 { Divider().padding(.leading, 58) }
@@ -843,14 +843,14 @@ struct HistoryView: View {
         }
         var out: [String: ProductStat] = [:]
         for (key, list) in byKey {
-            let sorted = list.sorted { $0.createdAt < $1.createdAt }
+            let sorted = list.sorted { $0.purchaseDate < $1.purchaseDate }
             let minUnit = sorted.map(\.price).min() ?? .zero
             let cheapest = sorted.first { $0.price == minUnit } ?? sorted[0]
             let sum = sorted.reduce(Decimal.zero) { $0 + $1.price }
             let avg = sum / Decimal(sorted.count)
-            let recent = sorted.suffix(6).map { PurchasePoint(date: $0.createdAt, unit: $0.price, isCheapest: $0.price == minUnit) }
+            let recent = sorted.suffix(6).map { PurchasePoint(date: $0.purchaseDate, unit: $0.price, isCheapest: $0.price == minUnit) }
             out[key] = ProductStat(count: sorted.count, avgUnit: avg, minUnit: minUnit,
-                                   minStore: cheapest.receipt?.store ?? "", minDate: cheapest.createdAt, recent: Array(recent))
+                                   minStore: cheapest.receipt?.store ?? "", minDate: cheapest.purchaseDate, recent: Array(recent))
         }
         return out
     }

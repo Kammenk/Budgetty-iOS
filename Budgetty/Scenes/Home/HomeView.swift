@@ -103,7 +103,9 @@ struct HomeView: View {
             let end = PayCycle.monthInterval(startDay: monthStartDay).end
             return DateInterval(start: start, end: end)
         case .allTime:
-            let earliest = receipts.map(\.createdAt).min() ?? PayCycle.monthInterval(startDay: monthStartDay).start
+            // Clamped to today: a receipt's printed date can sit in the future (a misread year), and
+            // a start after the end would trap DateInterval.
+            let earliest = min(receipts.map(\.date).min() ?? PayCycle.monthInterval(startDay: monthStartDay).start, .now)
             let end = cal.date(byAdding: .day, value: 1, to: cal.startOfDay(for: .now)) ?? .now
             return DateInterval(start: cal.startOfDay(for: earliest), end: end)
         }
@@ -111,7 +113,7 @@ struct HomeView: View {
 
     private var periodReceipts: [Receipt] {
         let window = periodWindow(period)
-        return receipts.filter { window.contains($0.createdAt) }
+        return receipts.filter { window.contains($0.date) }
     }
     private var periodSpent: Decimal { periodReceipts.reduce(.zero) { $0 + $1.paidTotal } }
 
@@ -327,11 +329,11 @@ struct HomeView: View {
     /// Spend inside the current pay-cycle month, independent of the selected period.
     private var cycleSpent: Decimal {
         let w = PayCycle.monthInterval(startDay: monthStartDay)
-        return receipts.filter { w.contains($0.createdAt) }.reduce(.zero) { $0 + $1.paidTotal }
+        return receipts.filter { w.contains($0.date) }.reduce(.zero) { $0 + $1.paidTotal }
     }
     private var cycleReceiptCount: Int {
         let w = PayCycle.monthInterval(startDay: monthStartDay)
-        return receipts.filter { w.contains($0.createdAt) }.count
+        return receipts.filter { w.contains($0.date) }.count
     }
     /// Bills already marked paid this cycle. They're spent money, so they stay subtracted from Safe to
     /// spend (like receipts) — surfaced under "Bills still due" and folded into "Total spent this cycle".
@@ -689,7 +691,7 @@ struct HomeView: View {
         let mf = DateFormatter(); mf.dateFormat = "MMM"
         let bars: [(label: String, value: Double)] = (0..<months).reversed().map { back in
             let w = PayCycle.monthInterval(startDay: monthStartDay, offset: -back)
-            let spent = receipts.filter { w.contains($0.createdAt) }.reduce(Decimal.zero) { $0 + $1.paidTotal }
+            let spent = receipts.filter { w.contains($0.date) }.reduce(Decimal.zero) { $0 + $1.paidTotal }
             let label = mf.string(from: PayCycle.month(.now, startDay: monthStartDay, offset: -back).start)
             return (label, (spent as NSDecimalNumber).doubleValue)
         }
@@ -738,7 +740,7 @@ struct HomeView: View {
             let y = DateFormatter(); y.dateFormat = "yyyy"
             return "\(m.string(from: w.start)) – \(m.string(from: last)) \(y.string(from: last))"
         case .allTime:
-            guard let earliest = receipts.map(\.createdAt).min() else { return String(localized: "all time") }
+            guard let earliest = receipts.map(\.date).min() else { return String(localized: "all time") }
             let f = DateFormatter(); f.dateFormat = "d MMM yyyy"
             return String(localized: "since \(f.string(from: earliest))")
         }
@@ -747,7 +749,7 @@ struct HomeView: View {
     /// Whole months spanned by the window, for the monthly-average denominator.
     private var periodMonthCount: Int {
         if let m = period.monthsBack { return m }
-        guard let earliest = receipts.map(\.createdAt).min() else { return 1 }
+        guard let earliest = receipts.map(\.date).min() else { return 1 }
         let cal = Calendar.current
         let a = PayCycle.month(earliest, startDay: monthStartDay).start
         let b = PayCycle.month(.now, startDay: monthStartDay).start
@@ -760,7 +762,7 @@ struct HomeView: View {
     }
 
     private var allTimeNote: String {
-        guard let earliest = receipts.map(\.createdAt).min() else {
+        guard let earliest = receipts.map(\.date).min() else {
             return String(localized: "All your spending so far.")
         }
         let f = DateFormatter(); f.dateFormat = "d MMM yyyy"
@@ -933,7 +935,7 @@ struct HomeView: View {
     private var weekSpent: Decimal {
         let cal = Calendar.current
         return receipts
-            .filter { cal.isDate($0.createdAt, equalTo: .now, toGranularity: .weekOfYear) }
+            .filter { cal.isDate($0.date, equalTo: .now, toGranularity: .weekOfYear) }
             .reduce(.zero) { $0 + $1.paidTotal }
     }
 
@@ -941,7 +943,7 @@ struct HomeView: View {
         let cal = Calendar.current
         guard let lastWeek = cal.date(byAdding: .weekOfYear, value: -1, to: .now) else { return 0 }
         return receipts
-            .filter { cal.isDate($0.createdAt, equalTo: lastWeek, toGranularity: .weekOfYear) }
+            .filter { cal.isDate($0.date, equalTo: lastWeek, toGranularity: .weekOfYear) }
             .reduce(.zero) { $0 + $1.paidTotal }
     }
 

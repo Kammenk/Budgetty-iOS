@@ -43,7 +43,7 @@ struct ForecastView: View {
         let cal = Calendar.current
         let windowStart = PayCycle.month(offset: -3).start
         let windowEnd = cal.date(byAdding: .day, value: 1, to: cal.startOfDay(for: PayCycle.month(offset: -1).end)) ?? .now
-        let total = items.filter { $0.createdAt >= windowStart && $0.createdAt < windowEnd }
+        let total = items.filter { $0.purchaseDate >= windowStart && $0.purchaseDate < windowEnd }
             .reduce(Decimal.zero) { $0 + $1.lineTotal }
         return Self.round2(total / 3)
     }

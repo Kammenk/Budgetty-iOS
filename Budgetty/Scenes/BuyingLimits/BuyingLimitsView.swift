@@ -66,7 +66,7 @@ struct BuyingLimitsView: View {
     }
 
     private var items: [CountableItem] {
-        lineItems.map { CountableItem(name: $0.name, quantity: $0.quantity, timestamp: $0.createdAt) }
+        lineItems.map { CountableItem(name: $0.name, quantity: $0.quantity, timestamp: $0.purchaseDate) }
     }
     private var atCap: Bool { BuyingLimitQuota.isAtCap(count: limits.count, isPremium: premium) }
 

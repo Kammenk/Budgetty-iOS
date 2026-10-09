@@ -587,9 +587,9 @@ struct InsightsView: View {
             // the trend and averages stay meaningful (no epoch-to-today blow-up). Reuses the custom
             // path so the arrows disable and the pill reads as a span, matching Android.
             Button {
-                // receipts are newest-first, so `.last` is the earliest; clamp below today so a
-                // future-dated receipt can't invert the range.
-                let earliest = min(receipts.last?.createdAt ?? .now, .now)
+                // The earliest printed date (what periods bucket by — the query is upload-ordered, so
+                // not simply `.last`); clamp below today so a future-dated receipt can't invert the range.
+                let earliest = min(receipts.map(\.date).min() ?? .now, .now)
                 customRange = earliest ... .now
             } label: {
                 Label("All time", systemImage: "infinity")
@@ -630,7 +630,7 @@ struct InsightsView: View {
 
     /// Stop stepping back once the window reaches the earliest recorded receipt.
     private var canStepBackward: Bool {
-        guard let oldest = receipts.last?.createdAt else { return false }
+        guard let oldest = receipts.map(\.date).min() else { return false }
         return period.interval.start > oldest
     }
 
@@ -650,7 +650,7 @@ struct InsightsView: View {
 
     private var periodReceipts: [Receipt] {
         let window = period.interval
-        return receipts.filter { window.contains($0.createdAt) }
+        return receipts.filter { window.contains($0.date) }
     }
     private var periodItems: [LineItem] { periodReceipts.flatMap(\.items) }
     private var totalSpent: Decimal { periodReceipts.reduce(.zero) { $0 + $1.paidTotal } }
@@ -719,7 +719,7 @@ struct InsightsView: View {
         let months: [NeedsWantsSplitMath.MonthInput] =
             (1...NeedsWantsSplitMath.trendMonths).map { back in
                 let window = InsightsPeriod.stepped(unit: .month, offset: -back).interval
-                let rs = receipts.filter { window.contains($0.createdAt) }
+                let rs = receipts.filter { window.contains($0.date) }
                 return NeedsWantsSplitMath.MonthInput(
                     axisLabel: f.string(from: window.start),
                     income: incomeRows.reduce(.zero) { $0 + $1.windowAmount(window) },
@@ -773,7 +773,7 @@ struct InsightsView: View {
 
     private var previousReceipts: [Receipt] {
         let window = period.previous().interval
-        return receipts.filter { window.contains($0.createdAt) }
+        return receipts.filter { window.contains($0.date) }
     }
     private var previousItems: [LineItem] { previousReceipts.flatMap(\.items) }
     private var previousTotal: Decimal { previousReceipts.reduce(.zero) { $0 + $1.paidTotal } }
@@ -868,7 +868,7 @@ struct InsightsView: View {
         trendWindows.map { p in
             let window = p.interval
             let total = receipts
-                .filter { window.contains($0.createdAt) }
+                .filter { window.contains($0.date) }
                 .reduce(Decimal.zero) { $0 + $1.paidTotal }
             return (label: p.barLabel, value: total)
         }

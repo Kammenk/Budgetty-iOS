@@ -70,7 +70,9 @@ enum ExportPeriod: String, CaseIterable, Identifiable {
             let start = PayCycle.month(.now, startDay: startDay, offset: -back).start
             return DateInterval(start: start, end: PayCycle.monthInterval(startDay: startDay).end)
         case .allTime:
-            let earliest = receipts.map(\.createdAt).min() ?? PayCycle.monthInterval(startDay: startDay).start
+            // Printed dates (what the rows bucket by), clamped to today so a future-dated receipt can't
+            // push the start past the end.
+            let earliest = min(receipts.map(\.date).min() ?? PayCycle.monthInterval(startDay: startDay).start, .now)
             let end = cal.date(byAdding: .day, value: 1, to: cal.startOfDay(for: .now)) ?? .now
             return DateInterval(start: cal.startOfDay(for: earliest), end: end)
         }
@@ -87,14 +89,14 @@ enum ExportBuilder {
                           totalRowLabel: String) -> ExportData {
         let df = DateFormatter(); df.setLocalizedDateFormatFromTemplate("dd MMM")
         let rows: [ExportRow] = receipts
-            .filter { interval.contains($0.createdAt) }
+            .filter { interval.contains($0.date) }
             .compactMap { r in
                 let total = SubscriptionDetector.round2(r.paidTotal)
                 guard total > 0 else { return nil }
                 let cats = r.items.map(\.category)
                 let category = mostCommon(cats) ?? cats.first ?? Categories.defaultName
                 let store = StoreNormalizer.normalize(r.store)
-                return ExportRow(date: r.createdAt, dateLabel: df.string(from: r.createdAt),
+                return ExportRow(date: r.date, dateLabel: df.string(from: r.date),
                                  store: store.isEmpty ? "—" : store, category: category,
                                  colorArgb: Categories.color(for: category), amount: total)
             }

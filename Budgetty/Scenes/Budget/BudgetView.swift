@@ -119,11 +119,10 @@ struct BudgetView: View {
             .sheet(isPresented: $showPaywall) { NavigationStack { PaywallView() } }
             .sheet(item: $savingsDetail) { SavingsGoalDetailView(goal: $0) }
             .sheet(isPresented: $showNewGoal) { SavingsGoalEditSheet(existing: nil) }
-            .alert("Switch to fortnightly?", isPresented: $showFortnightSwitch) {
-                Button("Cancel", role: .cancel) {}
-                Button("Use fortnightly") { confirmFortnightly() }
-            } message: {
-                Text("Your budget and bills keep their monthly figures — Budgetty just shows them per fortnight. Nothing is deleted, and past periods stay as they were.")
+            .sheet(isPresented: $showFortnightSwitch) {
+                let window = PayCycle.fortnight(anchorEpochDay: effectiveAnchor)
+                FortnightSwitchSheet(windowStart: window.start, windowEnd: window.end,
+                                     budget: fortnightSwitchBudget, onConfirm: confirmFortnightly)
             }
         }
     }
@@ -208,15 +207,15 @@ struct BudgetView: View {
             // Weekly stays calendar-aligned (the locale week).
             let cal = Calendar.current
             return receipts
-                .filter { cal.isDate($0.createdAt, equalTo: .now, toGranularity: .weekOfYear) }
+                .filter { cal.isDate($0.date, equalTo: .now, toGranularity: .weekOfYear) }
                 .reduce(.zero) { $0 + $1.paidTotal }
         case .fortnightly:
             let window = PayCycle.fortnightInterval(anchorEpochDay: effectiveAnchor)
-            return receipts.filter { window.contains($0.createdAt) }.reduce(.zero) { $0 + $1.paidTotal }
+            return receipts.filter { window.contains($0.date) }.reduce(.zero) { $0 + $1.paidTotal }
         case .monthly:
             // The monthly budget resets on the user's pay day (see PayCycle).
             let window = PayCycle.monthInterval(startDay: monthStartDay)
-            return receipts.filter { window.contains($0.createdAt) }.reduce(.zero) { $0 + $1.paidTotal }
+            return receipts.filter { window.contains($0.date) }.reduce(.zero) { $0 + $1.paidTotal }
         }
     }
 
@@ -229,23 +228,35 @@ struct BudgetView: View {
         }
     }
 
+    /// What switching to fortnightly does to the budget amount — shown in the switch sheet and applied
+    /// by `confirmFortnightly`, so the sheet always says exactly what will happen: keep a fortnightly
+    /// budget already set, else prorate the monthly one (× 12 ÷ 26). nil = no amount to carry.
+    private var fortnightSwitchBudget: FortnightSwitchSheet.BudgetChange? {
+        if let existing = budgets.first(where: { $0.key == Budget.fortnightlyKey }) {
+            return existing.amount > 0 ? .kept(existing.amount) : nil
+        }
+        guard let monthly = budgets.first(where: { $0.key == Budget.monthlyKey })?.amount, monthly > 0 else {
+            return nil
+        }
+        return .prorated(monthly: monthly, fortnightly: Budget.monthlyToFortnightly(monthly))
+    }
+
     /// Pins the fortnight anchor (so the 14-day grid is fixed), pre-fills the fortnightly budget from
     /// the monthly (prorated × 12 ÷ 26) if none is set, then switches cadence. Android parity: the
     /// switch confirm + `saveCadenceBudget`.
     private func confirmFortnightly() {
-        if fortnightAnchor == 0 { fortnightAnchor = PayCycle.defaultFortnightAnchor(startDay: monthStartDay) }
-        if !budgets.contains(where: { $0.key == Budget.fortnightlyKey }),
-           let monthly = budgets.first(where: { $0.key == Budget.monthlyKey })?.amount, monthly > 0 {
-            context.insert(Budget(key: Budget.fortnightlyKey, amount: Budget.monthlyToFortnightly(monthly)))
+        if case .prorated(_, let fortnightly) = fortnightSwitchBudget {
+            context.insert(Budget(key: Budget.fortnightlyKey, amount: fortnightly))
             try? context.save()
         }
+        if fortnightAnchor == 0 { fortnightAnchor = PayCycle.defaultFortnightAnchor(startDay: monthStartDay) }
         cadenceRaw = BudgetPeriod.fortnightly.key
     }
 
     private func categorySpent(_ group: String) -> Decimal {
         let window = PayCycle.monthInterval(startDay: monthStartDay)
         return allItems
-            .filter { window.contains($0.createdAt) }
+            .filter { window.contains($0.purchaseDate) }
             .filter { Categories.groupOf($0.category).caseInsensitiveCompare(group) == .orderedSame
                 || $0.category.caseInsensitiveCompare(group) == .orderedSame }
             .reduce(.zero) { $0 + $1.lineTotal }
@@ -275,7 +286,7 @@ struct BudgetView: View {
         var txns: [StreakTxn] = []
         for idx in 0..<StreakEngine.maxStreak {
             let interval = PayCycle.monthInterval(startDay: monthStartDay, offset: -(idx + 1), calendar: cal)
-            let monthItems = allItems.filter { interval.contains($0.createdAt) }
+            let monthItems = allItems.filter { interval.contains($0.purchaseDate) }
             guard !monthItems.isEmpty else { continue }   // empty month → no data at this index (breaks a run)
             txns.append(contentsOf: monthItems.map {
                 StreakTxn(periodIndex: idx, category: $0.category, amount: $0.lineTotal)
@@ -283,7 +294,7 @@ struct BudgetView: View {
         }
         let liveInterval = PayCycle.monthInterval(startDay: monthStartDay, offset: 0, calendar: cal)
         let live = LiveBudgetPeriod(transactions: allItems
-            .filter { liveInterval.contains($0.createdAt) }
+            .filter { liveInterval.contains($0.purchaseDate) }
             .map { StreakTxn(periodIndex: 0, category: $0.category, amount: $0.lineTotal) })
         let streaks = StreakEngine.budgetStreaks(BudgetStreakInput(
             transactions: txns, categoryBudgets: catBudgets, monthlyBudget: nil,

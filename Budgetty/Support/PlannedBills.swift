@@ -138,7 +138,7 @@ struct PlannedOverlay: Equatable {
         let charges = receipts.compactMap { r -> ReceiptCharge? in
             let merchant = StoreNormalizer.normalize(r.store)
             guard !merchant.isEmpty, r.paidTotal > 0 else { return nil }
-            return ReceiptCharge(merchant: merchant, amount: r.paidTotal, date: r.createdAt)
+            return ReceiptCharge(merchant: merchant, amount: r.paidTotal, date: r.date)
         }
         let split = splitPlannedBills(bills: billLines, charges: charges)
         let total = split.visible.reduce(Decimal.zero) { $0 + $1.amount }

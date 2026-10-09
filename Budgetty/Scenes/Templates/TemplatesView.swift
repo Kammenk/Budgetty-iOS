@@ -142,8 +142,8 @@ struct TemplateEditSheet: View {
                             .focused($focused, equals: .name)
                     }
                     LabeledContent("Amount") {
-                        TextField("0", value: $amount, format: .number).multilineTextAlignment(.trailing)
-                            .keyboardType(.decimalPad).focused($focused, equals: .amount)
+                        AmountField(value: $amount).multilineTextAlignment(.trailing)
+                            .focused($focused, equals: .amount)
                     }
                     Button { showCategoryPicker = true } label: {
                         HStack {

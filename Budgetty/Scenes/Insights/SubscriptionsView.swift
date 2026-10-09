@@ -362,8 +362,7 @@ struct TrackAsBillSheet: View {
                     HStack {
                         Text("Amount")
                         Spacer()
-                        TextField("0", value: $amount, format: .number)
-                            .keyboardType(.decimalPad).multilineTextAlignment(.trailing)
+                        AmountField(value: $amount).multilineTextAlignment(.trailing)
                     }
                 } header: {
                     Text("Prefilled from what we detected. Change anything before you save.")

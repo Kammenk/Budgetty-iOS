@@ -476,7 +476,9 @@ struct ImportCsvView: View {
         let known = knownCategories()
         let existing: Set<String> = {
             let items = (try? context.fetch(FetchDescriptor<LineItem>())) ?? []
-            return Set(items.map { CsvImport.dedupKey(date: $0.createdAt, amount: $0.lineTotal, name: $0.name) })
+            // A statement row's date is the purchase date, so compare against `purchaseDate` (Android's
+            // transaction timestamp), not the upload moment of a scanned receipt.
+            return Set(items.map { CsvImport.dedupKey(date: $0.purchaseDate, amount: $0.lineTotal, name: $0.name) })
         }()
         var seen = Set<String>()
         var p = ImportPlan()

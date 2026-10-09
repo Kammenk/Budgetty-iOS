@@ -90,8 +90,13 @@ struct ReviewView: View {
                         inflatedNotice(inflated)
                     }
                     ForEach(draft.items) { item in
+                        // An unpicked row's effective category is the default it saves as, so the
+                        // "remember this change?" prompt compares against (and shows) that.
                         ItemCard(item: item, tripTag: tripTag, onDelete: { draft.remove(item) },
-                                 onEditCategory: { oldCategory = item.category; categoryTarget = item })
+                                 onEditCategory: {
+                                     oldCategory = item.category.isEmpty ? Categories.defaultName : item.category
+                                     categoryTarget = item
+                                 })
                     }
                     addItemButton
                 }
@@ -367,10 +372,16 @@ private struct ItemCard: View {
                     HStack {
                         VStack(alignment: .leading, spacing: 2) {
                             label("Category")
-                            HStack(spacing: 4) {
-                                Text(Categories.emoji(for: item.category))
-                                Text(Categories.displayName(item.category)).font(.system(size: 14)).foregroundStyle(Palette.label)
+                            if item.category.isEmpty {
+                                // Nothing pre-picked on a fresh row (Android parity); saves as the default.
+                                Text("Select category").font(.system(size: 14)).foregroundStyle(Palette.secondaryLabel)
                                     .lineLimit(1)
+                            } else {
+                                HStack(spacing: 4) {
+                                    Text(Categories.emoji(for: item.category))
+                                    Text(Categories.displayName(item.category)).font(.system(size: 14)).foregroundStyle(Palette.label)
+                                        .lineLimit(1)
+                                }
                             }
                         }
                         Spacer()
@@ -384,8 +395,10 @@ private struct ItemCard: View {
 
                 VStack(alignment: .leading, spacing: 2) {
                     label("Price")
-                    TextField("0", value: $item.price, format: .number)
-                        .font(.system(size: 14)).keyboardType(.decimalPad)
+                    // Writes the price on every keystroke (Save sees "2,80" at once); a zero price shows
+                    // empty under a "0,00" placeholder, never a "0" that typing appends to.
+                    AmountField(AmountInput.decimalPlaceholder(), value: $item.price)
+                        .font(.system(size: 14))
                 }
                 .padding(.vertical, 10).padding(.horizontal, 12)
                 .frame(width: 100)

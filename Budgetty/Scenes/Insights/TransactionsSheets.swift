@@ -64,7 +64,7 @@ struct StoreTransactionsSheet: View {
 
     private var matching: [Receipt] {
         receipts.filter { $0.store.caseInsensitiveCompare(store) == .orderedSame }
-            .sorted { $0.createdAt > $1.createdAt }
+            .sorted { $0.date > $1.date }
     }
     private var total: Decimal { matching.reduce(.zero) { $0 + $1.paidTotal } }
 

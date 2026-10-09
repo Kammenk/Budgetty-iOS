@@ -49,7 +49,7 @@ final class BuyingLimitNudgeCenter {
 /// created). Counts sum quantity on the same normalized substring rule the management screen uses, so
 /// card and nudge always agree. Non-blocking: the receipt is already saved regardless.
 enum BuyingLimitNudger {
-    /// `savedItems` = the rows the just-finalized receipt persisted (name, quantity, `createdAt`).
+    /// `savedItems` = the rows the just-finalized receipt persisted (name, quantity, `purchaseDate`).
     @MainActor
     static func evaluate(savedItems: [CountableItem],
                          in context: ModelContext,
@@ -58,7 +58,7 @@ enum BuyingLimitNudger {
         let limits = (try? context.fetch(FetchDescriptor<BuyingLimit>())) ?? []
         guard !limits.isEmpty else { return nil }
         let allItems = ((try? context.fetch(FetchDescriptor<LineItem>())) ?? [])
-            .map { CountableItem(name: $0.name, quantity: $0.quantity, timestamp: $0.createdAt) }
+            .map { CountableItem(name: $0.name, quantity: $0.quantity, timestamp: $0.purchaseDate) }
         return selectNudge(limits: limits, allItems: allItems, savedItems: savedItems,
                            today: today, startDay: startDay)
     }
