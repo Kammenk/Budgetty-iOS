@@ -13,17 +13,20 @@ import SwiftUI
 /// Caps content to a readable width and centers it on regular-width (iPad) size classes; a no-op
 /// on compact (iPhone) so phone layouts are untouched. Use for list/detail screens that shouldn't
 /// stretch edge-to-edge in the iPad detail pane.
+///
+/// Both size classes run through the same two frames — on compact they carry no width bounds, which
+/// makes a frame size to its child, i.e. a no-op. An `if`/`else` here would give the content a new
+/// identity every time the size class flips (an iPhone Duo folding, a Max iPhone rotating) and throw
+/// away everything below it: scroll position, typed text, pushed screens.
 private struct ReadableWidth: ViewModifier {
     @Environment(\.horizontalSizeClass) private var hSize
     let maxWidth: CGFloat
 
     func body(content: Content) -> some View {
-        if hSize == .regular {
-            content.frame(maxWidth: maxWidth, alignment: .center)
-                .frame(maxWidth: .infinity)
-        } else {
-            content
-        }
+        let regular = hSize == .regular
+        content
+            .frame(maxWidth: regular ? maxWidth : nil, alignment: .center)
+            .frame(maxWidth: regular ? .infinity : nil)
     }
 }
 

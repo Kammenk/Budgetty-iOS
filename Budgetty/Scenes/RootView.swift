@@ -2,12 +2,13 @@
 //  RootView.swift
 //  Budgetty
 //
-//  App shell. iPhone (compact) draws its own floating glass dock — the mockup's dock is denser,
-//  wider and violet-selected, and the system Liquid Glass tab bar can't be restyled (it ignores
-//  `UITabBarAppearance` — pixel-diff-proven), so a custom bottom chrome is the only way to match.
-//  The Scan pill floats exactly 10pt above the dock (mockup spacing). iPad (regular) keeps the
-//  system `TabView` + `.sidebarAdaptable` — the floating top tab bar matches the iPad mockup —
-//  with Scan in the tab bar's bottom accessory. Scan is presented as a full-screen cover.
+//  App shell: one system `TabView` + `.sidebarAdaptable` for every width, so the tabs survive a
+//  size-class flip (iPhone Duo fold/unfold). iPhone (compact) hides its bar and draws a floating
+//  glass dock instead — the mockup's dock is denser, wider and violet-selected, and the system
+//  Liquid Glass tab bar can't be restyled (it ignores `UITabBarAppearance` — pixel-diff-proven), so
+//  a custom bottom chrome is the only way to match. The Scan pill floats exactly 10pt above the dock
+//  (mockup spacing). iPad (regular) shows the system bar — the floating top tab bar matches the iPad
+//  mockup — with Scan in its bottom accessory. Scan is presented as a full-screen cover.
 //
 
 import SwiftUI
@@ -240,58 +241,56 @@ struct RootView: View {
 
     /// iPhone: custom glass dock + the Scan pill floating 10pt above it (mockup bottom chrome).
     /// iPad: floating top tab bar / sidebar; Scan rides the tab-bar bottom accessory.
-    @ViewBuilder
+    ///
+    /// One `TabView` serves both, with only its chrome switched, so the four tab screens keep their
+    /// identity — and with it their scroll position, pushed screens and half-typed input — when the
+    /// width class flips under them: an iPhone Duo folding or unfolding, a Max iPhone rotating, an
+    /// iPad window resizing. Two separate shells rebuilt every tab from scratch on each flip.
     private var mainTabs: some View {
-        Group {
-            if hSize == .compact {
-                compactShell
-            } else {
-                styledTabView.tabViewBottomAccessory { scanAccessory }
+        let compact = hSize == .compact
+        // iPhone hides the system bar (it can't be restyled to the mockup's dock) and draws its own.
+        let systemBar: Visibility = compact ? .hidden : .automatic
+        // Only the dock reacts to scrolling; nil makes the tab roots' reporting a no-op on iPad.
+        let dockScrollReporter: ((CGFloat) -> Void)? = compact ? { handleDockScroll($0) } : nil
+        return TabView(selection: $tab) {
+            Tab(AppTab.home.title, systemImage: AppTab.home.symbol, value: AppTab.home) {
+                HomeView().toolbarVisibility(systemBar, for: .tabBar)
             }
+            Tab(AppTab.history.title, systemImage: AppTab.history.symbol, value: AppTab.history) {
+                HistoryView().toolbarVisibility(systemBar, for: .tabBar)
+            }
+            Tab(AppTab.insights.title, systemImage: AppTab.insights.symbol, value: AppTab.insights) {
+                InsightsView().toolbarVisibility(systemBar, for: .tabBar)
+            }
+            Tab(AppTab.budget.title, systemImage: AppTab.budget.symbol, value: AppTab.budget) {
+                BudgetView().toolbarVisibility(systemBar, for: .tabBar)
+            }
+        }
+        .tabViewStyle(.sidebarAdaptable)
+        .tabBarMinimizeBehavior(.onScrollDown) // Liquid Glass: chrome recedes as content scrolls up
+        .scanTabAccessory(enabled: !compact) { scanAccessory }
+        // iPhone: the glass dock rides a bottom safe-area inset so content scrolls under it. Toggled
+        // inside the inset rather than by adding/removing the modifier, which would re-identify the
+        // TabView and reset the tabs all over again.
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            if compact { bottomChrome }
+        }
+        .environment(\.dockScrollReporter, dockScrollReporter)
+        .environment(\.dockChromeHeight, compact ? chromeHeight : 0)
+        .onChange(of: tab) {
+            lastScrollY = nil // the new tab's offset is unrelated — don't read it as a scroll
+            setDock(hidden: false)
+        }
+        .onChange(of: compact) {
+            // Back on the dock after a flip: start shown, with no stale offset to compare against.
+            lastScrollY = nil
+            dockHidden = false
         }
         // Let tab-root views (Home's "See All" links) switch tabs, matching Android's card navigation.
         .environment(\.selectTab) { tab = $0 }
     }
 
-    private var styledTabView: some View {
-        TabView(selection: $tab) {
-            Tab(AppTab.home.title, systemImage: AppTab.home.symbol, value: AppTab.home) {
-                HomeView()
-            }
-            Tab(AppTab.history.title, systemImage: AppTab.history.symbol, value: AppTab.history) {
-                HistoryView()
-            }
-            Tab(AppTab.insights.title, systemImage: AppTab.insights.symbol, value: AppTab.insights) {
-                InsightsView()
-            }
-            Tab(AppTab.budget.title, systemImage: AppTab.budget.symbol, value: AppTab.budget) {
-                BudgetView()
-            }
-        }
-        .tabViewStyle(.sidebarAdaptable)
-        .tabBarMinimizeBehavior(.onScrollDown) // Liquid Glass: chrome recedes as content scrolls up
-    }
-
     // MARK: - iPhone custom bottom chrome
-
-    /// All four screens stay alive in a ZStack (so each keeps its scroll position and state, like
-    /// `TabView` would) with only the selected one visible; the glass dock rides a bottom
-    /// safe-area inset so content scrolls under it.
-    private var compactShell: some View {
-        ZStack {
-            tabScreen(.home) { HomeView() }
-            tabScreen(.history) { HistoryView() }
-            tabScreen(.insights) { InsightsView() }
-            tabScreen(.budget) { BudgetView() }
-        }
-        .safeAreaInset(edge: .bottom, spacing: 0) { bottomChrome }
-        .environment(\.dockScrollReporter, handleDockScroll)
-        .environment(\.dockChromeHeight, chromeHeight)
-        .onChange(of: tab) {
-            lastScrollY = nil // the new tab's offset is unrelated — don't read it as a scroll
-            setDock(hidden: false)
-        }
-    }
 
     // MARK: Scroll-driven hide (custom-chrome stand-in for tabBarMinimizeBehavior)
 
@@ -313,13 +312,6 @@ struct RootView: View {
     private func setDock(hidden: Bool) {
         guard dockHidden != hidden else { return }
         withAnimation(.spring(duration: 0.35)) { dockHidden = hidden }
-    }
-
-    private func tabScreen<Content: View>(_ t: AppTab, @ViewBuilder content: () -> Content) -> some View {
-        content()
-            .opacity(tab == t ? 1 : 0)
-            .allowsHitTesting(tab == t)
-            .accessibilityHidden(tab != t)
     }
 
     /// The dock, with the Scan pill stacked 10pt above it (mockup spacing). Both sit in the layout
@@ -450,6 +442,25 @@ struct RootView: View {
             .contains(ProcessInfo.processInfo.environment["SHOW_SCREEN"] ?? "")
     }
     #endif
+}
+
+private extension View {
+    /// Scan in the system tab bar's bottom accessory — iPad only; iPhone floats its own Scan pill
+    /// above the dock. Switched on and off in place so the `TabView` keeps its identity.
+    @ViewBuilder
+    func scanTabAccessory<Accessory: View>(enabled: Bool,
+                                           @ViewBuilder _ accessory: () -> Accessory) -> some View {
+        if #available(iOS 26.1, *) {
+            tabViewBottomAccessory(isEnabled: enabled, content: accessory)
+        } else if enabled {
+            // iOS 26.0 has no on/off switch, and an attached accessory still peeks out under the
+            // iPhone dock with the bar hidden — so it's attached on iPad only. On 26.0 alone that
+            // re-identifies the TabView on a size-class flip, i.e. the tabs reset as they used to.
+            tabViewBottomAccessory(content: accessory)
+        } else {
+            self
+        }
+    }
 }
 
 #if DEBUG
