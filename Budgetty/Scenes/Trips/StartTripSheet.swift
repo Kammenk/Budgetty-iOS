@@ -98,8 +98,8 @@ struct StartTripSheet: View {
                 HStack {
                     Text("Amount").foregroundStyle(Palette.label)
                     Spacer()
-                    TextField("0", value: $budget, format: .number).multilineTextAlignment(.trailing)
-                        .keyboardType(.decimalPad).frame(maxWidth: 140).focused($focusedField, equals: .amount)
+                    AmountField(value: $budget).multilineTextAlignment(.trailing)
+                        .frame(maxWidth: 140).focused($focusedField, equals: .amount)
                 }
                 .padding(.horizontal, 16).padding(.vertical, 10)
             }

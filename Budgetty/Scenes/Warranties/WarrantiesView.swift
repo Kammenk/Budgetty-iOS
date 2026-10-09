@@ -255,8 +255,8 @@ struct WarrantyEditSheet: View {
                     .pickerStyle(.segmented)
                     if length == .custom {
                         LabeledContent("Months") {
-                            TextField("24", value: $customMonths, format: .number)
-                                .multilineTextAlignment(.trailing).keyboardType(.numberPad)
+                            WholeNumberField("24", value: $customMonths)
+                                .multilineTextAlignment(.trailing)
                                 .focused($focused, equals: .custom)
                         }
                     }

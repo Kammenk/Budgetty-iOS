@@ -27,8 +27,7 @@ struct BudgetAmountSheet: View {
                     HStack {
                         Text("Amount")
                         Spacer()
-                        TextField("0", value: $amount, format: .number)
-                            .keyboardType(.decimalPad).multilineTextAlignment(.trailing)
+                        AmountField(value: $amount).multilineTextAlignment(.trailing)
                     }
                 }
                 if existing != nil {

@@ -44,8 +44,7 @@ struct RecurringSheet: View {
                     HStack {
                         Text(isIncome ? "Amount" : "Amount")
                         Spacer()
-                        TextField("0", value: $amount, format: .number)
-                            .keyboardType(.decimalPad).multilineTextAlignment(.trailing)
+                        AmountField(value: $amount).multilineTextAlignment(.trailing)
                     }
                 }
 
@@ -66,8 +65,7 @@ struct RecurringSheet: View {
                         HStack {
                             Text("Day of month")
                             Spacer()
-                            TextField("1", value: $dueDay, format: .number)
-                                .keyboardType(.numberPad)
+                            WholeNumberField("1", value: $dueDay)
                                 .multilineTextAlignment(.trailing)
                                 .frame(maxWidth: 48)
                                 .onChange(of: dueDay) { _, newValue in

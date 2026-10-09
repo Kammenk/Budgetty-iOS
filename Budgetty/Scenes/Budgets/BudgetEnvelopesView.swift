@@ -227,7 +227,7 @@ private struct EnvelopeEditSheet: View {
                         TextField("Everyday", text: $name).focused($focused)
                     }
                     labeledField("Amount") {
-                        TextField("0", value: $amount, format: .number).keyboardType(.decimalPad).focused($focused)
+                        AmountField(value: $amount).focused($focused)
                     }
                     Button { rangeSel = start...end; showRange = true } label: {
                         Text(EnvelopeFormat.range(start, end)).frame(maxWidth: .infinity)

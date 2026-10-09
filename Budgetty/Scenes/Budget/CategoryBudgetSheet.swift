@@ -60,8 +60,7 @@ struct CategoryBudgetSheet: View {
         HStack {
             Text(title)
             Spacer()
-            TextField("0", value: binding(for: key), format: .number)
-                .keyboardType(.decimalPad).multilineTextAlignment(.trailing)
+            AmountField(value: binding(for: key)).multilineTextAlignment(.trailing)
             Text(CurrencyOption.symbol(currency)).foregroundStyle(.secondary)
         }
     }
@@ -76,8 +75,7 @@ struct CategoryBudgetSheet: View {
                 Spacer()
                 Text(sp > 0 ? "\(sp.formatMoney()) spent" : "No spend")
                     .font(.caption).foregroundStyle(.secondary)
-                TextField("0", value: binding(for: key), format: .number)
-                    .keyboardType(.decimalPad).multilineTextAlignment(.trailing).frame(width: 56)
+                AmountField(value: binding(for: key)).multilineTextAlignment(.trailing).frame(width: 56)
                 Text(CurrencyOption.symbol(currency)).font(.caption).foregroundStyle(.secondary)
             }
             if amt > 0 {
